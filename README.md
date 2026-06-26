@@ -1,4 +1,58 @@
-# 🎨 Thiết kế giao diện — Hydrometeorology VN Dashboard
+# 🌏 Hydrometeorology VN Analytics — Nền tảng Phân tích KTTV Việt Nam
+
+Nền tảng tích hợp dữ liệu khí tượng thủy văn 34 tỉnh thành Việt Nam (2026) với giao diện React + Tailwind CSS hiện đại và trợ lý AI Human-in-the-Loop.
+
+---
+
+## 📁 Cấu Trúc Thư Mục
+
+```
+hydrometeorology_vn_analytics/
+├── frontend/               # Giao diện Web React + Vite + Tailwind CSS
+│   ├── src/
+│   │   ├── components/     # Các component giao diện
+│   │   ├── App.jsx         # Component gốc + router tab
+│   │   ├── mockData.js     # Dữ liệu mẫu cho demo
+│   │   └── main.jsx        # Entry point
+│   ├── package.json
+│   └── vite.config.js
+├── src/                    # Scripts Python xử lý dữ liệu
+│   ├── 01_crawl.py         # Thu thập dữ liệu từ Open-Meteo API
+│   ├── 02_preprocess.py    # Tiền xử lý và làm sạch dữ liệu
+│   └── backend/routers/    # FastAPI backend (phát triển sau)
+├── data/
+│   └── raw/
+│       ├── openmeteo_2026/ # Dữ liệu thô từng tỉnh (CSV)
+│       └── vietnam_kttv_34tinh_*.csv  # Dữ liệu gộp toàn quốc
+├── .gitignore
+└── README.md
+```
+
+---
+
+## 🚀 Khởi Chạy Frontend
+
+```powershell
+cd frontend
+npm install      # Chỉ cần chạy lần đầu
+npm run dev      # Khởi chạy dev server tại http://localhost:5173
+```
+
+---
+
+## 🐍 Chạy Scripts Python
+
+```powershell
+# Thu thập dữ liệu (cần kết nối internet)
+python src/01_crawl.py
+
+# Tiền xử lý dữ liệu
+python src/02_preprocess.py
+```
+
+---
+
+## 🗺️ Thiết kế giao diện — Hydrometeorology VN Dashboard
 
 ---
 
