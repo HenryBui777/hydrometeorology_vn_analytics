@@ -30,7 +30,7 @@ export default function SettingsView() {
     <div className="space-y-8 animate-fade-in max-w-4xl">
       {/* Page Title */}
       <div>
-        <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight sm:text-3xl">Cấu Hình Nền Tảng</h1>
+        <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight sm:text-3xl">Cấu hình nền tảng</h1>
         <p className="text-slate-500 text-sm mt-1">Thiết lập các thông số môi trường thực thi, kết nối mô hình AI LLM và lưu trữ logs.</p>
       </div>
 
@@ -40,7 +40,7 @@ export default function SettingsView() {
         <div className="glass-panel bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <Cpu className="h-5 w-5 text-brand-primary" />
-            <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Cấu Hình Mô Hình AI (LLM)</h2>
+            <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Cấu hình mô hình AI (LLM)</h2>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
@@ -79,7 +79,7 @@ export default function SettingsView() {
         <div className="glass-panel bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <FolderOpen className="h-5 w-5 text-brand-accent" />
-            <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Cài Đặt Môi Trường Cục Bộ (Local)</h2>
+            <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Cài đặt môi trường cục bộ (Local)</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
@@ -113,7 +113,7 @@ export default function SettingsView() {
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2">
               <Settings className="h-5 w-5 text-rose-500" />
-              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Chế Độ Bảo Mật Cát (Sandbox)</h2>
+              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Chế độ bảo mật hộp cát (Sandbox)</h2>
             </div>
             
             <button
@@ -157,7 +157,7 @@ export default function SettingsView() {
             type="submit"
             className="bg-brand-primary hover:bg-brand-primary/90 text-white font-bold text-xs px-6 py-3 rounded-xl transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2"
           >
-            <Save className="h-4 w-4" /> Lưu Cấu Hướng
+            <Save className="h-4 w-4" /> Lưu cấu hình
           </button>
         </div>
 

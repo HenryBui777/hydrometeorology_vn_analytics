@@ -77,7 +77,7 @@ Mã nguồn đã được tạo thành công và đang chuyển sang trạng th�
               <Cpu className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-850">Trợ Lý AI Phân Tích (Local Assistant)</h2>
+              <h2 className="text-sm font-bold text-slate-855">Trợ lý AI phân tích (Local Assistant)</h2>
               <span className="text-[10px] text-emerald-600 flex items-center gap-1 font-bold">
                 <span className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-ping" /> Online • Gemini Pro
               </span>
@@ -97,7 +97,7 @@ Mã nguồn đã được tạo thành công và đang chuyển sang trạng th�
               onClick={() => setCurrentTab('datasets')}
               className="bg-brand-primary hover:bg-brand-primary/95 text-white text-xs font-bold px-4 py-2.5 rounded-lg transition-all shadow-md shadow-blue-500/20"
             >
-              Đi tới Tải dữ liệu
+              Đi tới tải dữ liệu
             </button>
           </div>
         )}
@@ -155,7 +155,7 @@ Mã nguồn đã được tạo thành công và đang chuyển sang trạng th�
                         onClick={() => setCurrentTab('code')}
                         className="w-full bg-brand-primary hover:bg-brand-primary/90 text-white font-bold text-[11px] py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-blue-500/10"
                       >
-                        <Code2 className="h-3.5 w-3.5" /> Xem & Phê Duyệt Mã Nguồn
+                        <Code2 className="h-3.5 w-3.5" /> Xem & phê duyệt mã nguồn
                       </button>
                     </div>
                   )}

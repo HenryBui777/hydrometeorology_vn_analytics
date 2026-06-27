@@ -50,7 +50,7 @@ export default function DatasetManagement() {
     <div className="space-y-8 animate-fade-in">
       {/* Page Title */}
       <div>
-        <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight sm:text-3xl">Tập Dữ Liệu Khí Tượng</h1>
+        <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight sm:text-3xl">Tập dữ liệu khí tượng</h1>
         <p className="text-slate-500 text-sm mt-1">
           Dữ liệu thời tiết được nạp cố định làm cơ sở phân tích cho các truy vấn và mô hình của trợ lý AI.
         </p>
@@ -116,7 +116,7 @@ export default function DatasetManagement() {
                     : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                 }`}
               >
-                <Table className="h-4 w-4" /> Trình Duyệt Dữ Liệu
+                <Table className="h-4 w-4" /> Trình duyệt dữ liệu
               </button>
               <button
                 onClick={() => setActiveSubTab('schema')}
@@ -126,7 +126,7 @@ export default function DatasetManagement() {
                     : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                 }`}
               >
-                <Database className="h-4 w-4" /> Cấu Trúc Cột (Schema)
+                <Database className="h-4 w-4" /> Cấu trúc cột (Schema)
               </button>
             </div>
 

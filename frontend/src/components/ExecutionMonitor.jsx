@@ -63,7 +63,7 @@ export default function ExecutionMonitor({
     <div className="space-y-8 animate-fade-in">
       {/* Page Title */}
       <div>
-        <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight sm:text-3xl">Giám Sát Thực Thi Cục Bộ</h1>
+        <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight sm:text-3xl">Giám sát thực thi cục bộ</h1>
         <p className="text-slate-500 text-sm mt-1">Quan sát trực tiếp quá trình biên dịch Python và xử lý file CSV thời tiết cục bộ.</p>
       </div>
 
@@ -168,7 +168,7 @@ export default function ExecutionMonitor({
             onClick={() => setCurrentTab('results')}
             className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-6 py-3 rounded-xl transition-all shadow-lg shadow-emerald-500/25 flex items-center gap-2"
           >
-            Thành Công! Đi Tới Xem Kết Quả Trực Quan <ArrowRight className="h-4 w-4" />
+            Thành công! Đi tới xem kết quả trực quan <ArrowRight className="h-4 w-4" />
           </button>
         </div>
       )}

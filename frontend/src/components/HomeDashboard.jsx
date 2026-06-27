@@ -382,7 +382,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 text-white">
           <div className="space-y-1">
             <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl">
-              Nền tảng Phân tích Thời tiết & Khí hậu Việt Nam
+              Nền tảng phân tích thời tiết & khí hậu Việt Nam
             </h1>
             <p className="text-blue-50 text-xs font-semibold max-w-xl">
               Dự án Trực quan hóa dữ liệu Khí tượng Thủy văn (KTTV) 34 tỉnh thành Việt Nam tích hợp trợ lý lập trình AI cục bộ.
@@ -413,7 +413,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
       <div className="glass-panel rounded-2xl p-4 bg-white border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-slate-800">
           <Database className="h-4.5 w-4.5 text-brand-primary" />
-          <span className="font-bold text-xs uppercase tracking-wider text-slate-700">Bộ Lọc Dữ Liệu Dashboard</span>
+          <span className="font-bold text-xs uppercase tracking-wider text-slate-700">Bộ lọc dữ liệu Dashboard</span>
         </div>
         
         <div className="flex flex-wrap items-center gap-4">
@@ -495,7 +495,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         {/* KPI 1: Avg Temp */}
         <div className="glass-card rounded-2xl p-5 relative overflow-hidden bg-white border border-slate-200">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Nhiệt độ Trung bình</span>
+            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Nhiệt độ trung bình</span>
             <div className="bg-orange-50 p-2 rounded-xl text-orange-550 border border-orange-100">
               <Thermometer className="h-5 w-5 text-orange-500" />
             </div>
@@ -519,7 +519,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         {/* KPI 2: Avg Rain */}
         <div className="glass-card rounded-2xl p-5 relative overflow-hidden bg-white border border-slate-200">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Lượng mưa Trung bình</span>
+            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Lượng mưa trung bình</span>
             <div className="bg-blue-50 p-2 rounded-xl text-brand-primary border border-blue-100">
               <CloudRain className="h-5 w-5 text-brand-primary" />
             </div>
@@ -543,7 +543,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         {/* KPI 3: Avg Humidity */}
         <div className="glass-card rounded-2xl p-5 relative overflow-hidden bg-white border border-slate-200">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Độ ẩm Trung bình</span>
+            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Độ ẩm trung bình</span>
             <div className="bg-cyan-50 p-2 rounded-xl text-brand-accent border border-cyan-100">
               <Droplets className="h-5 w-5 text-brand-accent" />
             </div>
@@ -567,7 +567,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         {/* KPI 4: Avg Wind Speed */}
         <div className="glass-card rounded-2xl p-5 relative overflow-hidden bg-white border border-slate-200">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Tốc độ gió Trung bình</span>
+            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Tốc độ gió trung bình</span>
             <div className="bg-slate-50 p-2 rounded-xl text-slate-600 border border-slate-150">
               <Wind className="h-5 w-5 text-slate-500" />
             </div>
@@ -597,7 +597,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         <div className="lg:col-span-1 flex flex-col justify-between space-y-6">
           <div>
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-brand-primary" /> Bản Đồ Khí Hậu Việt Nam
+              <MapPin className="h-5 w-5 text-brand-primary" /> Bản đồ khí hậu Việt Nam
             </h2>
             <p className="text-xs text-slate-500 font-semibold mt-1">
               Bản đồ phân vùng địa lý Việt Nam. Rê chuột hoặc click vào một khu vực để hiển thị báo cáo chi tiết thời tiết.
@@ -613,7 +613,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
                     : 'bg-white hover:bg-slate-50 text-slate-650 border-slate-200'
                 }`}
               >
-                Xem theo Nhiệt độ
+                Xem theo nhiệt độ
               </button>
               <button
                 onClick={() => setMapMetric('rain')}
@@ -623,7 +623,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
                     : 'bg-white hover:bg-slate-50 text-slate-650 border-slate-200'
                 }`}
               >
-                Xem theo Lượng mưa
+                Xem theo lượng mưa
               </button>
             </div>
           </div>
@@ -922,7 +922,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         {/* Left: Temperature Trend Chart */}
         <div className="glass-panel rounded-2xl p-6 bg-white border border-slate-200 shadow-sm space-y-4">
           <div>
-            <h3 className="text-base font-bold text-slate-800">Biến Thiên Nhiệt Độ 3 Miền</h3>
+            <h3 className="text-base font-bold text-slate-800">Biến thiên nhiệt độ 3 miền</h3>
             <p className="text-xs text-slate-400 font-semibold mt-0.5">Xu hướng nhiệt độ trung bình (°C) tại Hà Nội, Huế và TP. HCM theo thời gian.</p>
           </div>
           <div className="h-72 w-full text-xs font-semibold">
@@ -947,7 +947,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         {/* Right: Rainfall by Province Bar Chart */}
         <div className="glass-panel rounded-2xl p-6 bg-white border border-slate-200 shadow-sm space-y-4">
           <div>
-            <h3 className="text-base font-bold text-slate-800">Lượng Mưa Theo Tỉnh Thành (Top 10)</h3>
+            <h3 className="text-base font-bold text-slate-800">Lượng mưa theo tỉnh thành (Top 10)</h3>
             <p className="text-xs text-slate-400 font-semibold mt-0.5">Các tỉnh thành có lượng mưa tích lũy trung bình (mm) cao nhất trong năm.</p>
           </div>
           <div className="h-72 w-full text-xs font-semibold">
@@ -974,7 +974,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         {/* Left: Humidity Distribution Area Chart */}
         <div className="glass-panel rounded-2xl p-6 bg-white border border-slate-200 shadow-sm space-y-4">
           <div>
-            <h3 className="text-base font-bold text-slate-800">Độ Ẩm Tương Đối Theo Vùng Miền</h3>
+            <h3 className="text-base font-bold text-slate-800">Độ ẩm tương đối theo vùng miền</h3>
             <p className="text-xs text-slate-400 font-semibold mt-0.5">Phân bố độ ẩm trung bình (%) của 7 khu vực địa lý khí hậu Việt Nam.</p>
           </div>
           <div className="h-72 w-full text-xs font-semibold">
@@ -995,7 +995,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         {/* Right: Temp vs Humidity Correlation Scatter Plot */}
         <div className="glass-panel rounded-2xl p-6 bg-white border border-slate-200 shadow-sm space-y-4">
           <div>
-            <h3 className="text-base font-bold text-slate-800">Tương Quan: Nhiệt Độ & Độ Ẩm</h3>
+            <h3 className="text-base font-bold text-slate-800">Tương quan: Nhiệt độ & độ ẩm</h3>
             <p className="text-xs text-slate-400 font-semibold mt-0.5">Biểu đồ phân tán (Scatter plot) mô tả mối quan hệ giữa nhiệt độ (°C) và độ ẩm (%).</p>
           </div>
           <div className="h-72 w-full text-xs font-semibold">
@@ -1023,7 +1023,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
               <Info className="h-5 w-5" />
             </span>
             <div>
-              <h3 className="text-base font-bold text-slate-800">Cảnh Báo Khí Hậu Đặc Biệt</h3>
+              <h3 className="text-base font-bold text-slate-800">Cảnh báo khí hậu đặc biệt</h3>
               <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Các giá trị khí tượng đạt ngưỡng cảnh báo từ tập dữ liệu.</p>
             </div>
           </div>
@@ -1068,7 +1068,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
               <CloudRain className="h-5 w-5" />
             </span>
             <div>
-              <h3 className="text-base font-bold text-slate-800">Thu Thập & Xử Lý Số Liệu</h3>
+              <h3 className="text-base font-bold text-slate-800">Thu thập & xử lý số liệu</h3>
               <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Mô tả cơ chế thu thập dữ liệu KTTV Việt Nam 2026.</p>
             </div>
           </div>
@@ -1110,7 +1110,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
               <Database className="h-5 w-5" />
             </span>
             <div>
-              <h3 className="text-base font-bold text-slate-800">Thông Số Tập Dữ Liệu</h3>
+              <h3 className="text-base font-bold text-slate-800">Thông số tập dữ liệu</h3>
               <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Thông tin kỹ thuật tệp CSV khí tượng cố định.</p>
             </div>
           </div>

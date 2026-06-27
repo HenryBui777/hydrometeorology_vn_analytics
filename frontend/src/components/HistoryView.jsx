@@ -23,7 +23,7 @@ export default function HistoryView({ historyList, onRestoreRun, onDeleteRun }) 
       {/* Page Title */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight sm:text-3xl">Lịch Sử Phân Tích</h1>
+          <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight sm:text-3xl">Lịch sử phân tích</h1>
           <p className="text-slate-500 text-sm mt-1">Lưu trữ tất cả các mã nguồn, logs và kết quả trực quan hóa đã từng chạy.</p>
         </div>
         

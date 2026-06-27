@@ -146,7 +146,7 @@ export default function App() {
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
             <span>Nền tảng KTTV</span>
             <span>/</span>
-            <span className="text-slate-800 font-bold capitalize">
+            <span className="text-slate-800 font-bold">
               {currentTab === 'dashboard' && 'Dashboard tổng quan'}
               {currentTab === 'datasets' && 'Quản lý dữ liệu'}
               {currentTab === 'chat' && 'AI Chat phân tích'}

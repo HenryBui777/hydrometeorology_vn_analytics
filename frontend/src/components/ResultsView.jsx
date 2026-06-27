@@ -290,7 +290,7 @@ export default function ResultsView() {
       {selectedQueryId === null ? (
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight sm:text-3xl">Kết Quả Trực Quan Hoá</h1>
+            <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight sm:text-3xl">Kết quả trực quan hóa</h1>
             <p className="text-slate-500 text-sm mt-1">Danh sách các báo cáo phân tích dữ liệu khí tượng Việt Nam đã hoàn thành.</p>
           </div>
 
@@ -390,7 +390,7 @@ export default function ResultsView() {
                     : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                 }`}
               >
-                <ChartIcon className="h-4 w-4" /> Biểu Đồ Tương Tác Phân Tích
+                <ChartIcon className="h-4 w-4" /> Biểu đồ tương tác phân tích
               </button>
               <button
                 onClick={() => setActiveTab('table')}
@@ -400,7 +400,7 @@ export default function ResultsView() {
                     : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                 }`}
               >
-                <Table className="h-4 w-4" /> Bảng Số Liệu Kết Quả
+                <Table className="h-4 w-4" /> Bảng số liệu kết quả
               </button>
               <button
                 onClick={() => setActiveTab('code')}
@@ -410,7 +410,7 @@ export default function ResultsView() {
                     : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                 }`}
               >
-                <Code2 className="h-4 w-4" /> Mã Nguồn Đã Chạy
+                <Code2 className="h-4 w-4" /> Mã nguồn đã chạy
               </button>
             </div>
 

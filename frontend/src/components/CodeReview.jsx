@@ -64,7 +64,7 @@ export default function CodeReview({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold text-slate-800">Trình Phê Duyệt Mã Phân Tích (Human-in-the-Loop)</h2>
+              <h2 className="text-sm font-bold text-slate-800">Trình phê duyệt mã phân tích (Human-in-the-Loop)</h2>
               <span className="bg-amber-50 border border-amber-200 text-amber-600 text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded">
                 Chờ duyệt
               </span>
@@ -75,13 +75,13 @@ export default function CodeReview({
         
         {/* Visual progress stepper */}
         <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-extrabold">
-          <span className="text-emerald-600">Dữ Liệu</span>
+          <span className="text-emerald-600">Dữ liệu</span>
           <span className="h-1 w-4 bg-emerald-200 rounded-full" />
-          <span className="text-emerald-600">Câu Hỏi</span>
+          <span className="text-emerald-600">Câu hỏi</span>
           <span className="h-1 w-4 bg-emerald-200 rounded-full" />
-          <span className="text-amber-600">Xem Code (Đang ở đây)</span>
+          <span className="text-amber-600">Xem code (Đang ở đây)</span>
           <span className="h-1 w-4 bg-slate-200 rounded-full" />
-          <span className="text-slate-400">Thực Thi</span>
+          <span className="text-slate-400">Thực thi</span>
         </div>
       </div>
 
@@ -137,7 +137,7 @@ export default function CodeReview({
           {/* Question Summary */}
           <div className="glass-panel bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3">
             <span className="text-slate-500 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
-              <HelpCircle className="h-4 w-4 text-brand-primary" /> Yêu Cầu Phân Tích
+              <HelpCircle className="h-4 w-4 text-brand-primary" /> Yêu cầu phân tích
             </span>
             <div className="bg-slate-50 border border-slate-150 rounded-xl p-4">
               <p className="text-slate-800 text-xs sm:text-sm font-bold leading-relaxed">{activeQuery.question}</p>
@@ -147,7 +147,7 @@ export default function CodeReview({
           {/* AI Explanation Block */}
           <div className="glass-panel bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3">
             <span className="text-slate-500 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
-              <Sparkles className="h-4 w-4 text-brand-accent" /> Giải Thích Bằng Ngôn Ngữ Tự Nhiên
+              <Sparkles className="h-4 w-4 text-brand-accent" /> Giải thích bằng ngôn ngữ tự nhiên
             </span>
             <div className="bg-blue-50/30 border border-blue-100 rounded-xl p-4 text-xs text-slate-650 leading-relaxed space-y-2">
               <p className="font-semibold">{activeQuery.explanation}</p>
@@ -161,7 +161,7 @@ export default function CodeReview({
           <div className="bg-rose-50 border border-rose-150 rounded-2xl p-5 text-xs text-rose-700 space-y-2 flex gap-3 shadow-sm">
             <AlertTriangle className="h-5 w-5 flex-shrink-0 text-rose-500" />
             <div className="space-y-1">
-              <h3 className="font-bold text-rose-700">Cảnh Báo An Toàn Local Run</h3>
+              <h3 className="font-bold text-rose-700">Cảnh báo an toàn local run</h3>
               <p className="text-[11px] text-slate-600 font-semibold leading-relaxed">
                 Mã Python sẽ chạy trực tiếp trên máy local của bạn. Hãy đảm bảo mã lệnh không chứa các hàm nguy hại 
                 (như xóa file, gửi dữ liệu ra ngoài internet qua socket/requests).
@@ -175,13 +175,13 @@ export default function CodeReview({
               onClick={() => rejectQuery()}
               className="flex-1 bg-white hover:bg-slate-50 text-rose-600 border border-slate-200 font-bold text-xs py-3.5 rounded-xl transition-all flex items-center justify-center gap-1.5"
             >
-              <X className="h-4 w-4" /> Từ Chối
+              <X className="h-4 w-4" /> Từ chối
             </button>
             <button
               onClick={handleApprove}
               className="flex-1 bg-brand-primary hover:bg-brand-primary/90 text-white font-bold text-xs py-3.5 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-blue-500/20"
             >
-              <Play className="h-4 w-4" /> Phê Duyệt & Chạy
+              <Play className="h-4 w-4" /> Phê duyệt & chạy
             </button>
           </div>
 

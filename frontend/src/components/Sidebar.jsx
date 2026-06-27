@@ -13,10 +13,10 @@ import {
 export default function Sidebar({ currentTab, setCurrentTab, isCollapsed, setIsCollapsed, pendingCount }) {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'datasets', label: 'Tập Dữ Liệu', icon: Database },
-    { id: 'chat', label: 'AI Chat Phân Tích', icon: MessageSquareCode },
-    { id: 'results', label: 'Kết Quả Trực Quan', icon: AreaChart },
-    { id: 'settings', label: 'Cài Đặt', icon: Settings },
+    { id: 'datasets', label: 'Tập dữ liệu', icon: Database },
+    { id: 'chat', label: 'AI chat phân tích', icon: MessageSquareCode },
+    { id: 'results', label: 'Kết quả trực quan', icon: AreaChart },
+    { id: 'settings', label: 'Cài đặt', icon: Settings },
   ];
 
   return (
