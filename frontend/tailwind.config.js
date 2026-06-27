@@ -8,16 +8,16 @@ export default {
     extend: {
       colors: {
         brand: {
-          primary: '#2563EB',    // Modern Blue
-          secondary: '#60A5FA',  // Light Blue
-          accent: '#06B6D4',     // Cyan
-          bg: '#F8FAFC',         // Soft Gray
+          primary: '#3B82F6',    // Sky Blue
+          secondary: '#1E3A8A',  // Deep Royal Blue
+          accent: '#60A5FA',     // Soft Light Blue
+          bg: '#F0F4F8',         // Light Blue-Gray bg
           card: '#FFFFFF',       // White
-          text: '#0F172A',       // Dark Slate
+          text: '#1E293B',       // Dark Slate
         }
       },
       fontFamily: {
-        sans: ['Outfit', 'Inter', 'system-ui', 'sans-serif'],
+        sans: ['"Be Vietnam Pro"', 'system-ui', 'sans-serif'],
       },
     },
   },

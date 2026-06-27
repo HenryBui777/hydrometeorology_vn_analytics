@@ -35,7 +35,8 @@ export default function DatasetManagement() {
   );
 
   // Pagination logic for data table
-  const indexOfLastRow = currentPage * rowsPerPage;
+  const activePage = parseInt(currentPage, 10) || 1;
+  const indexOfLastRow = activePage * rowsPerPage;
   const indexOfFirstRow = indexOfLastRow - rowsPerPage;
   const currentRows = filteredRows.slice(indexOfFirstRow, indexOfLastRow);
   const totalPages = Math.ceil(filteredRows.length / rowsPerPage);
@@ -57,15 +58,13 @@ export default function DatasetManagement() {
       </div>
 
       {/* Loaded Dataset Info Card */}
-      <div className="glass-panel rounded-2xl p-6 border border-emerald-250 bg-gradient-to-r from-white via-white to-emerald-50/20 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+      <div className="glass-panel rounded-xl p-6 bg-white border border-slate-200 shadow-sm flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
-          <div className="p-3 bg-emerald-50 border border-emerald-150 text-emerald-600 rounded-xl">
-            <FileSpreadsheet className="h-8 w-8" />
-          </div>
+          <FileSpreadsheet className="h-8 w-8 text-brand-primary flex-shrink-0" />
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-bold text-slate-800">{mockDatasetInfo.name}</h3>
-              <span className="bg-emerald-50 border border-emerald-100 text-emerald-600 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+              <span className="bg-blue-50 border border-blue-200 text-brand-primary text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
                 <CheckCircle2 className="h-3 w-3" /> Tập dữ liệu chính thức
               </span>
             </div>
@@ -78,13 +77,13 @@ export default function DatasetManagement() {
       <div className="space-y-6">
         {/* Metadata Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div className="glass-card rounded-xl p-5 border border-slate-200">
-            <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Dung lượng file</span>
-            <p className="text-xl font-extrabold text-slate-800 mt-1">{mockDatasetInfo.size}</p>
+          <div className="tech-card rounded-lg border border-slate-200 p-5 bg-white shadow-sm">
+            <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Dung lượng file</span>
+            <p className="text-xl font-extrabold text-slate-850 mt-1">{mockDatasetInfo.size}</p>
           </div>
-          <div className="glass-card rounded-xl p-5 border border-slate-200">
-            <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Tổng số dòng</span>
-            <p className="text-xl font-extrabold text-slate-800 mt-1">
+          <div className="tech-card rounded-lg border border-slate-200 p-5 bg-white shadow-sm">
+            <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Tổng số dòng</span>
+            <p className="text-xl font-extrabold text-slate-850 mt-1">
               {loading ? (
                 <Loader2 className="h-5 w-5 animate-spin text-brand-primary inline" />
               ) : (
@@ -92,38 +91,38 @@ export default function DatasetManagement() {
               )}
             </p>
           </div>
-          <div className="glass-card rounded-xl p-5 border border-slate-200">
-            <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Số biến dữ liệu</span>
-            <p className="text-xl font-extrabold text-slate-800 mt-1">{mockDatasetInfo.columnsCount} biến số</p>
+          <div className="tech-card rounded-lg border border-slate-200 p-5 bg-white shadow-sm">
+            <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Số biến dữ liệu</span>
+            <p className="text-xl font-extrabold text-slate-850 mt-1">{mockDatasetInfo.columnsCount} biến số</p>
           </div>
-          <div className="glass-card rounded-xl p-5 border border-slate-200">
-            <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Độ đại diện địa lý</span>
-            <p className="text-xl font-extrabold text-slate-800 mt-1">
+          <div className="tech-card rounded-lg border border-slate-200 p-5 bg-white shadow-sm">
+            <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Độ đại diện địa lý</span>
+            <p className="text-xl font-extrabold text-slate-850 mt-1">
               {loading ? '...' : `${fullStats?.provinces?.length ?? 34} tỉnh thành`}
             </p>
           </div>
         </div>
 
         {/* Sub-tabs Container */}
-        <div className="glass-panel rounded-2xl p-6 border border-slate-200 space-y-6 bg-white">
+        <div className="glass-panel rounded-xl p-6 border border-slate-200 space-y-6 bg-white shadow-sm">
           <div className="flex justify-between items-center border-b border-slate-100 pb-4">
             <div className="flex gap-2">
               <button
                 onClick={() => setActiveSubTab('explorer')}
-                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer ${
                   activeSubTab === 'explorer' 
-                    ? 'bg-brand-primary text-white shadow-md' 
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                    ? 'bg-brand-primary text-white border-brand-primary shadow-md shadow-blue-500/10' 
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 bg-white border-slate-200'
                 }`}
               >
                 <Table className="h-4 w-4" /> Trình duyệt dữ liệu
               </button>
               <button
                 onClick={() => setActiveSubTab('schema')}
-                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer ${
                   activeSubTab === 'schema' 
-                    ? 'bg-brand-primary text-white shadow-md' 
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                    ? 'bg-brand-primary text-white border-brand-primary shadow-md shadow-blue-500/10' 
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 bg-white border-slate-200'
                 }`}
               >
                 <Database className="h-4 w-4" /> Cấu trúc cột (Schema)
@@ -140,7 +139,7 @@ export default function DatasetManagement() {
                   placeholder="Tìm theo tỉnh, vùng..."
                   value={searchQuery}
                   onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                  className="glass-input w-full pl-9 py-2 text-xs"
+                  className="glass-input w-full !pl-9 py-2 text-xs"
                 />
               </div>
             )}
@@ -155,34 +154,34 @@ export default function DatasetManagement() {
                   <span className="text-sm font-semibold">Đang tải dữ liệu CSV...</span>
                 </div>
               ) : (
-              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+              <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
                 <table className="min-w-full text-left text-xs">
                   <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider">
-                      <th className="px-6 py-4">Tỉnh thành</th>
-                      <th className="px-6 py-4">Vùng miền</th>
-                      <th className="px-6 py-4">Ngày</th>
-                      <th className="px-6 py-4">Nhiệt độ TB (°C)</th>
-                      <th className="px-6 py-4">Lượng mưa (mm)</th>
-                      <th className="px-6 py-4">Độ ẩm TB (%)</th>
-                      <th className="px-6 py-4">Gió max (km/h)</th>
-                      <th className="px-6 py-4">Nắng (h)</th>
-                      <th className="px-6 py-4">Mùa</th>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-655 font-bold uppercase tracking-wider whitespace-nowrap">
+                      <th className="pl-5 pr-3 py-4">Tỉnh thành</th>
+                      <th className="px-3 py-4">Vùng miền</th>
+                      <th className="px-3 py-4">Ngày</th>
+                      <th className="px-3 py-4">Nhiệt độ TB (°C)</th>
+                      <th className="px-3 py-4">Lượng mưa (mm)</th>
+                      <th className="px-3 py-4">Độ ẩm TB (%)</th>
+                      <th className="px-3 py-4">Gió max (km/h)</th>
+                      <th className="px-3 py-4">Nắng (h)</th>
+                      <th className="pl-3 pr-5 py-4">Mùa</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {currentRows.length > 0 ? (
                       currentRows.map((row, index) => (
                         <tr key={index} className="hover:bg-slate-50/50 text-slate-700 transition-colors">
-                          <td className="px-6 py-3.5 font-bold text-slate-900">{row.province}</td>
-                          <td className="px-6 py-3.5 text-slate-600">{row.region}</td>
-                          <td className="px-6 py-3.5 font-mono text-slate-500">{row.date}</td>
-                          <td className="px-6 py-3.5 font-mono text-brand-primary font-bold">{row.temp?.toFixed(1)}</td>
-                          <td className="px-6 py-3.5 font-mono text-brand-accent font-bold">{row.rain?.toFixed(2)}</td>
-                          <td className="px-6 py-3.5 font-mono">{row.humidity?.toFixed(1)}%</td>
-                          <td className="px-6 py-3.5 font-mono text-slate-600">{row.wind?.toFixed(1)}</td>
-                          <td className="px-6 py-3.5 font-mono text-amber-600 font-bold">{row.sunshine?.toFixed(1)}</td>
-                          <td className="px-6 py-3.5">
+                          <td className="pl-5 pr-3 py-3.5 font-bold text-slate-900 whitespace-nowrap">{row.province}</td>
+                          <td className="px-3 py-3.5 text-slate-600 min-w-[165px] max-w-[185px] leading-normal">{row.region}</td>
+                          <td className="px-3 py-3.5 font-mono text-slate-500 whitespace-nowrap">{row.date}</td>
+                          <td className="px-3 py-3.5 font-mono text-brand-primary font-bold whitespace-nowrap">{row.temp?.toFixed(1)}</td>
+                          <td className="px-3 py-3.5 font-mono text-brand-accent font-bold whitespace-nowrap">{row.rain?.toFixed(2)}</td>
+                          <td className="px-3 py-3.5 font-mono whitespace-nowrap">{row.humidity?.toFixed(1)}%</td>
+                          <td className="px-3 py-3.5 font-mono text-slate-600 whitespace-nowrap">{row.wind?.toFixed(1)}</td>
+                          <td className="px-3 py-3.5 font-mono text-amber-600 font-bold whitespace-nowrap">{row.sunshine?.toFixed(1)}</td>
+                          <td className="pl-3 pr-5 py-3.5 whitespace-nowrap">
                             <span className="px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-[10px] text-brand-primary font-bold">
                               {row.season || '—'}
                             </span>
@@ -205,21 +204,41 @@ export default function DatasetManagement() {
                   <span>
                     Hiển thị {indexOfFirstRow + 1} - {Math.min(indexOfLastRow, filteredRows.length)} của {filteredRows.length.toLocaleString()} dòng dữ liệu thực
                   </span>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2.5 items-center">
                     <button 
                       disabled={currentPage === 1}
                       onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                      className="bg-slate-50 hover:bg-slate-100 disabled:opacity-40 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition-all"
+                      className="bg-slate-50 hover:bg-slate-100 disabled:opacity-40 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
                     >
                       Trước
                     </button>
-                    <span className="flex items-center px-3 text-slate-600 font-bold">
-                      {currentPage} / {totalPages}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-slate-400">Trang</span>
+                      <input
+                        type="text"
+                        value={currentPage}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, '');
+                          if (val === '') {
+                            setCurrentPage('');
+                          } else {
+                            const pageNum = Math.min(Math.max(parseInt(val, 10), 1), totalPages);
+                            setCurrentPage(pageNum);
+                          }
+                        }}
+                        onBlur={() => {
+                          if (currentPage === '') {
+                            setCurrentPage(1);
+                          }
+                        }}
+                        className="w-12 text-center font-bold text-slate-800 border border-slate-200 rounded-lg py-1 bg-white focus:outline-none focus:border-brand-primary"
+                      />
+                      <span className="text-slate-400">/ {totalPages}</span>
+                    </div>
                     <button 
                       disabled={currentPage === totalPages}
                       onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                      className="bg-slate-50 hover:bg-slate-100 disabled:opacity-40 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition-all"
+                      className="bg-slate-50 hover:bg-slate-100 disabled:opacity-40 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
                     >
                       Sau
                     </button>

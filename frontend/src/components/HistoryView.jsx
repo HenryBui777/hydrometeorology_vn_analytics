@@ -37,17 +37,17 @@ export default function HistoryView({ historyList, onRestoreRun, onDeleteRun }) 
             placeholder="Tìm truy vấn trong lịch sử..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="glass-input w-full pl-9 py-2 text-xs"
+            className="glass-input w-full !pl-9 py-2 text-xs"
           />
         </div>
       </div>
 
       {/* History List Grid */}
-      <div className="glass-panel rounded-2xl p-6 border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+      <div className="glass-panel rounded-xl p-6 border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
           <table className="min-w-full text-left text-xs">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase">
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-655 font-bold uppercase">
                 <th className="px-6 py-4">ID</th>
                 <th className="px-6 py-4">Tên truy vấn</th>
                 <th className="px-6 py-4">Yêu cầu người dùng</th>
@@ -72,13 +72,13 @@ export default function HistoryView({ historyList, onRestoreRun, onDeleteRun }) 
                     <td className="px-6 py-4 whitespace-nowrap text-center flex justify-center gap-2">
                       <button
                         onClick={() => onRestoreRun(item)}
-                        className="bg-blue-50 hover:bg-brand-primary text-brand-primary hover:text-white border border-blue-100 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1"
+                        className="bg-blue-50 hover:bg-brand-primary text-brand-primary hover:text-white border border-blue-100 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer"
                       >
                         <ExternalLink className="h-3 w-3" /> Khôi phục
                       </button>
                       <button
                         onClick={() => onDeleteRun(item.id)}
-                        className="bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200 hover:border-rose-150 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all"
+                        className="bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200 hover:border-rose-150 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
                       >
                         <Trash2 className="h-3 w-3" />
                       </button>

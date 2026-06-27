@@ -45,8 +45,8 @@ export default function ExecutionMonitor({
 
   if (!activeQuery) {
     return (
-      <div className="glass-panel rounded-2xl p-16 text-center max-w-xl mx-auto space-y-6 animate-fade-in mt-12 bg-white">
-        <div className="h-16 w-16 bg-slate-50 rounded-full border border-slate-200 flex items-center justify-center mx-auto text-slate-400">
+      <div className="glass-panel rounded-xl p-16 text-center max-w-xl mx-auto space-y-6 animate-fade-in mt-12 bg-white border border-slate-200 shadow-sm">
+        <div className="h-16 w-16 bg-blue-50 rounded-lg border border-blue-100 flex items-center justify-center mx-auto text-brand-primary">
           <Terminal className="h-8 w-8" />
         </div>
         <div className="space-y-2">
@@ -69,18 +69,18 @@ export default function ExecutionMonitor({
 
       {/* Execution Status Panel */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="glass-card rounded-xl p-5 border border-slate-200 flex items-center gap-4">
+        <div className="tech-card rounded-lg p-5 bg-white flex items-center gap-4 border border-slate-200 shadow-sm">
           <div className={`p-3 rounded-lg border ${
             executionStatus === 'running' 
-              ? 'bg-blue-55/20 border-blue-200 text-brand-primary animate-spin' 
+              ? 'bg-blue-50 border-brand-primary text-brand-primary animate-spin' 
               : executionStatus === 'success' 
-                ? 'bg-emerald-50 border-emerald-100 text-emerald-650' 
+                ? 'bg-blue-50 border-blue-100 text-brand-primary font-bold' 
                 : 'bg-slate-100 border-slate-200 text-slate-400'
           }`}>
             {executionStatus === 'running' ? <Cpu className="h-5 w-5 animate-spin" /> : <ShieldCheck className="h-5 w-5" />}
           </div>
           <div>
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Trạng thái</span>
+            <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Trạng thái</span>
             <p className="text-sm font-bold text-slate-800 mt-0.5">
               {executionStatus === 'running' && 'Đang thực thi...'}
               {executionStatus === 'success' && 'Đã hoàn thành'}
@@ -89,34 +89,34 @@ export default function ExecutionMonitor({
           </div>
         </div>
 
-        <div className="glass-card rounded-xl p-5 border border-slate-200 flex items-center gap-4">
-          <div className="p-3 bg-slate-50 border border-slate-150 text-slate-400 rounded-lg">
-            <Clock className="h-5 w-5 text-brand-accent" />
+        <div className="tech-card rounded-lg p-5 bg-white flex items-center gap-4 border border-slate-200 shadow-sm">
+          <div className="p-3 bg-blue-50 border border-blue-100 text-brand-primary rounded-lg">
+            <Clock className="h-5 w-5" />
           </div>
           <div>
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Thời gian chạy</span>
+            <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Thời gian chạy</span>
             <p className="text-sm font-bold text-slate-800 mt-0.5">
               {executionStatus === 'running' ? '1.8 giây...' : executionStatus === 'success' ? '2.4 giây' : '--'}
             </p>
           </div>
         </div>
 
-        <div className="glass-card rounded-xl p-5 border border-slate-200 flex items-center gap-4">
-          <div className="p-3 bg-slate-50 border border-slate-150 text-slate-400 rounded-lg">
-            <Terminal className="h-5 w-5 text-amber-500" />
+        <div className="tech-card rounded-lg p-5 bg-white flex items-center gap-4 border border-slate-200 shadow-sm">
+          <div className="p-3 bg-blue-50 border border-blue-100 text-brand-primary rounded-lg">
+            <Terminal className="h-5 w-5" />
           </div>
           <div>
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Môi trường</span>
+            <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Môi trường</span>
             <p className="text-sm font-bold text-slate-800 mt-0.5">Local Python (venv_kttv)</p>
           </div>
         </div>
 
-        <div className="glass-card rounded-xl p-5 border border-slate-200 flex items-center gap-4">
-          <div className="p-3 bg-slate-50 border border-slate-150 text-slate-400 rounded-lg">
-            <Cpu className="h-5 w-5 text-brand-primary" />
+        <div className="tech-card rounded-lg p-5 bg-white flex items-center gap-4 border border-slate-200 shadow-sm">
+          <div className="p-3 bg-blue-50 border border-blue-100 text-brand-primary rounded-lg">
+            <Cpu className="h-5 w-5" />
           </div>
           <div>
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">PID Tiến trình</span>
+            <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">PID Tiến trình</span>
             <p className="text-sm font-bold text-slate-800 mt-0.5">
               {executionStatus === 'idle' ? '--' : 'PID: 12504'}
             </p>
@@ -125,20 +125,20 @@ export default function ExecutionMonitor({
       </div>
 
       {/* Terminal Display - Professional dark console */}
-      <div className="rounded-2xl overflow-hidden border border-slate-300 shadow-lg">
+      <div className="rounded-xl overflow-hidden border border-slate-350 shadow-md">
         {/* Terminal Header */}
         <div className="bg-slate-900 px-4 py-3 border-b border-slate-950 flex justify-between items-center text-xs">
           <div className="flex items-center gap-2">
-            <div className="h-3 w-3 bg-accent-rose rounded-full" />
-            <div className="h-3 w-3 bg-accent-amber rounded-full" />
-            <div className="h-3 w-3 bg-accent-emerald rounded-full" />
+            <div className="h-2.5 w-2.5 bg-accent-rose rounded-full" />
+            <div className="h-2.5 w-2.5 bg-accent-amber rounded-full" />
+            <div className="h-2.5 w-2.5 bg-accent-emerald rounded-full" />
             <span className="font-mono text-slate-400 ml-2 font-bold">cmd.exe - python execute_script.py</span>
           </div>
           <span className="text-[10px] text-slate-500 font-mono">ANSI utf-8</span>
         </div>
 
         {/* Terminal Content Screen */}
-        <div className="bg-slate-955 p-6 min-h-[300px] font-mono text-xs text-emerald-450 space-y-2 overflow-y-auto max-h-[400px] bg-black">
+        <div className="bg-slate-950 p-6 min-h-[300px] font-mono text-xs text-emerald-450 space-y-2 overflow-y-auto max-h-[400px] bg-black">
           {streamedLogs.length === 0 && executionStatus === 'idle' && (
             <p className="text-slate-500 italic">Đang chờ lệnh phê duyệt thực thi...</p>
           )}
@@ -146,7 +146,7 @@ export default function ExecutionMonitor({
             <p 
               key={idx} 
               className={`leading-relaxed whitespace-pre-wrap ${
-                log.startsWith('[') ? 'text-cyan-400' : log.includes('SUCCESS') || log.includes('thành công') ? 'text-emerald-400 font-bold' : 'text-white'
+                log.startsWith('[') ? 'text-blue-400' : log.includes('SUCCESS') || log.includes('thành công') ? 'text-emerald-450 font-bold' : 'text-white'
               }`}
             >
               {log}
@@ -166,7 +166,7 @@ export default function ExecutionMonitor({
         <div className="flex justify-end animate-bounce">
           <button 
             onClick={() => setCurrentTab('results')}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-6 py-3 rounded-xl transition-all shadow-lg shadow-emerald-500/25 flex items-center gap-2"
+            className="bg-brand-primary hover:bg-brand-primary/90 text-white font-bold text-xs px-6 py-3 rounded-lg transition-all shadow-lg shadow-blue-500/25 flex items-center gap-2 cursor-pointer"
           >
             Thành công! Đi tới xem kết quả trực quan <ArrowRight className="h-4 w-4" />
           </button>

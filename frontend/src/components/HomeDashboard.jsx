@@ -9,7 +9,9 @@ import {
   Database, 
   Info, 
   MapPin,
-  Loader2
+  Loader2,
+  ChevronDown,
+  Check
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { 
@@ -28,6 +30,57 @@ import {
   Legend, 
   ResponsiveContainer 
 } from 'recharts';
+
+function CustomSelect({ value, onChange, options, className }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = React.useRef(null);
+
+  React.useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(opt => opt.value === value) || options[0];
+
+  return (
+    <div className="relative inline-block text-left" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`${className} flex items-center justify-between gap-1.5 cursor-pointer`}
+      >
+        <span>{selectedOption.label}</span>
+        <ChevronDown className="h-3.5 w-3.5 opacity-60 flex-shrink-0" />
+      </button>
+
+      {isOpen && (
+        <div className="absolute left-0 mt-1.5 min-w-[200px] w-full max-h-60 overflow-y-auto rounded-lg bg-white border border-slate-200 shadow-lg z-30 py-1 font-semibold text-slate-750 animate-fade-in">
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => {
+                onChange({ target: { value: opt.value } });
+                setIsOpen(false);
+              }}
+              className={`w-full text-left px-3.5 py-2 hover:bg-blue-50 transition-colors flex items-center justify-between text-xs cursor-pointer ${
+                opt.value === value ? 'bg-blue-50 text-brand-primary font-bold' : ''
+              }`}
+            >
+              <span>{opt.label}</span>
+              {opt.value === value && <Check className="h-3.5 w-3.5 text-brand-primary" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function HomeDashboard({ datasetUploaded, setCurrentTab, submitQuery }) {
   // --- Real CSV data from context ---
@@ -412,7 +465,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
       {/* 2. Interactive Filter Bar */}
       <div className="glass-panel rounded-2xl p-4 bg-white border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-slate-800">
-          <Database className="h-4.5 w-4.5 text-brand-primary" />
+          <img src="https://img.icons8.com/fluency/48/database.png" alt="Database" className="h-5 w-5 object-contain flex-shrink-0" />
           <span className="font-bold text-xs uppercase tracking-wider text-slate-700">Bộ lọc dữ liệu Dashboard</span>
         </div>
         
@@ -420,57 +473,60 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
           {/* Region Filter */}
           <div className="flex items-center gap-1.5 text-xs">
             <span className="text-slate-400 font-bold">Khu vực:</span>
-            <select 
+            <CustomSelect 
               value={filterRegion} 
               onChange={(e) => {
                 setFilterRegion(e.target.value);
                 if (e.target.value !== 'All') setSelectedRegion(e.target.value);
               }}
-              className="bg-slate-50 border border-slate-200 text-slate-700 font-bold px-2.5 py-1.5 rounded-lg shadow-sm focus:outline-none focus:border-brand-primary cursor-pointer transition-all"
-            >
-              <option value="All">Tất cả vùng miền</option>
-              <option value="NorthMountain">Miền núi phía Bắc</option>
-              <option value="RedRiverDelta">Đồng bằng sông Hồng</option>
-              <option value="NorthCentral">Bắc Trung Bộ</option>
-              <option value="SouthCentral">Duyên hải Nam Trung Bộ</option>
-              <option value="CentralHighlands">Tây Nguyên</option>
-              <option value="Southeast">Đông Nam Bộ</option>
-              <option value="MekongDelta">Đồng bằng sông Cửu Long</option>
-            </select>
+              options={[
+                { value: 'All', label: 'Tất cả vùng miền' },
+                { value: 'NorthMountain', label: 'Miền núi phía Bắc' },
+                { value: 'RedRiverDelta', label: 'Đồng bằng sông Hồng' },
+                { value: 'NorthCentral', label: 'Bắc Trung Bộ' },
+                { value: 'SouthCentral', label: 'Duyên hải Nam Trung Bộ' },
+                { value: 'CentralHighlands', label: 'Tây Nguyên' },
+                { value: 'Southeast', label: 'Đông Nam Bộ' },
+                { value: 'MekongDelta', label: 'Đồng bằng sông Cửu Long' }
+              ]}
+              className="bg-slate-50 border border-slate-200 text-slate-700 font-bold px-2.5 py-1.5 rounded-lg shadow-sm focus:outline-none focus:border-brand-primary transition-all min-w-[170px]"
+            />
           </div>
 
           {/* Month Filter */}
           <div className="flex items-center gap-1.5 text-xs">
             <span className="text-slate-400 font-bold">Tháng:</span>
-            <select 
+            <CustomSelect 
               value={filterMonth} 
               onChange={(e) => setFilterMonth(e.target.value)}
-              className="bg-slate-50 border border-slate-200 text-slate-700 font-bold px-2.5 py-1.5 rounded-lg shadow-sm focus:outline-none focus:border-brand-primary cursor-pointer transition-all"
-            >
-              <option value="All">Tất cả các tháng</option>
-              <option value="12">Tháng 12 (2025)</option>
-              <option value="1">Tháng 1 (2026)</option>
-              <option value="2">Tháng 2</option>
-              <option value="3">Tháng 3</option>
-              <option value="4">Tháng 4</option>
-              <option value="5">Tháng 5</option>
-              <option value="6">Tháng 6</option>
-            </select>
+              options={[
+                { value: 'All', label: 'Tất cả các tháng' },
+                { value: '12', label: 'Tháng 12 (2025)' },
+                { value: '1', label: 'Tháng 1 (2026)' },
+                { value: '2', label: 'Tháng 2' },
+                { value: '3', label: 'Tháng 3' },
+                { value: '4', label: 'Tháng 4' },
+                { value: '5', label: 'Tháng 5' },
+                { value: '6', label: 'Tháng 6' }
+              ]}
+              className="bg-slate-50 border border-slate-200 text-slate-700 font-bold px-2.5 py-1.5 rounded-lg shadow-sm focus:outline-none focus:border-brand-primary transition-all min-w-[140px]"
+            />
           </div>
 
           {/* Season Filter */}
           <div className="flex items-center gap-1.5 text-xs">
             <span className="text-slate-400 font-bold">Mùa:</span>
-            <select 
+            <CustomSelect 
               value={filterSeason} 
               onChange={(e) => setFilterSeason(e.target.value)}
-              className="bg-slate-50 border border-slate-200 text-slate-700 font-bold px-2.5 py-1.5 rounded-lg shadow-sm focus:outline-none focus:border-brand-primary cursor-pointer transition-all"
-            >
-              <option value="All">Tất cả các mùa</option>
-              <option value="Đông">Mùa Đông</option>
-              <option value="Xuân">Mùa Xuân</option>
-              <option value="Hè">Mùa Hè</option>
-            </select>
+              options={[
+                { value: 'All', label: 'Tất cả các mùa' },
+                { value: 'Đông', label: 'Mùa Đông' },
+                { value: 'Xuân', label: 'Mùa Xuân' },
+                { value: 'Hè', label: 'Mùa Hè' }
+              ]}
+              className="bg-slate-50 border border-slate-200 text-slate-700 font-bold px-2.5 py-1.5 rounded-lg shadow-sm focus:outline-none focus:border-brand-primary transition-all min-w-[130px]"
+            />
           </div>
           
           {/* Reset Filters button */}
@@ -496,9 +552,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         <div className="glass-card rounded-2xl p-5 relative overflow-hidden bg-white border border-slate-200">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Nhiệt độ trung bình</span>
-            <div className="bg-orange-50 p-2 rounded-xl text-orange-550 border border-orange-100">
-              <Thermometer className="h-5 w-5 text-orange-500" />
-            </div>
+<img src="https://img.icons8.com/fluency/48/thermometer.png" alt="Nhiệt độ" className="h-6 w-6 object-contain flex-shrink-0" />
           </div>
           <div className="flex justify-between items-end">
             <div className="space-y-0.5">
@@ -520,9 +574,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         <div className="glass-card rounded-2xl p-5 relative overflow-hidden bg-white border border-slate-200">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Lượng mưa trung bình</span>
-            <div className="bg-blue-50 p-2 rounded-xl text-brand-primary border border-blue-100">
-              <CloudRain className="h-5 w-5 text-brand-primary" />
-            </div>
+<img src="https://img.icons8.com/fluency/48/rain.png" alt="Lượng mưa" className="h-6 w-6 object-contain flex-shrink-0" />
           </div>
           <div className="flex justify-between items-end">
             <div className="space-y-0.5">
@@ -544,9 +596,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         <div className="glass-card rounded-2xl p-5 relative overflow-hidden bg-white border border-slate-200">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Độ ẩm trung bình</span>
-            <div className="bg-cyan-50 p-2 rounded-xl text-brand-accent border border-cyan-100">
-              <Droplets className="h-5 w-5 text-brand-accent" />
-            </div>
+<img src="https://img.icons8.com/fluency/48/humidity.png" alt="Độ ẩm" className="h-6 w-6 object-contain flex-shrink-0" />
           </div>
           <div className="flex justify-between items-end">
             <div className="space-y-0.5">
@@ -568,9 +618,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         <div className="glass-card rounded-2xl p-5 relative overflow-hidden bg-white border border-slate-200">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Tốc độ gió trung bình</span>
-            <div className="bg-slate-50 p-2 rounded-xl text-slate-600 border border-slate-150">
-              <Wind className="h-5 w-5 text-slate-500" />
-            </div>
+<img src="https://img.icons8.com/fluency/48/wind.png" alt="Tốc độ gió" className="h-6 w-6 object-contain flex-shrink-0" />
           </div>
           <div className="flex justify-between items-end">
             <div className="space-y-0.5">
@@ -1018,19 +1066,14 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         
         {/* Column 1: Extreme Climate & Anomalies Alert Console */}
         <div className="glass-panel rounded-2xl p-6 bg-white border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
-          <div className="flex items-center gap-2">
-            <span className="p-2 rounded-xl bg-rose-50 border border-rose-100 text-rose-600">
-              <Info className="h-5 w-5" />
-            </span>
-            <div>
-              <h3 className="text-base font-bold text-slate-800">Cảnh báo khí hậu đặc biệt</h3>
-              <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Các giá trị khí tượng đạt ngưỡng cảnh báo từ tập dữ liệu.</p>
-            </div>
+          <div className="flex items-center gap-2.5">
+            <img src="https://img.icons8.com/fluency/48/info.png" alt="Cảnh báo" className="h-6 w-6 object-contain flex-shrink-0" />
+            <h3 className="text-base font-bold text-slate-800">Cảnh báo khí hậu đặc biệt</h3>
           </div>
 
           <div className="space-y-2.5 flex-1">
             <div className="flex gap-3 items-start p-2.5 bg-rose-50/40 border border-rose-100/50 rounded-xl">
-              <span className="mt-0.5 text-[9px] bg-rose-100 border border-rose-200 text-rose-700 font-bold px-1.5 py-0.5 rounded flex-shrink-0">NẮNG NÓNG</span>
+              <span className="mt-0.5 text-[9px] bg-rose-100 border border-rose-200 text-rose-700 font-bold w-[76px] py-0.5 rounded flex-shrink-0 text-center justify-center flex items-center">NẮNG NÓNG</span>
               <div className="space-y-0.5">
                 <p className="text-[11px] font-bold text-slate-800">Đông Nam Bộ (TP. HCM)</p>
                 <p className="text-[10px] text-slate-650 font-medium leading-relaxed">
@@ -1040,7 +1083,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
             </div>
 
             <div className="flex gap-3 items-start p-2.5 bg-blue-50/30 border border-blue-100/50 rounded-xl">
-              <span className="mt-0.5 text-[9px] bg-blue-100 border border-blue-200 text-blue-700 font-bold px-1.5 py-0.5 rounded flex-shrink-0">MƯA LỚN</span>
+              <span className="mt-0.5 text-[9px] bg-blue-100 border border-blue-200 text-blue-700 font-bold w-[76px] py-0.5 rounded flex-shrink-0 text-center justify-center flex items-center">MƯA LỚN</span>
               <div className="space-y-0.5">
                 <p className="text-[11px] font-bold text-slate-800">Bắc Trung Bộ (Hà Tĩnh & Quảng Trị)</p>
                 <p className="text-[10px] text-slate-650 font-medium leading-relaxed">
@@ -1050,7 +1093,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
             </div>
 
             <div className="flex gap-3 items-start p-2.5 bg-amber-50/40 border border-amber-100/50 rounded-xl">
-              <span className="mt-0.5 text-[9px] bg-amber-100 border border-amber-200 text-amber-700 font-bold px-1.5 py-0.5 rounded flex-shrink-0">TIA UV</span>
+              <span className="mt-0.5 text-[9px] bg-amber-100 border border-amber-200 text-amber-700 font-bold w-[76px] py-0.5 rounded flex-shrink-0 text-center justify-center flex items-center">TIA UV</span>
               <div className="space-y-0.5">
                 <p className="text-[11px] font-bold text-slate-800">Tây Nam Bộ (An Giang)</p>
                 <p className="text-[10px] text-slate-650 font-medium leading-relaxed">
@@ -1063,14 +1106,9 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
 
         {/* Column 2: Data Crawling & Sampling Engine */}
         <div className="glass-panel rounded-2xl p-6 bg-white border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
-          <div className="flex items-center gap-2">
-            <span className="p-2 rounded-xl bg-cyan-50 border border-cyan-100 text-brand-accent">
-              <CloudRain className="h-5 w-5" />
-            </span>
-            <div>
-              <h3 className="text-base font-bold text-slate-800">Thu thập & xử lý số liệu</h3>
-              <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Mô tả cơ chế thu thập dữ liệu KTTV Việt Nam 2026.</p>
-            </div>
+          <div className="flex items-center gap-2.5">
+            <img src="https://img.icons8.com/fluency/48/weather.png" alt="Thu thập" className="h-6 w-6 object-contain flex-shrink-0" />
+            <h3 className="text-base font-bold text-slate-800">Thu thập & xử lý số liệu</h3>
           </div>
 
           <div className="divide-y divide-slate-100 text-xs font-semibold flex-1">
@@ -1105,14 +1143,9 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
 
         {/* Column 3: Fixed Meteorological Dataset Specs */}
         <div className="glass-panel rounded-2xl p-6 bg-white border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
-          <div className="flex items-center gap-2">
-            <span className="p-2 rounded-xl bg-blue-50 border border-blue-100 text-brand-primary">
-              <Database className="h-5 w-5" />
-            </span>
-            <div>
-              <h3 className="text-base font-bold text-slate-800">Thông số tập dữ liệu</h3>
-              <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Thông tin kỹ thuật tệp CSV khí tượng cố định.</p>
-            </div>
+          <div className="flex items-center gap-2.5">
+            <img src="https://img.icons8.com/fluency/48/csv.png" alt="Thông số" className="h-6 w-6 object-contain flex-shrink-0" />
+            <h3 className="text-base font-bold text-slate-800">Thông số tập dữ liệu</h3>
           </div>
 
           <div className="divide-y divide-slate-100 text-xs font-semibold flex-1">

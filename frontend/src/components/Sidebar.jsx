@@ -1,22 +1,16 @@
 import React from 'react';
 import { 
-  LayoutDashboard, 
-  Database, 
-  MessageSquareCode, 
-  AreaChart, 
-  Settings, 
   ChevronLeft, 
-  ChevronRight,
-  Cpu
+  ChevronRight
 } from 'lucide-react';
 
 export default function Sidebar({ currentTab, setCurrentTab, isCollapsed, setIsCollapsed, pendingCount }) {
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'datasets', label: 'Tập dữ liệu', icon: Database },
-    { id: 'chat', label: 'AI chat phân tích', icon: MessageSquareCode },
-    { id: 'results', label: 'Kết quả trực quan', icon: AreaChart },
-    { id: 'settings', label: 'Cài đặt', icon: Settings },
+    { id: 'dashboard', label: 'Dashboard', iconUrl: 'https://img.icons8.com/fluency/48/combo-chart.png' },
+    { id: 'datasets', label: 'Tập dữ liệu', iconUrl: 'https://img.icons8.com/fluency/48/database.png' },
+    { id: 'chat', label: 'AI chat phân tích', iconUrl: 'https://img.icons8.com/fluency/48/artificial-intelligence.png' },
+    { id: 'results', label: 'Kết quả trực quan', iconUrl: 'https://img.icons8.com/fluency/48/area-chart.png' },
+    { id: 'settings', label: 'Cài đặt', iconUrl: 'https://img.icons8.com/fluency/48/gear.png' },
   ];
 
   return (
@@ -29,19 +23,18 @@ export default function Sidebar({ currentTab, setCurrentTab, isCollapsed, setIsC
       <div>
         <div className="p-5 flex items-center justify-between border-b border-slate-800/80">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="bg-gradient-to-tr from-brand-primary to-brand-accent p-2.5 rounded-xl shadow-lg shadow-blue-500/25">
-              <Cpu className="h-5 w-5 text-white" />
-            </div>
+            <img src="https://img.icons8.com/fluency/48/weather.png" alt="KTTV Logo" className="h-8 w-8 object-contain flex-shrink-0" />
             {!isCollapsed && (
-              <span className="font-bold text-base text-slate-100 tracking-tight whitespace-nowrap">
-                KTTV Analytics <span className="text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-brand-primary">AI</span>
+              <span className="font-bold text-sm text-slate-100 tracking-tight whitespace-nowrap flex items-center gap-1.5">
+                <span>KTTV Analytics</span>
+                <span className="text-white text-[8px] font-extrabold px-1 py-0.5 rounded bg-brand-primary leading-none inline-flex items-center justify-center">AI</span>
               </span>
             )}
           </div>
           {!isCollapsed && (
             <button 
               onClick={() => setIsCollapsed(true)}
-              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
@@ -51,20 +44,19 @@ export default function Sidebar({ currentTab, setCurrentTab, isCollapsed, setIsC
         {/* Navigation Items */}
         <nav className="p-3 space-y-1.5">
           {menuItems.map((item) => {
-            const Icon = item.icon;
             const isActive = currentTab === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => setCurrentTab(item.id)}
-                className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold transition-all duration-200 ${
+                className={`w-full flex items-center justify-between px-3.5 py-3 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer ${
                   isActive 
-                    ? 'bg-brand-primary text-white shadow-md shadow-blue-600/10' 
+                    ? 'bg-brand-primary text-white shadow-lg shadow-blue-500/15' 
                     : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <Icon className={`h-4.5 w-4.5 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                <div className="flex items-center gap-3 font-semibold">
+                  <img src={item.iconUrl} alt={item.label} className="h-5 w-5 object-contain flex-shrink-0" />
                   {!isCollapsed && <span className="whitespace-nowrap">{item.label}</span>}
                 </div>
               </button>
@@ -78,7 +70,7 @@ export default function Sidebar({ currentTab, setCurrentTab, isCollapsed, setIsC
         <div className="p-4 border-t border-slate-800 flex justify-center">
           <button 
             onClick={() => setIsCollapsed(false)}
-            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <ChevronRight className="h-5 w-5" />
           </button>

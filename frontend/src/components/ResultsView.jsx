@@ -98,7 +98,7 @@ export default function ResultsView() {
                   <XAxis dataKey="month" stroke="#70859c" />
                   <YAxis stroke="#70859c" />
                   <Tooltip contentStyle={{ backgroundColor: '#fff', borderColor: '#e2e8f0', color: '#0f172a' }} />
-                  <Area type="monotone" dataKey="Mưa TB" name="Lượng mưa (mm)" fill="#06B6D4" fillOpacity={0.15} stroke="#06B6D4" strokeWidth={2} />
+                  <Area type="monotone" dataKey="Mưa TB" name="Lượng mưa (mm)" fill="#60A5FA" fillOpacity={0.15} stroke="#3B82F6" strokeWidth={2} />
                 </RechartsAreaChart>
               </ResponsiveContainer>
             </div>
@@ -132,9 +132,9 @@ export default function ResultsView() {
                   <YAxis stroke="#70859c" />
                   <Tooltip contentStyle={{ backgroundColor: '#fff', borderColor: '#e2e8f0', color: '#0f172a' }} />
                   <Legend />
-                  <Line type="monotone" dataKey="Hà Nội" stroke="#06B6D4" strokeWidth={2} activeDot={{ r: 5 }} />
-                  <Line type="monotone" dataKey="Huế" stroke="#f59e0b" strokeWidth={2} />
-                  <Line type="monotone" dataKey="Hồ Chí Minh" stroke="#f43f5e" strokeWidth={2} />
+                  <Line type="monotone" dataKey="Hà Nội" stroke="#3B82F6" strokeWidth={2} activeDot={{ r: 5 }} />
+                  <Line type="monotone" dataKey="Huế" stroke="#60A5FA" strokeWidth={2} />
+                  <Line type="monotone" dataKey="Hồ Chí Minh" stroke="#1E3A8A" strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -150,9 +150,9 @@ export default function ResultsView() {
                   <YAxis stroke="#70859c" />
                   <Tooltip contentStyle={{ backgroundColor: '#fff', borderColor: '#e2e8f0', color: '#0f172a' }} />
                   <Legend />
-                  <Bar dataKey="Hà Nội" fill="#06B6D4" />
-                  <Bar dataKey="Huế" fill="#f59e0b" />
-                  <Bar dataKey="Hồ Chí Minh" fill="#f43f5e" />
+                  <Bar dataKey="Hà Nội" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Huế" fill="#60A5FA" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Hồ Chí Minh" fill="#1E3A8A" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -179,7 +179,7 @@ export default function ResultsView() {
                   <YAxis type="number" dataKey="rain" name="Lượng mưa" unit="mm" stroke="#70859c" />
                   <ZAxis type="category" dataKey="name" name="Tỉnh thành" />
                   <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: '#fff', borderColor: '#e2e8f0' }} />
-                  <Scatter name="Top 10 tỉnh nóng" data={data} fill="#10b981" />
+                  <Scatter name="Top 10 tỉnh nóng" data={data} fill="#3B82F6" />
                 </ScatterChart>
               </ResponsiveContainer>
             </div>
@@ -194,7 +194,7 @@ export default function ResultsView() {
                   <XAxis type="number" stroke="#70859c" domain={[26, 34]} />
                   <YAxis dataKey="name" type="category" stroke="#70859c" tick={{ fontSize: 9 }} width={65} />
                   <Tooltip contentStyle={{ backgroundColor: '#fff', borderColor: '#e2e8f0' }} />
-                  <Bar dataKey="temp" name="Nhiệt độ (°C)" fill="#f43f5e" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="temp" name="Nhiệt độ (°C)" fill="#3B82F6" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -299,14 +299,14 @@ export default function ResultsView() {
               <div 
                 key={q.id} 
                 onClick={() => { setSelectedQueryId(q.id); setActiveTab('chart'); }}
-                className="glass-card bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:border-brand-primary/40 cursor-pointer flex flex-col justify-between h-56 transition-all duration-200 group"
+                className="tech-card bg-white rounded-xl p-6 cursor-pointer flex flex-col justify-between h-56 border border-slate-200 shadow-sm transition-all group"
               >
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-[9px] bg-emerald-50 border border-emerald-100 text-emerald-600 font-extrabold px-2 py-0.5 rounded-full uppercase">
+                    <span className="text-[9px] bg-blue-50 border border-blue-100 text-brand-primary font-extrabold px-2 py-0.5 rounded-md uppercase">
                       Executed
                     </span>
-                    <span className="text-[10px] text-slate-400 font-bold font-mono">#{q.id}</span>
+                    <span className="text-[10px] text-slate-500 font-bold font-mono">#{q.id}</span>
                   </div>
                   <h3 className="text-base font-bold text-slate-800 group-hover:text-brand-primary transition-colors leading-tight">
                     {q.title}
@@ -317,7 +317,7 @@ export default function ResultsView() {
                 </div>
 
                 <div className="flex justify-between items-center pt-4 border-t border-slate-100">
-                  <span className="text-[10px] bg-slate-50 border border-slate-200 text-slate-600 font-semibold px-2.5 py-1 rounded-lg uppercase">
+                  <span className="text-[10px] bg-slate-50 border border-slate-200 text-slate-700 font-bold px-2.5 py-1 rounded-lg uppercase">
                     Báo cáo {q.chartType === 'bar' ? 'Mưa' : q.chartType === 'line' ? 'Nhiệt độ' : 'Tương quan'}
                   </span>
                   <span className="text-xs text-brand-primary font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
@@ -337,7 +337,7 @@ export default function ResultsView() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setSelectedQueryId(null)}
-                className="p-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-650 rounded-xl transition-all shadow-sm"
+                className="p-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg transition-all cursor-pointer shadow-sm active:scale-95"
                 title="Quay lại danh sách"
               >
                 <ArrowLeft className="h-4.5 w-4.5" />
@@ -350,13 +350,13 @@ export default function ResultsView() {
             
             {/* Export Buttons */}
             <div className="flex flex-wrap gap-2.5">
-              <button className="bg-white hover:bg-slate-50 border border-slate-200 text-xs text-slate-700 font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all">
-                <Download className="h-3.5 w-3.5 text-brand-accent" /> CSV
+              <button className="bg-white hover:bg-slate-100 border border-slate-200 text-xs text-slate-700 font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95">
+                <Download className="h-3.5 w-3.5 text-brand-primary" /> CSV
               </button>
-              <button className="bg-white hover:bg-slate-50 border border-slate-200 text-xs text-slate-700 font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all">
-                <Download className="h-3.5 w-3.5 text-brand-primary" /> Ảnh đồ thị
+              <button className="bg-white hover:bg-slate-100 border border-slate-200 text-xs text-slate-700 font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95">
+                <Download className="h-3.5 w-3.5 text-brand-accent" /> Ảnh đồ thị
               </button>
-              <button className="bg-brand-primary hover:bg-brand-primary/90 text-xs text-white font-bold px-4 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-sm shadow-blue-500/10">
+              <button className="bg-brand-primary hover:bg-brand-primary/90 text-xs text-white font-bold px-4 py-1.5 rounded-lg border border-transparent flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-blue-500/15 active:scale-95">
                 <Share2 className="h-3.5 w-3.5" /> Báo cáo
               </button>
             </div>
@@ -365,13 +365,13 @@ export default function ResultsView() {
           {/* Dynamic KPI Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {selectedQuery.kpis.map((kpi, idx) => (
-              <div key={idx} className="glass-card rounded-xl p-5 border border-slate-200 bg-white flex items-center justify-between">
+              <div key={idx} className="tech-card rounded-lg border border-slate-200 shadow-sm p-5 bg-white flex items-center justify-between">
                 <div className="space-y-1">
-                  <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">{kpi.label}</span>
+                  <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">{kpi.label}</span>
                   <p className="text-2xl font-extrabold text-slate-800 tracking-tight">{kpi.value}</p>
                   <p className="text-xs text-slate-500 font-semibold mt-0.5">{kpi.desc}</p>
                 </div>
-                <div className={`p-2.5 rounded-lg ${getTrendClass(kpi.trend)}`}>
+                <div className={`p-2 rounded-lg border border-slate-200 ${getTrendClass(kpi.trend)}`}>
                   {renderTrendIcon(kpi.trend)}
                 </div>
               </div>
@@ -379,14 +379,14 @@ export default function ResultsView() {
           </div>
 
           {/* Main Tab Panel Display */}
-          <div className="glass-panel bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-6">
+          <div className="glass-panel rounded-xl p-6 border border-slate-200 bg-white space-y-6 shadow-sm">
             {/* Navigation Tabs */}
             <div className="flex gap-2 border-b border-slate-100 pb-4">
               <button
                 onClick={() => setActiveTab('chart')}
-                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                   activeTab === 'chart' 
-                    ? 'bg-brand-primary text-white shadow-md' 
+                    ? 'bg-brand-primary text-white shadow-md shadow-blue-500/15' 
                     : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                 }`}
               >
@@ -394,9 +394,9 @@ export default function ResultsView() {
               </button>
               <button
                 onClick={() => setActiveTab('table')}
-                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                   activeTab === 'table' 
-                    ? 'bg-brand-primary text-white shadow-md' 
+                    ? 'bg-brand-primary text-white shadow-md shadow-blue-500/15' 
                     : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                 }`}
               >
@@ -404,9 +404,9 @@ export default function ResultsView() {
               </button>
               <button
                 onClick={() => setActiveTab('code')}
-                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                   activeTab === 'code' 
-                    ? 'bg-brand-primary text-white shadow-md' 
+                    ? 'bg-brand-primary text-white shadow-md shadow-blue-500/15' 
                     : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                 }`}
               >
@@ -416,10 +416,10 @@ export default function ResultsView() {
 
             {/* Tab 1: Interactive Charts Grid (Showing multiple charts!) */}
             {activeTab === 'chart' && (
-              <div className="bg-slate-50/50 p-6 rounded-xl border border-slate-150 flex flex-col justify-center items-center space-y-4">
+              <div className="bg-slate-50/50 p-6 rounded-lg border border-slate-200 flex flex-col justify-center items-center space-y-4">
                 {renderMultiChartsGrid()}
-                <div className="mt-4 p-3 bg-white rounded-xl border border-slate-200 flex items-center gap-2 text-xs text-slate-550 max-w-lg shadow-sm">
-                  <FileText className="h-4 w-4 text-brand-accent flex-shrink-0" />
+                <div className="mt-4 p-3 bg-white rounded-lg border border-slate-200 flex items-center gap-2 text-xs text-slate-550 max-w-lg shadow-sm">
+                  <FileText className="h-4 w-4 text-brand-primary flex-shrink-0" />
                   <span>Hệ thống hiển thị kết hợp đa biểu đồ (Multi-chart) để phân tích sâu sắc các chiều tương quan thời tiết khác nhau.</span>
                 </div>
               </div>
@@ -427,14 +427,14 @@ export default function ResultsView() {
 
             {/* Tab 2: Result Table */}
             {activeTab === 'table' && (
-              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+              <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
                 {renderResultsTable()}
               </div>
             )}
 
             {/* Tab 3: Executed Code */}
             {activeTab === 'code' && (
-              <div className="bg-slate-900 rounded-xl border border-slate-950 p-5 font-mono text-xs text-indigo-200 max-h-[400px] overflow-y-auto leading-relaxed">
+              <div className="bg-slate-900 rounded-lg border border-slate-950 p-5 font-mono text-xs text-indigo-200 max-h-[400px] overflow-y-auto leading-relaxed">
                 <pre>{selectedQuery.code}</pre>
               </div>
             )}

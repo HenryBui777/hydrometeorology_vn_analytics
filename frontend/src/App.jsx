@@ -179,12 +179,12 @@ export default function App() {
 
             {/* Profile Tools */}
             <div className="flex items-center gap-3">
-              <button className="p-2 bg-slate-50 border border-slate-200 hover:text-slate-800 rounded-xl text-slate-400 transition-colors relative">
-                <Bell className="h-4.5 w-4.5" />
-                <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-brand-primary rounded-full" />
+              <button className="relative cursor-pointer hover:scale-105 transition-transform flex items-center justify-center p-1">
+                <img src="https://img.icons8.com/fluency/48/appointment-reminders.png" alt="Thông báo" className="h-6 w-6 object-contain" />
+                <span className="absolute top-1 right-1.5 h-2 w-2 bg-rose-500 rounded-full border border-white" />
               </button>
-              <div className="flex items-center gap-2 pl-1">
-                <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-brand-primary to-brand-accent flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20">
+              <div className="flex items-center gap-2 pl-1 cursor-pointer">
+                <div className="h-8 w-8 rounded-lg bg-brand-primary flex items-center justify-center text-white font-bold">
                   <User className="h-4 w-4" />
                 </div>
                 <div className="hidden sm:block text-left">
@@ -198,7 +198,7 @@ export default function App() {
         </header>
 
         {/* View Router Render Area */}
-        <main className="flex-1 p-8 overflow-y-auto bg-brand-bg">
+        <main className={`flex-1 bg-brand-bg ${currentTab === 'chat' ? 'p-0 overflow-hidden flex flex-col' : 'p-8 overflow-y-auto'}`}>
           {currentTab === 'dashboard' && (
             <HomeDashboard 
               datasetUploaded={datasetUploaded} 
