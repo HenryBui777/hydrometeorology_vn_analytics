@@ -302,12 +302,6 @@ export default function ResultsView() {
                 className="tech-card bg-white rounded-xl p-6 cursor-pointer flex flex-col justify-between h-56 border border-slate-200 shadow-sm transition-all group"
               >
                 <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[9px] bg-blue-50 border border-blue-100 text-brand-primary font-extrabold px-2 py-0.5 rounded-md uppercase">
-                      Executed
-                    </span>
-                    <span className="text-[10px] text-slate-500 font-bold font-mono">#{q.id}</span>
-                  </div>
                   <h3 className="text-base font-bold text-slate-800 group-hover:text-brand-primary transition-colors leading-tight">
                     {q.title}
                   </h3>

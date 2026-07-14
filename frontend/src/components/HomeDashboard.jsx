@@ -1,34 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Thermometer, 
-  CloudRain, 
-  Droplets, 
-  Wind, 
-  TrendingUp, 
-  TrendingDown, 
-  Database, 
-  Info, 
+import {
+  Thermometer,
+  CloudRain,
+  Droplets,
+  Wind,
+  TrendingUp,
+  TrendingDown,
+  Database,
+  Info,
   MapPin,
   Loader2,
   ChevronDown,
   Check
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
-import { 
-  LineChart, 
-  Line, 
-  BarChart, 
-  Bar, 
-  AreaChart as RechartsAreaChart, 
-  Area, 
-  ScatterChart, 
-  Scatter, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer 
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  AreaChart as RechartsAreaChart,
+  Area,
+  ScatterChart,
+  Scatter,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
 } from 'recharts';
 
 function CustomSelect({ value, onChange, options, className }) {
@@ -68,9 +68,8 @@ function CustomSelect({ value, onChange, options, className }) {
                 onChange({ target: { value: opt.value } });
                 setIsOpen(false);
               }}
-              className={`w-full text-left px-3.5 py-2 hover:bg-blue-50 transition-colors flex items-center justify-between text-xs cursor-pointer ${
-                opt.value === value ? 'bg-blue-50 text-brand-primary font-bold' : ''
-              }`}
+              className={`w-full text-left px-3.5 py-2 hover:bg-blue-50 transition-colors flex items-center justify-between text-xs cursor-pointer ${opt.value === value ? 'bg-blue-50 text-brand-primary font-bold' : ''
+                }`}
             >
               <span>{opt.label}</span>
               {opt.value === value && <Check className="h-3.5 w-3.5 text-brand-primary" />}
@@ -97,12 +96,12 @@ export default function HomeDashboard({ datasetUploaded, setCurrentTab, submitQu
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   // Sync local filter UI with global filter context
-  const filterRegion  = filters.regionKey;
-  const filterMonth   = filters.month;
-  const filterSeason  = filters.season;
+  const filterRegion = filters.regionKey;
+  const filterMonth = filters.month;
+  const filterSeason = filters.season;
 
   const setFilterRegion = (v) => setFilters(f => ({ ...f, regionKey: v }));
-  const setFilterMonth  = (v) => setFilters(f => ({ ...f, month: v }));
+  const setFilterMonth = (v) => setFilters(f => ({ ...f, month: v }));
   const setFilterSeason = (v) => setFilters(f => ({ ...f, season: v }));
 
   const handleMouseDown = (e) => {
@@ -156,7 +155,7 @@ export default function HomeDashboard({ datasetUploaded, setCurrentTab, submitQu
   const getRegionOfProvince = (provinceName) => {
     if (!provinceName) return 'NorthMountain';
     const name = provinceName.toLowerCase();
-    
+
     // Check Red River Delta
     if (name.includes('hà nội') || name.includes('hanoi') || name.includes('bắc ninh') || name.includes('hưng yên') || name.includes('hải phòng') || name.includes('ninh bình') || name.includes('vĩnh phúc') || name.includes('hải dương') || name.includes('thái bình') || name.includes('hà nam') || name.includes('nam định')) {
       return 'RedRiverDelta';
@@ -200,7 +199,7 @@ export default function HomeDashboard({ datasetUploaded, setCurrentTab, submitQu
     "Nghệ An": { status: "Không sáp nhập", color: "#F59E0B" },
     "Hà Tĩnh": { status: "Không sáp nhập", color: "#F59E0B" },
     "Thừa Thiên - Huế": { status: "Không sáp nhập", color: "#F59E0B", label: "TP. Huế" },
-    
+
     "Tuyên Quang": { status: "Sáp nhập", color: "#60A5FA" },
     "Lào Cai": { status: "Sáp nhập", color: "#60A5FA" },
     "Phú Thọ": { status: "Sáp nhập", color: "#60A5FA" },
@@ -255,14 +254,14 @@ export default function HomeDashboard({ datasetUploaded, setCurrentTab, submitQu
   const getCentroid = (feature) => {
     if (!feature || !feature.geometry) return [0, 0];
     const { type, coordinates } = feature.geometry;
-    
+
     const minLon = 101.8;
     const maxLon = 109.8;
     const minLat = 8.2;
     const maxLat = 23.8;
     const width = 180;
     const height = 450;
-    
+
     const projectX = (lon) => ((lon - minLon) / (maxLon - minLon)) * width + 10;
     const projectY = (lat) => height - ((lat - minLat) / (maxLat - minLat)) * height + 15;
 
@@ -281,28 +280,28 @@ export default function HomeDashboard({ datasetUploaded, setCurrentTab, submitQu
         pts = coordinates[0][0];
       }
     }
-    
+
     let sumX = 0;
     let sumY = 0;
     pts.forEach(pt => {
       sumX += projectX(pt[0]);
       sumY += projectY(pt[1]);
     });
-    
+
     return [sumX / pts.length, sumY / pts.length];
   };
 
   const getProvincePath = (feature) => {
     if (!feature || !feature.geometry) return '';
     const { type, coordinates } = feature.geometry;
-    
+
     const minLon = 101.8;
     const maxLon = 109.8;
     const minLat = 8.2;
     const maxLat = 23.8;
     const width = 180;
     const height = 450;
-    
+
     const projectPoint = (coord) => {
       const lon = coord[0];
       const lat = coord[1];
@@ -326,7 +325,7 @@ export default function HomeDashboard({ datasetUploaded, setCurrentTab, submitQu
         }).join(' ');
       }
     }
-    
+
     if (type === 'Polygon') {
       return coordinates.map(ring => {
         const points = ring.map(projectPoint).join(' ');
@@ -347,11 +346,11 @@ export default function HomeDashboard({ datasetUploaded, setCurrentTab, submitQu
   // Use filteredStats when available, fall back to fullStats
   const activeStats = filteredStats || fullStats;
   const regionalData = activeStats ? activeStats.regionStats : {};
-  const tempTrendData         = fullStats  ? fullStats.tempTrend            : [];
+  const tempTrendData = fullStats ? fullStats.tempTrend : [];
   const rainfallProvincesData = activeStats ? activeStats.topRainfallProvinces : [];
-  const humidityDistributionData = activeStats ? activeStats.humidityByRegion  : [];
-  const correlationData       = activeStats ? activeStats.correlationData    : [];
-  const nationalKPIs          = activeStats ? activeStats.nationalKPIs       : { temp: 0, rain: 0, humidity: 0, wind: 0, sunshine: 0, et0: 0 };
+  const humidityDistributionData = activeStats ? activeStats.humidityByRegion : [];
+  const correlationData = activeStats ? activeStats.correlationData : [];
+  const nationalKPIs = activeStats ? activeStats.nationalKPIs : { temp: 0, rain: 0, humidity: 0, wind: 0, sunshine: 0, et0: 0 };
 
   // Filtered rainfall for bar chart (filter by region if selected)
   const filteredRainfallData = filterRegion === 'All'
@@ -359,10 +358,10 @@ export default function HomeDashboard({ datasetUploaded, setCurrentTab, submitQu
     : rainfallProvincesData.filter(p => getRegionOfProvince(p.name) === filterRegion);
 
   // KPI display values — directly from real aggregated data
-  const displayTemp     = nationalKPIs.temp;
-  const displayRain     = nationalKPIs.rain;
+  const displayTemp = nationalKPIs.temp;
+  const displayRain = nationalKPIs.rain;
   const displayHumidity = nationalKPIs.humidity;
-  const displayWind     = nationalKPIs.wind;
+  const displayWind = nationalKPIs.wind;
 
 
   // Handlers for AI Quick Analysis
@@ -391,8 +390,8 @@ export default function HomeDashboard({ datasetUploaded, setCurrentTab, submitQu
         const matched = predefinedQueries.find(q => q.question.toLowerCase().includes(prompt.toLowerCase())) || predefinedQueries[0];
         submitQuery(
           `Tôi đã phân tích câu hỏi: "${prompt}". 
-Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Python để trích xuất số liệu. Trạng thái mã nguồn đang là **"Chờ Phê Duyệt"**.`, 
-          'ai', 
+Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Python để trích xuất số liệu. Trạng thái mã nguồn đang là **"Chờ Phê Duyệt"**.`,
+          'ai',
           matched
         );
       }, 1500);
@@ -429,7 +428,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
 
   return (
     <div className="space-y-8 animate-fade-in pb-12">
-      
+
       {/* 1. Concise Header Banner (Reduced height by 40%) */}
       <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-brand-primary to-brand-accent px-6 py-5 border border-blue-200 shadow-md">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 text-white">
@@ -443,14 +442,14 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
           </div>
           <div className="flex gap-2.5 flex-shrink-0">
             {!datasetUploaded ? (
-              <button 
+              <button
                 onClick={() => setCurrentTab('datasets')}
                 className="bg-white hover:bg-slate-50 text-brand-primary text-xs font-bold px-4 py-2 rounded-lg shadow-sm transition-all"
               >
                 Nạp tập dữ liệu mẫu
               </button>
             ) : (
-              <button 
+              <button
                 onClick={() => setCurrentTab('chat')}
                 className="bg-white hover:bg-slate-50 text-brand-primary text-xs font-bold px-4 py-2 rounded-lg shadow-sm transition-all"
               >
@@ -468,13 +467,13 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
           <img src="https://img.icons8.com/fluency/48/database.png" alt="Database" className="h-5 w-5 object-contain flex-shrink-0" />
           <span className="font-bold text-xs uppercase tracking-wider text-slate-700">Bộ lọc dữ liệu Dashboard</span>
         </div>
-        
+
         <div className="flex flex-wrap items-center gap-4">
           {/* Region Filter */}
           <div className="flex items-center gap-1.5 text-xs">
             <span className="text-slate-400 font-bold">Khu vực:</span>
-            <CustomSelect 
-              value={filterRegion} 
+            <CustomSelect
+              value={filterRegion}
               onChange={(e) => {
                 setFilterRegion(e.target.value);
                 if (e.target.value !== 'All') setSelectedRegion(e.target.value);
@@ -496,8 +495,8 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
           {/* Month Filter */}
           <div className="flex items-center gap-1.5 text-xs">
             <span className="text-slate-400 font-bold">Tháng:</span>
-            <CustomSelect 
-              value={filterMonth} 
+            <CustomSelect
+              value={filterMonth}
               onChange={(e) => setFilterMonth(e.target.value)}
               options={[
                 { value: 'All', label: 'Tất cả các tháng' },
@@ -516,8 +515,8 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
           {/* Season Filter */}
           <div className="flex items-center gap-1.5 text-xs">
             <span className="text-slate-400 font-bold">Mùa:</span>
-            <CustomSelect 
-              value={filterSeason} 
+            <CustomSelect
+              value={filterSeason}
               onChange={(e) => setFilterSeason(e.target.value)}
               options={[
                 { value: 'All', label: 'Tất cả các mùa' },
@@ -528,10 +527,10 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
               className="bg-slate-50 border border-slate-200 text-slate-700 font-bold px-2.5 py-1.5 rounded-lg shadow-sm focus:outline-none focus:border-brand-primary transition-all min-w-[130px]"
             />
           </div>
-          
+
           {/* Reset Filters button */}
           {(filterRegion !== 'All' || filterMonth !== 'All' || filterSeason !== 'All') && (
-            <button 
+            <button
               onClick={() => {
                 setFilterRegion('All');
                 setFilterMonth('All');
@@ -547,12 +546,12 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
 
       {/* 3. Climate KPI Cards Grid (with trend lines and sparklines) */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        
+
         {/* KPI 1: Avg Temp */}
         <div className="glass-card rounded-2xl p-5 relative overflow-hidden bg-white border border-slate-200">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Nhiệt độ trung bình</span>
-<img src="https://img.icons8.com/fluency/48/thermometer.png" alt="Nhiệt độ" className="h-6 w-6 object-contain flex-shrink-0" />
+            <img src="https://img.icons8.com/fluency/48/thermometer.png" alt="Nhiệt độ" className="h-6 w-6 object-contain flex-shrink-0" />
           </div>
           <div className="flex justify-between items-end">
             <div className="space-y-0.5">
@@ -574,7 +573,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         <div className="glass-card rounded-2xl p-5 relative overflow-hidden bg-white border border-slate-200">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Lượng mưa trung bình</span>
-<img src="https://img.icons8.com/fluency/48/rain.png" alt="Lượng mưa" className="h-6 w-6 object-contain flex-shrink-0" />
+            <img src="https://img.icons8.com/fluency/48/rain.png" alt="Lượng mưa" className="h-6 w-6 object-contain flex-shrink-0" />
           </div>
           <div className="flex justify-between items-end">
             <div className="space-y-0.5">
@@ -596,7 +595,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         <div className="glass-card rounded-2xl p-5 relative overflow-hidden bg-white border border-slate-200">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Độ ẩm trung bình</span>
-<img src="https://img.icons8.com/fluency/48/humidity.png" alt="Độ ẩm" className="h-6 w-6 object-contain flex-shrink-0" />
+            <img src="https://img.icons8.com/fluency/48/humidity.png" alt="Độ ẩm" className="h-6 w-6 object-contain flex-shrink-0" />
           </div>
           <div className="flex justify-between items-end">
             <div className="space-y-0.5">
@@ -618,7 +617,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         <div className="glass-card rounded-2xl p-5 relative overflow-hidden bg-white border border-slate-200">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Tốc độ gió trung bình</span>
-<img src="https://img.icons8.com/fluency/48/wind.png" alt="Tốc độ gió" className="h-6 w-6 object-contain flex-shrink-0" />
+            <img src="https://img.icons8.com/fluency/48/wind.png" alt="Tốc độ gió" className="h-6 w-6 object-contain flex-shrink-0" />
           </div>
           <div className="flex justify-between items-end">
             <div className="space-y-0.5">
@@ -640,7 +639,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
 
       {/* 2A. Vietnam Weather Map Section (Main visual focus) */}
       <div className="glass-panel rounded-2xl p-6 bg-white border border-slate-200 shadow-sm grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
+
         {/* Map Panel Title & Toggle Controls */}
         <div className="lg:col-span-1 flex flex-col justify-between space-y-6">
           <div>
@@ -655,21 +654,19 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
             <div className="flex gap-2 mt-6">
               <button
                 onClick={() => setMapMetric('temp')}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-all ${
-                  mapMetric === 'temp' 
-                    ? 'bg-brand-primary text-white border-brand-primary shadow-sm shadow-blue-500/10' 
-                    : 'bg-white hover:bg-slate-50 text-slate-650 border-slate-200'
-                }`}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-all ${mapMetric === 'temp'
+                  ? 'bg-brand-primary text-white border-brand-primary shadow-sm shadow-blue-500/10'
+                  : 'bg-white hover:bg-slate-50 text-slate-650 border-slate-200'
+                  }`}
               >
                 Xem theo nhiệt độ
               </button>
               <button
                 onClick={() => setMapMetric('rain')}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-all ${
-                  mapMetric === 'rain' 
-                    ? 'bg-brand-primary text-white border-brand-primary shadow-sm shadow-blue-500/10' 
-                    : 'bg-white hover:bg-slate-50 text-slate-650 border-slate-200'
-                }`}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-all ${mapMetric === 'rain'
+                  ? 'bg-brand-primary text-white border-brand-primary shadow-sm shadow-blue-500/10'
+                  : 'bg-white hover:bg-slate-50 text-slate-650 border-slate-200'
+                  }`}
               >
                 Xem theo lượng mưa
               </button>
@@ -715,7 +712,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
 
         {/* Dynamic SVG Map container */}
         <div className="lg:col-span-2 flex flex-col justify-center items-center bg-[#FAF6E8] border border-orange-100/40 rounded-2xl p-6 h-96 relative overflow-hidden select-none">
-          
+
           {/* Hover Province Tooltip */}
           {hoveredProvince && (
             <div className="absolute top-3 left-3 bg-slate-900/90 backdrop-blur-md text-white text-[10px] font-bold px-3 py-1.5 rounded-lg border border-slate-800 shadow-lg pointer-events-none z-20 transition-all">
@@ -725,7 +722,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
 
           {/* Floating Zoom Controls */}
           <div className="absolute right-3 top-3 flex flex-col gap-1 z-20">
-            <button 
+            <button
               type="button"
               onClick={handleZoomIn}
               className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold h-7 w-7 rounded-lg shadow-sm flex items-center justify-center text-xs transition-all active:scale-90"
@@ -733,7 +730,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
             >
               +
             </button>
-            <button 
+            <button
               type="button"
               onClick={handleZoomOut}
               className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold h-7 w-7 rounded-lg shadow-sm flex items-center justify-center text-xs transition-all active:scale-90"
@@ -741,7 +738,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
             >
               -
             </button>
-            <button 
+            <button
               type="button"
               onClick={handleResetZoom}
               className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-500 font-bold px-1 py-0.5 rounded-lg shadow-sm text-[8px] transition-all active:scale-90"
@@ -753,10 +750,10 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
 
           {!geoJson ? (
             // Fallback: 7-region S-curve map while loading
-            <svg 
-              className="w-full h-full max-w-[320px]" 
-              viewBox="0 0 240 400" 
-              style={{ 
+            <svg
+              className="w-full h-full max-w-[320px]"
+              viewBox="0 0 240 400"
+              style={{
                 filter: 'drop-shadow(0 4px 6px rgba(15, 23, 42, 0.08))',
                 cursor: zoomScale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'
               }}
@@ -765,26 +762,26 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
             >
-              <g 
-                style={{ 
+              <g
+                style={{
                   transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale})`,
                   transformOrigin: 'center center',
                   transition: isDragging ? 'none' : 'transform 0.15s ease-out'
                 }}
               >
                 {/* North Mountain Region */}
-                <polygon 
-                  points="12,48 20,30 35,20 55,14 78,10 95,12 110,22 118,34 112,48 102,52 90,56 82,65 72,72 58,74 44,70 30,62 18,58" 
+                <polygon
+                  points="12,48 20,30 35,20 55,14 78,10 95,12 110,22 118,34 112,48 102,52 90,56 82,65 72,72 58,74 44,70 30,62 18,58"
                   fill="#F59E0B"
                   stroke="#fff"
                   strokeWidth={1}
                   className="cursor-pointer transition-all duration-200 hover:opacity-85"
                   onClick={() => { setSelectedRegion('NorthMountain'); setFilterRegion('NorthMountain'); }}
                 />
-                
+
                 {/* Red River Delta Region */}
-                <polygon 
-                  points="82,65 90,56 102,52 112,48 108,70 102,76 92,78 85,75" 
+                <polygon
+                  points="82,65 90,56 102,52 112,48 108,70 102,76 92,78 85,75"
                   fill="#60A5FA"
                   stroke="#fff"
                   strokeWidth={1}
@@ -793,8 +790,8 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
                 />
 
                 {/* North Central Region */}
-                <polygon 
-                  points="58,74 82,65 108,70 115,82 122,95 128,112 134,130 138,145 137,155 126,145 115,138 105,128 95,120 85,110 75,98 65,85" 
+                <polygon
+                  points="58,74 82,65 108,70 115,82 122,95 128,112 134,130 138,145 137,155 126,145 115,138 105,128 95,120 85,110 75,98 65,85"
                   fill="#F59E0B"
                   stroke="#fff"
                   strokeWidth={1}
@@ -803,8 +800,8 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
                 />
 
                 {/* South Central Region */}
-                <polygon 
-                  points="137,155 142,165 146,180 149,195 152,210 154,225 153,240 150,255 142,268 135,260 132,245 130,225 127,205 128,185 132,170" 
+                <polygon
+                  points="137,155 142,165 146,180 149,195 152,210 154,225 153,240 150,255 142,268 135,260 132,245 130,225 127,205 128,185 132,170"
                   fill="#60A5FA"
                   stroke="#fff"
                   strokeWidth={1}
@@ -813,8 +810,8 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
                 />
 
                 {/* Central Highlands Region */}
-                <polygon 
-                  points="137,155 132,170 128,185 127,205 130,225 132,245 135,260 122,255 114,250 108,238 108,218 112,198 118,180 124,165" 
+                <polygon
+                  points="137,155 132,170 128,185 127,205 130,225 132,245 135,260 122,255 114,250 108,238 108,218 112,198 118,180 124,165"
                   fill="#60A5FA"
                   stroke="#fff"
                   strokeWidth={1}
@@ -823,8 +820,8 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
                 />
 
                 {/* Southeast Region */}
-                <polygon 
-                  points="114,250 102,248 92,255 88,265 96,275 105,285 114,290 122,282 130,272 135,260 122,255" 
+                <polygon
+                  points="114,250 102,248 92,255 88,265 96,275 105,285 114,290 122,282 130,272 135,260 122,255"
                   fill="#60A5FA"
                   stroke="#fff"
                   strokeWidth={1}
@@ -833,8 +830,8 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
                 />
 
                 {/* Mekong Delta Region */}
-                <polygon 
-                  points="88,265 80,272 70,278 62,288 52,298 46,310 48,325 52,338 60,345 72,342 85,335 98,320 108,305 114,290 105,285 96,275" 
+                <polygon
+                  points="88,265 80,272 70,278 62,288 52,298 46,310 48,325 52,338 60,345 72,342 85,335 98,320 108,305 114,290 105,285 96,275"
                   fill="#60A5FA"
                   stroke="#fff"
                   strokeWidth={1}
@@ -864,10 +861,10 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
             </svg>
           ) : (
             // Detailed 63-province GeoJSON map displaying ONLY the 34 provinces from dataset
-            <svg 
-              className="w-full h-full max-w-[320px]" 
-              viewBox="0 0 260 480" 
-              style={{ 
+            <svg
+              className="w-full h-full max-w-[320px]"
+              viewBox="0 0 260 480"
+              style={{
                 filter: 'drop-shadow(0 4px 6px rgba(15, 23, 42, 0.08))',
                 cursor: zoomScale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'
               }}
@@ -876,8 +873,8 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
             >
-              <g 
-                style={{ 
+              <g
+                style={{
                   transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale})`,
                   transformOrigin: 'center center',
                   transition: isDragging ? 'none' : 'transform 0.15s ease-out'
@@ -887,14 +884,14 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
                 {geoJson.features.map((feature, idx) => {
                   const provName = feature.properties.NAME_1;
                   const statusInfo = provinceStatus[provName];
-                  
+
                   // Omit the other 29 provinces not in the 34-province dataset
                   if (!statusInfo) return null;
-                  
+
                   const pathData = getProvincePath(feature);
                   const regionKey = getRegionOfProvince(provName);
                   const isSelected = selectedRegion === regionKey;
-                  
+
                   return (
                     <path
                       key={idx}
@@ -966,7 +963,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
 
       {/* 2B. Main Analytics Section (2-Column Layout) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
+
         {/* Left: Temperature Trend Chart */}
         <div className="glass-panel rounded-2xl p-6 bg-white border border-slate-200 shadow-sm space-y-4">
           <div>
@@ -979,7 +976,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.6} />
                 <XAxis dataKey="date" stroke="#70859c" />
                 <YAxis stroke="#70859c" />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#fff', borderColor: '#e2e8f0', color: '#0f172a', borderRadius: '8px' }}
                   labelStyle={{ fontWeight: 'bold', color: '#2563EB' }}
                 />
@@ -1004,7 +1001,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.6} />
                 <XAxis dataKey="name" stroke="#70859c" tick={{ fontSize: 9 }} />
                 <YAxis stroke="#70859c" />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#fff', borderColor: '#e2e8f0', color: '#0f172a', borderRadius: '8px' }}
                   labelStyle={{ fontWeight: 'bold', color: '#2563EB' }}
                 />
@@ -1018,7 +1015,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
 
       {/* 2C. Secondary Analytics Section (2-Column Layout) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
+
         {/* Left: Humidity Distribution Area Chart */}
         <div className="glass-panel rounded-2xl p-6 bg-white border border-slate-200 shadow-sm space-y-4">
           <div>
@@ -1031,7 +1028,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.6} />
                 <XAxis dataKey="name" stroke="#70859c" tick={{ fontSize: 8 }} />
                 <YAxis stroke="#70859c" domain={[60, 90]} />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#fff', borderColor: '#e2e8f0', color: '#0f172a', borderRadius: '8px' }}
                 />
                 <Area type="monotone" dataKey="value" name="Độ ẩm TB" fill="#06B6D4" fillOpacity={0.15} stroke="#06B6D4" strokeWidth={2} />
@@ -1063,7 +1060,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
 
       {/* 4. New Replacement Section: Insights & Dataset Technical Specs */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
+
         {/* Column 1: Extreme Climate & Anomalies Alert Console */}
         <div className="glass-panel rounded-2xl p-6 bg-white border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
           <div className="flex items-center gap-2.5">
@@ -1121,17 +1118,17 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
               <span className="text-slate-800 font-mono text-[11px] text-right">script/01_crawl.py</span>
             </div>
             <div className="py-2 flex flex-col gap-1">
-              <span className="text-slate-400">Phương pháp lấy mẫu (Spatial Sampling):</span>
+              <span className="text-slate-400">Phương pháp lấy mẫu:</span>
               <p className="text-[10px] text-slate-650 leading-relaxed font-medium">
-                • Tỉnh thông thường: Thu thập **5 điểm** quanh centroid.<br/>
+                • Tỉnh thông thường: Thu thập **5 điểm** quanh centroid.<br />
                 • Tỉnh diện tích lớn: Thu thập **9 điểm** để tăng độ đại diện không gian.
               </p>
             </div>
             <div className="py-2 flex flex-col gap-1">
-              <span className="text-slate-400">Phương pháp tổng hợp (Aggregation):</span>
+              <span className="text-slate-400">Phương pháp tổng hợp:</span>
               <p className="text-[10px] text-slate-650 leading-relaxed font-medium">
-                • Biến số đo đạc: Tính **giá trị trung bình** (mean) theo ngày.<br/>
-                • Biến phân loại: Lấy **yếu vị (mode)** cho các chỉ số chính.
+                • Biến số đo đạc: Tính giá trị trung bình theo ngày.<br />
+                • Biến phân loại: Lấy yếu vị cho các chỉ số chính.
               </p>
             </div>
           </div>

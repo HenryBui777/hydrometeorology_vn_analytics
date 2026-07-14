@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { 
-  Settings, 
-  Key, 
-  Cpu, 
-  FolderOpen, 
+import {
+  Settings,
+  Key,
+  Cpu,
+  FolderOpen,
   ToggleLeft,
   ToggleRight,
   Save,
@@ -49,9 +49,8 @@ function CustomSelect({ value, onChange, options, className }) {
                 onChange({ target: { value: opt.value } });
                 setIsOpen(false);
               }}
-              className={`w-full text-left px-3.5 py-2 hover:bg-blue-50 transition-colors flex items-center justify-between text-xs cursor-pointer ${
-                opt.value === value ? 'bg-blue-55/60 text-brand-primary font-bold' : ''
-              }`}
+              className={`w-full text-left px-3.5 py-2 hover:bg-blue-50 transition-colors flex items-center justify-between text-xs cursor-pointer ${opt.value === value ? 'bg-blue-55/60 text-brand-primary font-bold' : ''
+                }`}
             >
               <span>{opt.label}</span>
               {opt.value === value && <Check className="h-3.5 w-3.5 text-brand-primary" />}
@@ -88,14 +87,14 @@ export default function SettingsView() {
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
-        
+
         {/* LLM Connection settings */}
         <div className="glass-panel bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <Cpu className="h-5 w-5 text-brand-primary" />
             <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Cấu hình kết nối LLM</h2>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
             <div className="space-y-1.5">
               <label className="text-slate-650 font-bold">Primary LLM Model</label>
@@ -148,7 +147,7 @@ export default function SettingsView() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-slate-650 font-bold">Thời gian chạy tối đa (Timeout)</label>
+              <label className="text-slate-650 font-bold">Thời gian chạy tối đa</label>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
@@ -169,7 +168,7 @@ export default function SettingsView() {
               <Settings className="h-5 w-5 text-rose-500 animate-spin-slow" />
               <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Cơ chế bảo mật Sandbox</h2>
             </div>
-            
+
             <button
               type="button"
               onClick={() => setEnableSandbox(!enableSandbox)}
@@ -182,10 +181,10 @@ export default function SettingsView() {
               )}
             </button>
           </div>
-          
+
           <div className="text-xs space-y-2">
             <p className="text-slate-600 leading-relaxed font-semibold">
-              Khi kích hoạt, hệ thống thực hiện Static Analysis (phân tích tĩnh) mã nguồn Python trước khi khởi chạy. 
+              Khi kích hoạt, hệ thống thực hiện phân tích tĩnh mã nguồn Python trước khi khởi chạy.
               Lệnh import các thư viện hệ thống (như `os`, `sys`, `subprocess`, `shutil`) sẽ tự động bị chặn để bảo vệ an toàn cho máy chủ.
             </p>
             <div className="flex items-center gap-1.5 pt-1">

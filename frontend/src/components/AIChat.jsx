@@ -1,19 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Send, 
-  Cpu, 
-  User, 
+import {
+  Send,
+  Cpu,
+  User,
   Database,
   Code2,
   AlertCircle
 } from 'lucide-react';
 import { predefinedQueries } from '../mockData';
 
-export default function AIChat({ 
-  datasetUploaded, 
-  chatHistory, 
-  submitQuery, 
-  setCurrentTab 
+export default function AIChat({
+  datasetUploaded,
+  chatHistory,
+  submitQuery,
+  setCurrentTab
 }) {
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -35,14 +35,14 @@ export default function AIChat({
 
   const executeSubmit = (text) => {
     setIsTyping(true);
-    
+
     // Submit user message instantly
     submitQuery(text, 'user');
 
     // Simulate AI thinking and generating code
     setTimeout(() => {
       setIsTyping(false);
-      
+
       // Look for keywords to match predefined queries
       let matchedQuery = predefinedQueries[0];
       if (text.toLowerCase().includes('mưa') || text.toLowerCase().includes('precipitation')) {
@@ -57,8 +57,8 @@ export default function AIChat({
       submitQuery(
         `Tôi đã phân tích yêu cầu: "${text}". 
 Tôi sẽ tạo ra một đoạn script Python sử dụng thư viện Pandas để đọc tệp CSV \`vietnam_kttv_34tinh_2025-12-06_2026-06-04.csv\` cục bộ, thực hiện tiền xử lý, tính toán giá trị thống kê và xuất kết quả. 
-Mã nguồn đã được tạo thành công và đang chuyển sang trạng thái **"Chờ Phê Duyệt"** dưới sự kiểm soát của bạn.`, 
-        'ai', 
+Mã nguồn đã được tạo thành công và đang chuyển sang trạng thái **"Chờ Phê Duyệt"** dưới sự kiểm soát của bạn.`,
+        'ai',
         matchedQuery
       );
     }, 1800);
@@ -66,15 +66,15 @@ Mã nguồn đã được tạo thành công và đang chuyển sang trạng th�
 
   return (
     <div className="flex-1 p-8 h-full flex flex-col overflow-hidden animate-fade-in">
-      
+
       {/* Right Side (AI conversation area - now takes full width) */}
       <div className="flex-1 glass-panel rounded-xl bg-white flex flex-col overflow-hidden relative shadow-sm border border-slate-200">
-        
+
         {/* Chat Header */}
         <div className="p-4 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div>
-              <h2 className="text-sm font-bold text-slate-855">Trợ lý AI phân tích (Local Assistant)</h2>
+              <h2 className="text-sm font-bold text-slate-855">Trợ lý AI phân tích</h2>
               <span className="text-[10px] text-emerald-600 flex items-center gap-1 font-bold">
                 <span className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-ping" /> Online • Gemini Pro
               </span>
@@ -90,7 +90,7 @@ Mã nguồn đã được tạo thành công và đang chuyển sang trạng th�
             <p className="text-xs text-slate-555 max-w-sm font-semibold">
               Bạn cần nạp tập dữ liệu Khí tượng Thủy văn trước khi có thể trò chuyện và yêu cầu AI sinh mã nguồn phân tích dữ liệu.
             </p>
-            <button 
+            <button
               onClick={() => setCurrentTab('datasets')}
               className="bg-brand-primary hover:bg-brand-primary/90 text-white text-xs font-bold px-4 py-2.5 rounded-lg transition-all shadow-md shadow-blue-500/20 cursor-pointer active:scale-95"
             >
@@ -113,7 +113,7 @@ Mã nguồn đã được tạo thành công và đang chuyển sang trạng th�
             </div>
           ) : (
             chatHistory.map((msg, index) => (
-              <div 
+              <div
                 key={index}
                 className={`flex gap-4 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
               >
@@ -125,13 +125,12 @@ Mã nguồn đã được tạo thành công và đang chuyển sang trạng th�
                 )}
 
                 {/* Message Bubble */}
-                <div className={`max-w-[75%] rounded-lg p-4 border text-xs sm:text-sm leading-relaxed space-y-4 ${
-                  msg.sender === 'user'
+                <div className={`max-w-[75%] rounded-lg p-4 border text-xs sm:text-sm leading-relaxed space-y-4 ${msg.sender === 'user'
                     ? 'bg-brand-primary text-white border-transparent shadow-md shadow-blue-500/10'
                     : 'bg-slate-50 border-slate-200 text-slate-855'
-                }`}>
+                  }`}>
                   <p className="whitespace-pre-wrap font-semibold">{msg.text}</p>
-                  
+
                   {/* If AI generates code, show action button to approve */}
                   {msg.sender === 'ai' && msg.code && (
                     <div className="bg-white border border-slate-200 rounded-lg p-4 mt-2 space-y-3 shadow-sm">
@@ -190,8 +189,8 @@ Mã nguồn đã được tạo thành công và đang chuyển sang trạng th�
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             placeholder={
-              datasetUploaded 
-                ? "Hỏi AI (Ví dụ: So sánh lượng mưa các vùng)..." 
+              datasetUploaded
+                ? "Hỏi AI (Ví dụ: So sánh lượng mưa các vùng)..."
                 : "Vui lòng upload tập dữ liệu trước..."
             }
             className="glass-input flex-1 py-2.5 text-xs sm:text-sm bg-white"
