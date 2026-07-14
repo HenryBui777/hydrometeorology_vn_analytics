@@ -117,6 +117,7 @@ export default function CodeReview({
               readOnly={!isEditing}
               value={editableCode}
               onChange={handleCodeChange}
+              aria-label="Mã nguồn Python"
               className="w-full h-full bg-transparent text-indigo-300 border-none outline-none resize-none overflow-y-auto leading-relaxed focus:ring-0"
               style={{
                 fontFamily: "'Courier New', Courier, monospace",

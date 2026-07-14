@@ -142,20 +142,16 @@ export default function App() {
         {/* Top Header Bar */}
         <header className="h-16 border-b border-slate-200 bg-white/80 backdrop-blur-md px-8 flex justify-between items-center z-20 flex-shrink-0">
           
-          {/* Breadcrumbs / Path */}
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-            <span>Nền tảng KTTV</span>
-            <span>/</span>
-            <span className="text-slate-800 font-bold">
-              {currentTab === 'dashboard' && 'Dashboard tổng quan'}
-              {currentTab === 'datasets' && 'Quản lý dữ liệu'}
-              {currentTab === 'chat' && 'AI Chat phân tích'}
-              {currentTab === 'code' && 'Duyệt mã nguồn'}
-              {currentTab === 'monitor' && 'Giám sát thực thi'}
-              {currentTab === 'results' && 'Kết quả trực quan'}
-              {currentTab === 'history' && 'Lịch sử chạy'}
-              {currentTab === 'settings' && 'Cài đặt'}
-            </span>
+          {/* Page Title */}
+          <div className="text-lg md:text-xl font-bold text-slate-800 tracking-tight">
+            {currentTab === 'dashboard' && 'Dashboard tổng quan'}
+            {currentTab === 'datasets' && 'Quản lý dữ liệu'}
+            {currentTab === 'chat' && 'AI Chat phân tích'}
+            {currentTab === 'code' && 'Duyệt mã nguồn'}
+            {currentTab === 'monitor' && 'Giám sát thực thi'}
+            {currentTab === 'results' && 'Kết quả trực quan'}
+            {currentTab === 'history' && 'Lịch sử chạy'}
+            {currentTab === 'settings' && 'Cài đặt'}
           </div>
 
           {/* Quick Metrics & User tools */}

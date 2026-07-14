@@ -59,7 +59,7 @@ function CustomSelect({ value, onChange, options, className }) {
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 mt-1.5 min-w-[200px] w-full max-h-60 overflow-y-auto rounded-lg bg-white border border-slate-200 shadow-lg z-30 py-1 font-semibold text-slate-750 animate-fade-in">
+        <div className="absolute right-0 mt-1.5 min-w-full w-max max-w-[240px] max-h-80 overflow-y-auto rounded-lg bg-white border border-slate-200 shadow-lg z-30 py-1 font-semibold text-slate-750 animate-fade-in">
           {options.map((opt) => (
             <button
               key={opt.value}
