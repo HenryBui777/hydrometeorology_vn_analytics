@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Thermometer,
   CloudRain,
@@ -90,6 +91,7 @@ export default function HomeDashboard({ datasetUploaded, setCurrentTab, submitQu
   const [aiPromptInput, setAiPromptInput] = useState('');
   const [geoJson, setGeoJson] = useState(null);
   const [hoveredProvince, setHoveredProvince] = useState(null);
+  const [mapTooltipPos, setMapTooltipPos] = useState({ x: 0, y: 0 });
   const [zoomScale, setZoomScale] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -362,6 +364,51 @@ export default function HomeDashboard({ datasetUploaded, setCurrentTab, submitQu
   const displayRain = nationalKPIs.rain;
   const displayHumidity = nationalKPIs.humidity;
   const displayWind = nationalKPIs.wind;
+  const displaySunshine = nationalKPIs.sunshine;
+  const displayET0 = nationalKPIs.et0;
+
+  // Pre-calculate average statistics for each province
+  const provinceStats = useMemo(() => {
+    if (!rawRows.length) return {};
+    const grouped = {};
+    rawRows.forEach(r => {
+      if (!grouped[r.province]) {
+        grouped[r.province] = { temp: [], rain: [], humidity: [], wind: [], sunshine: [] };
+      }
+      const g = grouped[r.province];
+      if (r.temp !== null && !isNaN(r.temp)) g.temp.push(r.temp);
+      if (r.rain !== null && !isNaN(r.rain)) g.rain.push(r.rain);
+      if (r.humidity !== null && !isNaN(r.humidity)) g.humidity.push(r.humidity);
+      if (r.wind !== null && !isNaN(r.wind)) g.wind.push(r.wind);
+      if (r.sunshine !== null && !isNaN(r.sunshine)) g.sunshine.push(r.sunshine);
+    });
+
+    const result = {};
+    const avg = arr => arr.length ? arr.reduce((sum, v) => sum + v, 0) / arr.length : 0;
+    
+    Object.entries(grouped).forEach(([prov, data]) => {
+      result[prov] = {
+        temp: (avg(data.temp)).toFixed(1),
+        rain: (avg(data.rain)).toFixed(1),
+        humidity: Math.round(avg(data.humidity)),
+        wind: (avg(data.wind)).toFixed(1),
+        sunshine: Math.round(avg(data.sunshine))
+      };
+    });
+    return result;
+  }, [rawRows]);
+
+  const getProvinceStats = (name) => {
+    if (!name) return null;
+    if (provinceStats[name]) return provinceStats[name];
+    
+    const keys = Object.keys(provinceStats);
+    const matchedKey = keys.find(k => k.toLowerCase() === name.toLowerCase() || 
+                                     name.toLowerCase().includes(k.toLowerCase()) ||
+                                     k.toLowerCase().includes(name.toLowerCase()));
+    if (matchedKey) return provinceStats[matchedKey];
+    return null;
+  };
 
 
   // Handlers for AI Quick Analysis
@@ -545,24 +592,24 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
       </div>
 
       {/* 3. Climate KPI Cards Grid (with trend lines and sparklines) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
 
         {/* KPI 1: Avg Temp */}
-        <div className="glass-card rounded-2xl p-5 relative overflow-hidden bg-white border border-slate-200">
+        <div className="glass-card rounded-2xl p-4 relative overflow-hidden bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Nhiệt độ trung bình</span>
             <img src="https://img.icons8.com/fluency/48/thermometer.png" alt="Nhiệt độ" className="h-6 w-6 object-contain flex-shrink-0" />
           </div>
           <div className="flex justify-between items-end">
             <div className="space-y-0.5">
-              <span className="text-2xl font-extrabold text-slate-800 tracking-tight">{displayTemp} °C</span>
-              <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-bold">
-                <TrendingUp className="h-3.5 w-3.5" /> +0.4°C vs tháng trước
+              <span className="text-xl font-extrabold text-slate-800 tracking-tight">{displayTemp} °C</span>
+              <div className="flex items-center gap-0.5 text-[9px] text-emerald-600 font-bold">
+                <TrendingUp className="h-3 w-3" /> +0.4°C vs tháng trước
               </div>
             </div>
             {/* Tiny Sparkline */}
             <div className="pb-1">
-              <svg className="w-16 h-8 text-orange-400" viewBox="0 0 50 20">
+              <svg className="w-12 h-6 text-orange-400" viewBox="0 0 50 20">
                 <path d="M0,15 L10,13 L20,10 L30,12 L40,6 L50,3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
               </svg>
             </div>
@@ -570,21 +617,21 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         </div>
 
         {/* KPI 2: Avg Rain */}
-        <div className="glass-card rounded-2xl p-5 relative overflow-hidden bg-white border border-slate-200">
+        <div className="glass-card rounded-2xl p-4 relative overflow-hidden bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Lượng mưa trung bình</span>
             <img src="https://img.icons8.com/fluency/48/rain.png" alt="Lượng mưa" className="h-6 w-6 object-contain flex-shrink-0" />
           </div>
           <div className="flex justify-between items-end">
             <div className="space-y-0.5">
-              <span className="text-2xl font-extrabold text-slate-800 tracking-tight">{displayRain} mm</span>
-              <div className="flex items-center gap-1 text-[10px] text-cyan-600 font-bold">
-                <TrendingDown className="h-3.5 w-3.5" /> -12% vs tháng trước
+              <span className="text-xl font-extrabold text-slate-800 tracking-tight">{displayRain} mm</span>
+              <div className="flex items-center gap-0.5 text-[9px] text-cyan-600 font-bold">
+                <TrendingDown className="h-3 w-3" /> -12% vs tháng trước
               </div>
             </div>
             {/* Tiny Sparkline */}
             <div className="pb-1">
-              <svg className="w-16 h-8 text-blue-400" viewBox="0 0 50 20">
+              <svg className="w-12 h-6 text-blue-400" viewBox="0 0 50 20">
                 <path d="M0,5 L10,8 L20,12 L30,9 L40,15 L50,16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
               </svg>
             </div>
@@ -592,21 +639,21 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         </div>
 
         {/* KPI 3: Avg Humidity */}
-        <div className="glass-card rounded-2xl p-5 relative overflow-hidden bg-white border border-slate-200">
+        <div className="glass-card rounded-2xl p-4 relative overflow-hidden bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Độ ẩm trung bình</span>
             <img src="https://img.icons8.com/fluency/48/humidity.png" alt="Độ ẩm" className="h-6 w-6 object-contain flex-shrink-0" />
           </div>
           <div className="flex justify-between items-end">
             <div className="space-y-0.5">
-              <span className="text-2xl font-extrabold text-slate-800 tracking-tight">{displayHumidity} %</span>
-              <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-bold">
-                <TrendingUp className="h-3.5 w-3.5" /> +1.2% vs tháng trước
+              <span className="text-xl font-extrabold text-slate-800 tracking-tight">{displayHumidity} %</span>
+              <div className="flex items-center gap-0.5 text-[9px] text-emerald-600 font-bold">
+                <TrendingUp className="h-3 w-3" /> +1.2% vs tháng trước
               </div>
             </div>
             {/* Tiny Sparkline */}
             <div className="pb-1">
-              <svg className="w-16 h-8 text-cyan-400" viewBox="0 0 50 20">
+              <svg className="w-12 h-6 text-cyan-400" viewBox="0 0 50 20">
                 <path d="M0,12 L10,10 L20,14 L30,8 L40,10 L50,4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
               </svg>
             </div>
@@ -614,22 +661,66 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         </div>
 
         {/* KPI 4: Avg Wind Speed */}
-        <div className="glass-card rounded-2xl p-5 relative overflow-hidden bg-white border border-slate-200">
+        <div className="glass-card rounded-2xl p-4 relative overflow-hidden bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Tốc độ gió trung bình</span>
             <img src="https://img.icons8.com/fluency/48/wind.png" alt="Tốc độ gió" className="h-6 w-6 object-contain flex-shrink-0" />
           </div>
           <div className="flex justify-between items-end">
             <div className="space-y-0.5">
-              <span className="text-2xl font-extrabold text-slate-800 tracking-tight">{displayWind} km/h</span>
-              <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-bold">
-                <TrendingUp className="h-3.5 w-3.5" /> +0.8 km/h vs tháng trước
+              <span className="text-xl font-extrabold text-slate-800 tracking-tight">{displayWind} km/h</span>
+              <div className="flex items-center gap-0.5 text-[9px] text-emerald-600 font-bold">
+                <TrendingUp className="h-3 w-3" /> +0.8 km/h vs tháng trước
               </div>
             </div>
             {/* Tiny Sparkline */}
             <div className="pb-1">
-              <svg className="w-16 h-8 text-slate-400" viewBox="0 0 50 20">
+              <svg className="w-12 h-6 text-slate-400" viewBox="0 0 50 20">
                 <path d="M0,10 L10,11 L20,9 L30,10 L40,8 L50,7" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI 5: Avg Sunshine Hours */}
+        <div className="glass-card rounded-2xl p-4 relative overflow-hidden bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Tổng giờ nắng</span>
+            <img src="https://img.icons8.com/fluency/48/sun.png" alt="Giờ nắng" className="h-6 w-6 object-contain flex-shrink-0" />
+          </div>
+          <div className="flex justify-between items-end">
+            <div className="space-y-0.5">
+              <span className="text-xl font-extrabold text-slate-800 tracking-tight">{displaySunshine} giờ</span>
+              <div className="flex items-center gap-0.5 text-[9px] text-emerald-600 font-bold">
+                <TrendingUp className="h-3 w-3" /> +15.4 giờ vs tháng trước
+              </div>
+            </div>
+            {/* Tiny Sparkline */}
+            <div className="pb-1">
+              <svg className="w-12 h-6 text-amber-550" viewBox="0 0 50 20">
+                <path d="M0,10 L10,8 L20,5 L30,9 L40,4 L50,2" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI 6: Avg Evapotranspiration ET0 */}
+        <div className="glass-card rounded-2xl p-4 relative overflow-hidden bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Lượng bốc hơi ET₀</span>
+            <img src="https://img.icons8.com/fluency/48/water.png" alt="Bốc hơi ET0" className="h-6 w-6 object-contain flex-shrink-0" />
+          </div>
+          <div className="flex justify-between items-end">
+            <div className="space-y-0.5">
+              <span className="text-xl font-extrabold text-slate-800 tracking-tight">{displayET0} mm</span>
+              <div className="flex items-center gap-0.5 text-[9px] text-cyan-600 font-bold">
+                <TrendingDown className="h-3 w-3" /> -4% vs tháng trước
+              </div>
+            </div>
+            {/* Tiny Sparkline */}
+            <div className="pb-1">
+              <svg className="w-12 h-6 text-cyan-550" viewBox="0 0 50 20">
+                <path d="M0,14 L10,12 L20,13 L30,9 L40,11 L50,8" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
               </svg>
             </div>
           </div>
@@ -650,27 +741,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
               Bản đồ phân vùng địa lý Việt Nam. Rê chuột hoặc click vào một khu vực để hiển thị báo cáo chi tiết thời tiết.
             </p>
 
-            {/* Metric Toggle Buttons */}
-            <div className="flex gap-2 mt-6">
-              <button
-                onClick={() => setMapMetric('temp')}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-all ${mapMetric === 'temp'
-                  ? 'bg-brand-primary text-white border-brand-primary shadow-sm shadow-blue-500/10'
-                  : 'bg-white hover:bg-slate-50 text-slate-650 border-slate-200'
-                  }`}
-              >
-                Xem theo nhiệt độ
-              </button>
-              <button
-                onClick={() => setMapMetric('rain')}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-all ${mapMetric === 'rain'
-                  ? 'bg-brand-primary text-white border-brand-primary shadow-sm shadow-blue-500/10'
-                  : 'bg-white hover:bg-slate-50 text-slate-650 border-slate-200'
-                  }`}
-              >
-                Xem theo lượng mưa
-              </button>
-            </div>
+
           </div>
 
           {/* Region Weather Inspector details card */}
@@ -714,10 +785,52 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         <div className="lg:col-span-2 flex flex-col justify-center items-center bg-[#FAF6E8] border border-orange-100/40 rounded-2xl p-6 h-96 relative overflow-hidden select-none">
 
           {/* Hover Province Tooltip */}
-          {hoveredProvince && (
-            <div className="absolute top-3 left-3 bg-slate-900/90 backdrop-blur-md text-white text-[10px] font-bold px-3 py-1.5 rounded-lg border border-slate-800 shadow-lg pointer-events-none z-20 transition-all">
-              Tỉnh: <span className="text-brand-accent">{hoveredProvince.name}</span> ({hoveredProvince.status})
-            </div>
+          {hoveredProvince && createPortal(
+            (() => {
+              const pStats = getProvinceStats(hoveredProvince.originalName);
+              return (
+                <div 
+                  className="fixed bg-slate-900/95 backdrop-blur border border-slate-800 text-white rounded-xl p-3 shadow-xl pointer-events-none z-50 text-[10px] font-medium min-w-[180px] transition-all space-y-2"
+                  style={{ 
+                    left: `${mapTooltipPos.x + 15}px`, 
+                    top: `${mapTooltipPos.y + 15}px`,
+                    transform: mapTooltipPos.x > window.innerWidth - 220 ? 'translateX(-110%)' : 'none'
+                  }}
+                >
+                  <div className="border-b border-slate-800 pb-1.5 flex justify-between items-center">
+                    <span className="font-extrabold text-brand-accent text-xs">{hoveredProvince.name}</span>
+                    <span className="text-[7.5px] text-slate-400 font-extrabold uppercase tracking-wider">{hoveredProvince.status}</span>
+                  </div>
+                  {pStats ? (
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 font-mono text-[9px] text-slate-350">
+                      <div>
+                        <span className="text-[7.5px] text-slate-500 font-extrabold uppercase block font-sans">Nhiệt độ</span>
+                        <span className="font-bold text-slate-100">{pStats.temp} °C</span>
+                      </div>
+                      <div>
+                        <span className="text-[7.5px] text-slate-500 font-extrabold uppercase block font-sans">Lượng mưa</span>
+                        <span className="font-bold text-blue-400">{pStats.rain} mm</span>
+                      </div>
+                      <div>
+                        <span className="text-[7.5px] text-slate-500 font-extrabold uppercase block font-sans">Độ ẩm</span>
+                        <span className="font-bold text-slate-100">{pStats.humidity} %</span>
+                      </div>
+                      <div>
+                        <span className="text-[7.5px] text-slate-500 font-extrabold uppercase block font-sans">Tốc độ gió</span>
+                        <span className="font-bold text-slate-100">{pStats.wind} km/h</span>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-[7.5px] text-slate-500 font-extrabold uppercase block font-sans">Giờ nắng TB</span>
+                        <span className="font-bold text-amber-400">{pStats.sunshine} giờ</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-[8px] text-slate-500 font-bold">Không có dữ liệu chi tiết</p>
+                  )}
+                </div>
+              );
+            })(),
+            document.body
           )}
 
           {/* Floating Zoom Controls */}
@@ -892,7 +1005,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
                   const regionKey = getRegionOfProvince(provName);
                   const isSelected = selectedRegion === regionKey;
 
-                  return (
+                   return (
                     <path
                       key={idx}
                       d={pathData}
@@ -900,7 +1013,13 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
                       stroke={isSelected ? '#2563EB' : '#fff'}
                       strokeWidth={isSelected ? 1.2 : 0.4}
                       className="cursor-pointer transition-all duration-150 hover:opacity-85"
-                      onMouseEnter={() => setHoveredProvince({ name: getProvinceLabel(provName), status: statusInfo.status })}
+                      onMouseEnter={(e) => {
+                        setHoveredProvince({ name: getProvinceLabel(provName), originalName: provName, status: statusInfo.status });
+                        setMapTooltipPos({ x: e.clientX, y: e.clientY });
+                      }}
+                      onMouseMove={(e) => {
+                        setMapTooltipPos({ x: e.clientX, y: e.clientY });
+                      }}
                       onMouseLeave={() => setHoveredProvince(null)}
                       onClick={() => { setSelectedRegion(regionKey); setFilterRegion(regionKey); }}
                     />

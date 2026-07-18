@@ -30,7 +30,7 @@ export default function Sidebar({ currentTab, setCurrentTab, isCollapsed, setIsC
             {!isCollapsed && (
               <span className="font-bold text-sm text-slate-100 tracking-tight whitespace-nowrap flex items-center gap-1.5">
                 <span>KTTV Analytics</span>
-                <span className="text-white text-[8px] font-extrabold px-1 py-0.5 rounded bg-brand-primary leading-none inline-flex items-center justify-center">AI</span>
+                <span className="text-white text-[7.5px] font-extrabold w-[18px] h-[13px] rounded bg-brand-primary flex items-center justify-center leading-none pt-[0.5px]">AI</span>
               </span>
             )}
           </div>
