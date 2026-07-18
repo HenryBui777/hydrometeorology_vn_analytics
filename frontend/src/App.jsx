@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { predefinedQueries } from './mockData';
 import Sidebar from './components/Sidebar';
 import HomeDashboard from './components/HomeDashboard';
+import TimeSeriesView from './components/TimeSeriesView';
+import ComparisonView from './components/ComparisonView';
+import AnalysisView from './components/AnalysisView';
 import DatasetManagement from './components/DatasetManagement';
 import AIChat from './components/AIChat';
 import CodeReview from './components/CodeReview';
@@ -145,6 +148,9 @@ export default function App() {
           {/* Page Title */}
           <div className="text-lg md:text-xl font-bold text-slate-800 tracking-tight">
             {currentTab === 'dashboard' && 'Dashboard tổng quan'}
+            {currentTab === 'timeseries' && 'Xu hướng thời gian (Time Series)'}
+            {currentTab === 'comparison' && 'So sánh khí hậu (Comparison)'}
+            {currentTab === 'analysis' && 'Tương quan & Phân phối (Analysis)'}
             {currentTab === 'datasets' && 'Quản lý dữ liệu'}
             {currentTab === 'chat' && 'AI Chat phân tích'}
             {currentTab === 'code' && 'Duyệt mã nguồn'}
@@ -200,6 +206,18 @@ export default function App() {
               datasetUploaded={datasetUploaded} 
               setCurrentTab={setCurrentTab} 
             />
+          )}
+
+          {currentTab === 'timeseries' && (
+            <TimeSeriesView />
+          )}
+
+          {currentTab === 'comparison' && (
+            <ComparisonView />
+          )}
+
+          {currentTab === 'analysis' && (
+            <AnalysisView />
           )}
 
           {currentTab === 'datasets' && (

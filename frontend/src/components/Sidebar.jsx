@@ -7,6 +7,9 @@ import {
 export default function Sidebar({ currentTab, setCurrentTab, isCollapsed, setIsCollapsed, pendingCount }) {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', iconUrl: 'https://img.icons8.com/fluency/48/combo-chart.png' },
+    { id: 'timeseries', label: 'Xu hướng thời gian', iconUrl: 'https://img.icons8.com/fluency/48/graph.png' },
+    { id: 'comparison', label: 'So sánh đối chiếu', iconUrl: 'https://img.icons8.com/fluency/48/scales.png' },
+    { id: 'analysis', label: 'Phân tích tương quan', iconUrl: 'https://img.icons8.com/fluency/48/heat-map.png' },
     { id: 'datasets', label: 'Tập dữ liệu', iconUrl: 'https://img.icons8.com/fluency/48/database.png' },
     { id: 'chat', label: 'AI chat phân tích', iconUrl: 'https://img.icons8.com/fluency/48/artificial-intelligence.png' },
     { id: 'results', label: 'Kết quả trực quan', iconUrl: 'https://img.icons8.com/fluency/48/area-chart.png' },

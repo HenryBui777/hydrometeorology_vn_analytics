@@ -107,6 +107,16 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   box-shadow: none !important;
 }
 
+/* Remove outline from SVGs and Recharts elements when clicked */
+svg, g, rect, path, .recharts-wrapper, .recharts-surface, .recharts-layer, .recharts-bar-rectangles {
+  outline: none !important;
+  box-shadow: none !important;
+}
+svg:focus, g:focus, rect:focus, path:focus, .recharts-wrapper:focus, .recharts-surface:focus, .recharts-layer:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 /* Springy entrance animations */
 @keyframes springySlideUp {
   from {
