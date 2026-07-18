@@ -21,6 +21,8 @@ import {
   Search, 
   Check, 
   ChevronDown, 
+  ChevronLeft,
+  ChevronRight,
   X,
   TrendingUp,
   CloudRain,
@@ -67,6 +69,13 @@ export default function TimeSeriesView() {
   const [isMetricDropdownOpen, setIsMetricDropdownOpen] = useState(false);
   const metricDropdownRef = useRef(null);
 
+  // Custom calendar date picker states
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [calendarTarget, setCalendarTarget] = useState('start'); // 'start' | 'end'
+  const [currentYear, setCurrentYear] = useState(2025);
+  const [currentMonth, setCurrentMonth] = useState(11); // 11 = Dec
+  const datePickerRef = useRef(null);
+
   // Set default date range once data is loaded
   useEffect(() => {
     if (fullStats?.dateRange) {
@@ -75,7 +84,7 @@ export default function TimeSeriesView() {
     }
   }, [fullStats]);
 
-  // Click outside listener for dropdowns
+  // Click outside listener for dropdowns & calendar
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -84,10 +93,88 @@ export default function TimeSeriesView() {
       if (metricDropdownRef.current && !metricDropdownRef.current.contains(event.target)) {
         setIsMetricDropdownOpen(false);
       }
+      if (datePickerRef.current && !datePickerRef.current.contains(event.target)) {
+        setIsCalendarOpen(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // 0. Custom Calendar calculations and handlers
+  const calendarDays = useMemo(() => {
+    const firstDay = new Date(currentYear, currentMonth, 1);
+    const startOffset = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
+    const totalDays = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const prevTotalDays = new Date(currentYear, currentMonth, 0).getDate();
+
+    const days = [];
+    for (let i = startOffset - 1; i >= 0; i--) {
+      const pmMonth = currentMonth === 0 ? 12 : currentMonth;
+      const pmYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+      days.push({
+        dateStr: `${pmYear}-${pmMonth.toString().padStart(2, '0')}-${(prevTotalDays - i).toString().padStart(2, '0')}`,
+        dayNum: prevTotalDays - i,
+        isCurrentMonth: false
+      });
+    }
+    for (let i = 1; i <= totalDays; i++) {
+      days.push({
+        dateStr: `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${i.toString().padStart(2, '0')}`,
+        dayNum: i,
+        isCurrentMonth: true
+      });
+    }
+    const remaining = 42 - days.length;
+    for (let i = 1; i <= remaining; i++) {
+      const nmMonth = currentMonth === 11 ? 1 : currentMonth + 2;
+      const nmYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+      days.push({
+        dateStr: `${nmYear}-${nmMonth.toString().padStart(2, '0')}-${i.toString().padStart(2, '0')}`,
+        dayNum: i,
+        isCurrentMonth: false
+      });
+    }
+    return days;
+  }, [currentYear, currentMonth]);
+
+  const formatDateVN = (dateStr) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    const [y, m, d] = parts;
+    return `${d}/${m}/${y}`;
+  };
+
+  const handleDateClick = (dateStr) => {
+    if (calendarTarget === 'start') {
+      if (endDate && dateStr > endDate) return;
+      setStartDate(dateStr);
+      setIsCalendarOpen(false);
+    } else {
+      if (startDate && dateStr < startDate) return;
+      setEndDate(dateStr);
+      setIsCalendarOpen(false);
+    }
+  };
+
+  const handlePrevMonth = () => {
+    if (currentMonth === 0) {
+      setCurrentMonth(11);
+      setCurrentYear(prev => prev - 1);
+    } else {
+      setCurrentMonth(prev => prev - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (currentMonth === 11) {
+      setCurrentMonth(0);
+      setCurrentYear(prev => prev + 1);
+    } else {
+      setCurrentMonth(prev => prev + 1);
+    }
+  };
 
   // Filter provinces list by search input
   const filteredProvincesList = useMemo(() => {
@@ -372,7 +459,7 @@ export default function TimeSeriesView() {
             </button>
 
             {isMetricDropdownOpen && (
-              <div className="absolute left-0 mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-1.5 animate-fade-in max-h-80 overflow-y-auto">
+              <div className="absolute left-0 mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-1.5 animate-fade-in">
                 {METRICS.map(m => (
                   <button
                     key={m.key}
@@ -396,28 +483,125 @@ export default function TimeSeriesView() {
         </div>
 
         {/* Date Ranges (Col Span 5) */}
-        <div className="lg:col-span-5 space-y-1.5">
+        <div className="lg:col-span-5 space-y-1.5" ref={datePickerRef}>
           <label className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
             <Calendar className="h-3.5 w-3.5 text-emerald-500" /> Khoảng thời gian
           </label>
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={startDate}
-              min={fullStats?.dateRange?.min}
-              max={fullStats?.dateRange?.max}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-1/2 bg-slate-50 border border-slate-250 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 shadow-sm focus:border-brand-primary outline-none"
-            />
+          <div className="flex items-center gap-2 relative">
+            <button
+              type="button"
+              onClick={() => {
+                setCalendarTarget('start');
+                setIsCalendarOpen(true);
+                if (startDate) {
+                  const parts = startDate.split('-');
+                  if (parts.length === 3) {
+                    setCurrentYear(parseInt(parts[0], 10));
+                    setCurrentMonth(parseInt(parts[1], 10) - 1);
+                  }
+                }
+              }}
+              className={`w-1/2 bg-slate-50 border ${
+                isCalendarOpen && calendarTarget === 'start' ? 'border-brand-primary ring-1 ring-blue-100' : 'border-slate-250'
+              } rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 text-left shadow-sm cursor-pointer transition-all flex justify-between items-center outline-none`}
+            >
+              <span>{startDate ? formatDateVN(startDate) : 'Từ ngày'}</span>
+              <Calendar className="h-3.5 w-3.5 text-slate-400" />
+            </button>
+
             <span className="text-slate-400 text-xs font-semibold">đến</span>
-            <input
-              type="date"
-              value={endDate}
-              min={fullStats?.dateRange?.min}
-              max={fullStats?.dateRange?.max}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-1/2 bg-slate-50 border border-slate-250 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 shadow-sm focus:border-brand-primary outline-none"
-            />
+
+            <button
+              type="button"
+              onClick={() => {
+                setCalendarTarget('end');
+                setIsCalendarOpen(true);
+                if (endDate) {
+                  const parts = endDate.split('-');
+                  if (parts.length === 3) {
+                    setCurrentYear(parseInt(parts[0], 10));
+                    setCurrentMonth(parseInt(parts[1], 10) - 1);
+                  }
+                }
+              }}
+              className={`w-1/2 bg-slate-50 border ${
+                isCalendarOpen && calendarTarget === 'end' ? 'border-brand-primary ring-1 ring-blue-100' : 'border-slate-250'
+              } rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 text-left shadow-sm cursor-pointer transition-all flex justify-between items-center outline-none`}
+            >
+              <span>{endDate ? formatDateVN(endDate) : 'Đến ngày'}</span>
+              <Calendar className="h-3.5 w-3.5 text-slate-400" />
+            </button>
+
+            {isCalendarOpen && (
+              <div className={`absolute ${calendarTarget === 'start' ? 'left-0' : 'right-0'} top-full mt-1.5 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 p-4 space-y-3 animate-fade-in`}>
+                {/* Header: Month/Year & Controls */}
+                <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                  <button
+                    type="button"
+                    onClick={handlePrevMonth}
+                    className="p-1 hover:bg-slate-100 rounded-lg transition-colors text-slate-500"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="text-xs font-bold text-slate-800">
+                    Tháng {currentMonth + 1} / {currentYear}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleNextMonth}
+                    className="p-1 hover:bg-slate-100 rounded-lg transition-colors text-slate-500"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* Day of Week Headers */}
+                <div className="grid grid-cols-7 gap-1 text-center">
+                  {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map(d => (
+                    <span key={d} className="text-[9px] font-extrabold text-slate-400 uppercase">
+                      {d}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Grid of Days */}
+                <div className="grid grid-cols-7 gap-1">
+                  {calendarDays.map((day, idx) => {
+                    const isSelected = calendarTarget === 'start' ? day.dateStr === startDate : day.dateStr === endDate;
+                    const isMinMaxBound = fullStats?.dateRange && (day.dateStr < fullStats.dateRange.min || day.dateStr > fullStats.dateRange.max);
+                    const isDateInvalid = calendarTarget === 'start'
+                      ? (endDate && day.dateStr > endDate)
+                      : (startDate && day.dateStr < startDate);
+                    const isDisabled = isMinMaxBound || isDateInvalid;
+                    
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => handleDateClick(day.dateStr)}
+                        className={`py-1 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center cursor-pointer ${
+                          isDisabled 
+                            ? 'text-slate-200 cursor-not-allowed opacity-40' 
+                            : !day.isCurrentMonth
+                            ? 'text-slate-300 hover:bg-slate-50'
+                            : isSelected
+                            ? 'bg-brand-primary text-white font-extrabold shadow-sm'
+                            : 'text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        {day.dayNum}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Footer instructions */}
+                <div className="text-[9px] text-slate-400 font-semibold text-center border-t border-slate-100 pt-2">
+                  {calendarTarget === 'start' ? 'Chọn ngày bắt đầu (Từ ngày)' : 'Chọn ngày kết thúc (Đến ngày)'}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
