@@ -163,21 +163,7 @@ export default function App() {
           {/* Quick Metrics & User tools */}
           <div className="flex items-center gap-6">
             
-            {/* System Status Indicators */}
-            <div className="hidden lg:flex items-center gap-4 text-[10px] font-bold text-slate-500 border-r border-slate-200 pr-6">
-              <span className="flex items-center gap-1.5">
-                <Activity className="h-3.5 w-3.5 text-brand-primary" /> 
-                CPU: <span className="text-slate-700 font-mono">1.2%</span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Cpu className="h-3.5 w-3.5 text-brand-accent" /> 
-                RAM: <span className="text-slate-700 font-mono">124MB</span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Database className="h-3.5 w-3.5 text-emerald-500" /> 
-                Runtime: <span className="text-emerald-600 font-semibold">Sẵn sàng</span>
-              </span>
-            </div>
+
 
             {/* Profile Tools */}
             <div className="flex items-center gap-3">

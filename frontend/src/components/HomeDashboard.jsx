@@ -1135,12 +1135,12 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
               className="w-full flex items-center justify-between bg-slate-50 border border-slate-200 text-slate-700 font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-sm focus:outline-none focus:border-brand-primary hover:bg-slate-100 transition-all select-none"
             >
               <span>
-                {activeRankMetric === 'hottest' && '🔥 Nhiệt độ trung bình cao nhất (Nóng nhất)'}
-                {activeRankMetric === 'coldest' && '❄️ Nhiệt độ trung bình thấp nhất (Lạnh nhất)'}
-                {activeRankMetric === 'rainiest' && '🌧️ Lượng mưa trung bình cao nhất (Mưa nhiều nhất)'}
-                {activeRankMetric === 'driest' && '☀️ Lượng mưa trung bình thấp nhất (Mưa ít nhất)'}
-                {activeRankMetric === 'windiest' && '💨 Tốc độ gió trung bình cao nhất (Gió mạnh nhất)'}
-                {activeRankMetric === 'sunniest' && '🔆 Tổng giờ nắng trung bình cao nhất (Nắng nhiều nhất)'}
+                {activeRankMetric === 'hottest' && '🔥 Nhiệt độ trung bình cao nhất'}
+                {activeRankMetric === 'coldest' && '❄️ Nhiệt độ trung bình thấp nhất'}
+                {activeRankMetric === 'rainiest' && '🌧️ Lượng mưa trung bình cao nhất'}
+                {activeRankMetric === 'driest' && '☀️ Lượng mưa trung bình thấp nhất'}
+                {activeRankMetric === 'windiest' && '💨 Tốc độ gió trung bình cao nhất'}
+                {activeRankMetric === 'sunniest' && '🔆 Tổng giờ nắng trung bình cao nhất'}
               </span>
               <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -1242,132 +1242,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
 
 
 
-      {/* 4. New Replacement Section: Insights & Dataset Technical Specs */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-        {/* Column 1: Extreme Climate & Anomalies Alert Console */}
-        <div className="glass-panel rounded-2xl p-6 bg-white border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
-          <div className="flex items-center gap-2.5">
-            <img src="https://img.icons8.com/fluency/48/info.png" alt="Cảnh báo" className="h-6 w-6 object-contain flex-shrink-0" />
-            <h3 className="text-base font-bold text-slate-800">Cảnh báo khí hậu đặc biệt</h3>
-          </div>
-
-          <div className="space-y-2.5 flex-1">
-            <div className="flex gap-3 items-start p-2.5 bg-rose-50/40 border border-rose-100/50 rounded-xl">
-              <span className="mt-0.5 text-[9px] bg-rose-100 border border-rose-200 text-rose-700 font-bold w-[76px] py-0.5 rounded flex-shrink-0 text-center justify-center flex items-center">NẮNG NÓNG</span>
-              <div className="space-y-0.5">
-                <p className="text-[11px] font-bold text-slate-800">Đông Nam Bộ (TP. HCM)</p>
-                <p className="text-[10px] text-slate-650 font-medium leading-relaxed">
-                  Đạt cực đại <strong className="text-rose-650">35.8 °C</strong>, chỉ số UV cực đại ở mức nguy hại là <strong>9.0</strong> vào giữa tháng 5/2026.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-3 items-start p-2.5 bg-blue-50/30 border border-blue-100/50 rounded-xl">
-              <span className="mt-0.5 text-[9px] bg-blue-100 border border-blue-200 text-blue-700 font-bold w-[76px] py-0.5 rounded flex-shrink-0 text-center justify-center flex items-center">MƯA LỚN</span>
-              <div className="space-y-0.5">
-                <p className="text-[11px] font-bold text-slate-800">Bắc Trung Bộ (Hà Tĩnh & Quảng Trị)</p>
-                <p className="text-[10px] text-slate-650 font-medium leading-relaxed">
-                  Lượng mưa kỷ lục đạt <strong>4.98 mm</strong> và <strong>4.25 mm</strong>, cao gấp 2.5 lần trung bình toàn quốc.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-3 items-start p-2.5 bg-amber-50/40 border border-amber-100/50 rounded-xl">
-              <span className="mt-0.5 text-[9px] bg-amber-100 border border-amber-200 text-amber-700 font-bold w-[76px] py-0.5 rounded flex-shrink-0 text-center justify-center flex items-center">TIA UV</span>
-              <div className="space-y-0.5">
-                <p className="text-[11px] font-bold text-slate-800">Tây Nam Bộ (An Giang)</p>
-                <p className="text-[10px] text-slate-650 font-medium leading-relaxed">
-                  Chỉ số UV cực đại chạm ngưỡng nguy hại <strong className="text-amber-700">9.2</strong>. Khuyến cáo hạn chế di chuyển ngoài trời.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Column 2: Data Crawling & Sampling Engine */}
-        <div className="glass-panel rounded-2xl p-6 bg-white border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
-          <div className="flex items-center gap-2.5">
-            <img src="https://img.icons8.com/fluency/48/weather.png" alt="Thu thập" className="h-6 w-6 object-contain flex-shrink-0" />
-            <h3 className="text-base font-bold text-slate-800">Thu thập & xử lý số liệu</h3>
-          </div>
-
-          <div className="divide-y divide-slate-100 text-xs font-semibold flex-1">
-            <div className="py-2 flex justify-between items-start gap-4">
-              <span className="text-slate-400 flex-shrink-0">API Nguồn:</span>
-              <span className="text-slate-800 font-bold text-right">Open-Meteo API</span>
-            </div>
-            <div className="py-2 flex justify-between items-start gap-4">
-              <span className="text-slate-400 flex-shrink-0">Script chính:</span>
-              <span className="text-slate-800 font-mono text-[11px] text-right">script/01_crawl.py</span>
-            </div>
-            <div className="py-2 flex flex-col gap-1">
-              <span className="text-slate-400">Phương pháp lấy mẫu:</span>
-              <p className="text-[10px] text-slate-650 leading-relaxed font-medium">
-                • Tỉnh thông thường: Thu thập **5 điểm** quanh centroid.<br />
-                • Tỉnh diện tích lớn: Thu thập **9 điểm** để tăng độ đại diện không gian.
-              </p>
-            </div>
-            <div className="py-2 flex flex-col gap-1">
-              <span className="text-slate-400">Phương pháp tổng hợp:</span>
-              <p className="text-[10px] text-slate-650 leading-relaxed font-medium">
-                • Biến số đo đạc: Tính giá trị trung bình theo ngày.<br />
-                • Biến phân loại: Lấy yếu vị cho các chỉ số chính.
-              </p>
-            </div>
-          </div>
-
-          <div className="text-[10px] text-slate-500 font-bold border-t border-slate-100 pt-2 flex justify-between">
-            <span>Đầu ra: data/raw/openmeteo_2026/</span>
-          </div>
-        </div>
-
-        {/* Column 3: Fixed Meteorological Dataset Specs */}
-        <div className="glass-panel rounded-2xl p-6 bg-white border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
-          <div className="flex items-center gap-2.5">
-            <img src="https://img.icons8.com/fluency/48/csv.png" alt="Thông số" className="h-6 w-6 object-contain flex-shrink-0" />
-            <h3 className="text-base font-bold text-slate-800">Thông số tập dữ liệu</h3>
-          </div>
-
-          <div className="divide-y divide-slate-100 text-xs font-semibold flex-1">
-            <div className="py-2 flex justify-between">
-              <span className="text-slate-400">Tên tệp:</span>
-              <span className="text-slate-800 font-bold max-w-[130px] truncate" title="vietnam_kttv_34tinh_2025-12-06_2026-06-04.csv">
-                vietnam_kttv_34tinh...csv
-              </span>
-            </div>
-            <div className="py-2 flex justify-between">
-              <span className="text-slate-400">Dung lượng:</span>
-              <span className="text-slate-800 font-mono font-bold">2.38 MB</span>
-            </div>
-            <div className="py-2 flex justify-between">
-              <span className="text-slate-400">Tổng số bản ghi:</span>
-              <span className="text-slate-800 font-mono font-bold">{fullStats ? fullStats.totalRows.toLocaleString() : '...'} dòng</span>
-            </div>
-            <div className="py-2 flex justify-between">
-              <span className="text-slate-400">Số lượng cột:</span>
-              <span className="text-slate-800 font-mono font-bold">36 thuộc tính</span>
-            </div>
-            <div className="py-2 flex justify-between">
-              <span className="text-slate-400">Thời gian:</span>
-              <span className="text-slate-800 font-mono font-bold">
-                {fullStats ? `${fullStats.dateRange.min} → ${fullStats.dateRange.max}` : '...'}
-              </span>
-            </div>
-            <div className="py-2 flex justify-between">
-              <span className="text-slate-400">Bao phủ:</span>
-              <span className="text-slate-800 font-bold">{fullStats ? fullStats.provinces.length : 34} tỉnh/thành</span>
-            </div>
-          </div>
-
-          <button
-            onClick={() => setCurrentTab('datasets')}
-            className="w-full py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-700 text-xs font-bold transition-all"
-          >
-            Xem cấu trúc chi tiết
-          </button>
-        </div>
-      </div>
 
     </div>
   );

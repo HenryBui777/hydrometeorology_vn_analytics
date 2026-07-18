@@ -12,7 +12,6 @@ export default function Sidebar({ currentTab, setCurrentTab, isCollapsed, setIsC
     { id: 'analysis', label: 'Phân tích tương quan', iconUrl: 'https://img.icons8.com/fluency/48/heat-map.png' },
     { id: 'datasets', label: 'Tập dữ liệu', iconUrl: 'https://img.icons8.com/fluency/48/database.png' },
     { id: 'chat', label: 'AI chat phân tích', iconUrl: 'https://img.icons8.com/fluency/48/artificial-intelligence.png' },
-    { id: 'results', label: 'Kết quả trực quan', iconUrl: 'https://img.icons8.com/fluency/48/area-chart.png' },
     { id: 'settings', label: 'Cài đặt', iconUrl: 'https://img.icons8.com/fluency/48/gear.png' },
   ];
 
