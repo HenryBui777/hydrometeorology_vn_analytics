@@ -149,30 +149,40 @@ export default function TimeSeriesView() {
   const weeklyData = useMemo(() => {
     if (!filteredRows.length) return [];
 
-    // Group rows by week
-    const byWeek = {};
+    // Group rows by week and year
+    const byWeekYear = {};
     filteredRows.forEach(row => {
+      const year = (row.date || '').substring(0, 4);
       const wk = row.week;
-      if (!byWeek[wk]) {
-        byWeek[wk] = { week: wk, rainSum: 0, sunshineSum: 0, count: 0 };
+      const key = `${year}-W${wk.toString().padStart(2, '0')}`;
+
+      if (!byWeekYear[key]) {
+        byWeekYear[key] = { 
+          week: wk, 
+          year,
+          rainSum: 0, 
+          sunshineSum: 0, 
+          count: 0,
+          minDate: row.date 
+        };
       }
-      byWeek[wk].rainSum += row.rain;
-      byWeek[wk].sunshineSum += row.sunshine;
-      byWeek[wk].count += 1;
+      byWeekYear[key].rainSum += row.rain;
+      byWeekYear[key].sunshineSum += row.sunshine;
+      byWeekYear[key].count += 1;
+      if (row.date < byWeekYear[key].minDate) {
+        byWeekYear[key].minDate = row.date;
+      }
     });
 
-    // Map to formatted objects, sorted by week index
-    return Object.values(byWeek)
+    // Map to formatted objects, sorted chronologically by minDate
+    return Object.values(byWeekYear)
       .map(w => ({
-        name: `Tuần ${w.week}`,
+        name: `Tuần ${w.week} (${w.year})`,
+        minDate: w.minDate,
         'Lượng mưa (mm)': Math.round((w.rainSum / w.count) * 100) / 100,
         'Số giờ nắng (h)': Math.round((w.sunshineSum / w.count) * 100) / 100
       }))
-      .sort((a, b) => {
-        const numA = parseInt(a.name.replace('Tuần ', ''), 10);
-        const numB = parseInt(b.name.replace('Tuần ', ''), 10);
-        return numA - numB;
-      });
+      .sort((a, b) => a.minDate.localeCompare(b.minDate));
   }, [filteredRows]);
 
   // Toggles lines visibility on legend click
