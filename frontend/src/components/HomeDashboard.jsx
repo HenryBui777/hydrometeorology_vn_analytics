@@ -559,10 +559,10 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 text-white">
           <div className="space-y-1">
             <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl">
-              Nền tảng phân tích thời tiết & khí hậu Việt Nam
+              Nền tảng phân tích thời tiết và khí hậu Việt Nam
             </h1>
-            <p className="text-blue-50 text-xs font-semibold max-w-xl">
-              Dự án Trực quan hóa dữ liệu Khí tượng Thủy văn (KTTV) 34 tỉnh thành Việt Nam tích hợp trợ lý lập trình AI cục bộ.
+            <p className="text-blue-50 text-xs font-semibold whitespace-nowrap">
+              Dự án trực quan hóa dữ liệu khí tượng thủy văn 34 tỉnh thành Việt Nam tích hợp trợ lý lập trình AI cục bộ.
             </p>
           </div>
           <div className="flex gap-2.5 flex-shrink-0">
@@ -1129,7 +1129,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
             <h3 className="text-base font-bold text-slate-800">Xếp hạng khí hậu toàn quốc</h3>
           </div>
 
-          <div className="relative min-w-[320px] z-30">
+          <div className="relative z-30">
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
               className="w-full flex items-center justify-between bg-slate-50 border border-slate-200 text-slate-700 font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-sm focus:outline-none focus:border-brand-primary hover:bg-slate-100 transition-all select-none"
@@ -1148,14 +1148,14 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
             {dropdownOpen && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setDropdownOpen(false)} />
-                <div className="absolute right-0 mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-xl z-40 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="absolute right-0 mt-1.5 min-w-full w-max bg-white border border-slate-200 rounded-xl shadow-xl z-40 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
                   {[
-                    { value: 'hottest', label: '🔥 Nhiệt độ trung bình cao nhất (Nóng nhất)' },
-                    { value: 'coldest', label: '❄️ Nhiệt độ trung bình thấp nhất (Lạnh nhất)' },
-                    { value: 'rainiest', label: '🌧️ Lượng mưa trung bình cao nhất (Mưa nhiều nhất)' },
-                    { value: 'driest', label: '☀️ Lượng mưa trung bình thấp nhất (Mưa ít nhất)' },
-                    { value: 'windiest', label: '💨 Tốc độ gió trung bình cao nhất (Gió mạnh nhất)' },
-                    { value: 'sunniest', label: '🔆 Tổng giờ nắng trung bình cao nhất (Nắng nhiều nhất)' }
+                    { value: 'hottest', label: '🔥 Nhiệt độ trung bình cao nhất' },
+                    { value: 'coldest', label: '❄️ Nhiệt độ trung bình thấp nhất' },
+                    { value: 'rainiest', label: '🌧️ Lượng mưa trung bình cao nhất' },
+                    { value: 'driest', label: '☀️ Lượng mưa trung bình thấp nhất' },
+                    { value: 'windiest', label: '💨 Tốc độ gió trung bình cao nhất' },
+                    { value: 'sunniest', label: '🔆 Tổng giờ nắng trung bình cao nhất' }
                   ].map((opt) => (
                     <div
                       key={opt.value}
@@ -1163,7 +1163,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
                         setActiveRankMetric(opt.value);
                         setDropdownOpen(false);
                       }}
-                      className={`px-4 py-2.5 text-xs font-bold cursor-pointer transition-all hover:bg-slate-50 flex items-center ${activeRankMetric === opt.value ? 'text-brand-primary bg-slate-50/50' : 'text-slate-600'}`}
+                      className={`px-4 py-2.5 text-xs font-bold cursor-pointer transition-all hover:bg-slate-50 flex items-center whitespace-nowrap ${activeRankMetric === opt.value ? 'text-brand-primary bg-slate-50/50' : 'text-slate-600'}`}
                     >
                       {opt.label}
                     </div>

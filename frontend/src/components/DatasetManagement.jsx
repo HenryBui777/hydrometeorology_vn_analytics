@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { 
-  FileSpreadsheet, 
-  Info, 
-  Search, 
-  Table, 
+import {
+  FileSpreadsheet,
+  Info,
+  Search,
+  Table,
   Database,
   CheckCircle2,
   ChevronLeft,
@@ -18,7 +18,7 @@ export default function DatasetManagement() {
 
   const [activeSubTab, setActiveSubTab] = useState('explorer'); // 'explorer' | 'schema'
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Data table pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
@@ -52,9 +52,6 @@ export default function DatasetManagement() {
       {/* Page Title */}
       <div>
         <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight sm:text-3xl">Tập dữ liệu khí tượng</h1>
-        <p className="text-slate-500 text-sm mt-1">
-          Dữ liệu thời tiết được nạp cố định làm cơ sở phân tích cho các truy vấn và mô hình của trợ lý AI.
-        </p>
       </div>
 
       {/* Loaded Dataset Info Card */}
@@ -109,21 +106,19 @@ export default function DatasetManagement() {
             <div className="flex gap-2">
               <button
                 onClick={() => setActiveSubTab('explorer')}
-                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer ${
-                  activeSubTab === 'explorer' 
-                    ? 'bg-brand-primary text-white border-brand-primary shadow-md shadow-blue-500/10' 
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer ${activeSubTab === 'explorer'
+                    ? 'bg-brand-primary text-white border-brand-primary shadow-md shadow-blue-500/10'
                     : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 bg-white border-slate-200'
-                }`}
+                  }`}
               >
                 <Table className="h-4 w-4" /> Trình duyệt dữ liệu
               </button>
               <button
                 onClick={() => setActiveSubTab('schema')}
-                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer ${
-                  activeSubTab === 'schema' 
-                    ? 'bg-brand-primary text-white border-brand-primary shadow-md shadow-blue-500/10' 
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer ${activeSubTab === 'schema'
+                    ? 'bg-brand-primary text-white border-brand-primary shadow-md shadow-blue-500/10'
                     : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 bg-white border-slate-200'
-                }`}
+                  }`}
               >
                 <Database className="h-4 w-4" /> Cấu trúc cột (Schema)
               </button>
@@ -154,48 +149,48 @@ export default function DatasetManagement() {
                   <span className="text-sm font-semibold">Đang tải dữ liệu CSV...</span>
                 </div>
               ) : (
-              <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
-                <table className="min-w-full text-left text-xs">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-655 font-bold uppercase tracking-wider whitespace-nowrap">
-                      <th className="pl-5 pr-3 py-4">Tỉnh thành</th>
-                      <th className="px-3 py-4">Vùng miền</th>
-                      <th className="px-3 py-4">Ngày</th>
-                      <th className="px-3 py-4">Nhiệt độ TB (°C)</th>
-                      <th className="px-3 py-4">Lượng mưa (mm)</th>
-                      <th className="px-3 py-4">Độ ẩm TB (%)</th>
-                      <th className="px-3 py-4">Gió max (km/h)</th>
-                      <th className="px-3 py-4">Nắng (h)</th>
-                      <th className="pl-3 pr-5 py-4">Mùa</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {currentRows.length > 0 ? (
-                      currentRows.map((row, index) => (
-                        <tr key={index} className="hover:bg-slate-50/50 text-slate-700 transition-colors">
-                          <td className="pl-5 pr-3 py-3.5 font-bold text-slate-900 whitespace-nowrap">{row.province}</td>
-                          <td className="px-3 py-3.5 text-slate-600 min-w-[165px] max-w-[185px] leading-normal">{row.region}</td>
-                          <td className="px-3 py-3.5 font-mono text-slate-500 whitespace-nowrap">{row.date}</td>
-                          <td className="px-3 py-3.5 font-mono text-brand-primary font-bold whitespace-nowrap">{row.temp?.toFixed(1)}</td>
-                          <td className="px-3 py-3.5 font-mono text-brand-accent font-bold whitespace-nowrap">{row.rain?.toFixed(2)}</td>
-                          <td className="px-3 py-3.5 font-mono whitespace-nowrap">{row.humidity?.toFixed(1)}%</td>
-                          <td className="px-3 py-3.5 font-mono text-slate-600 whitespace-nowrap">{row.wind?.toFixed(1)}</td>
-                          <td className="px-3 py-3.5 font-mono text-amber-600 font-bold whitespace-nowrap">{row.sunshine?.toFixed(1)}</td>
-                          <td className="pl-3 pr-5 py-3.5 whitespace-nowrap">
-                            <span className="px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-[10px] text-brand-primary font-bold">
-                              {row.season || '—'}
-                            </span>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="9" className="text-center py-8 text-slate-400">Không tìm thấy bản ghi phù hợp.</td>
+                <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+                  <table className="min-w-full text-left text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-655 font-bold uppercase tracking-wider whitespace-nowrap">
+                        <th className="pl-5 pr-3 py-4">Tỉnh thành</th>
+                        <th className="px-3 py-4">Vùng miền</th>
+                        <th className="px-3 py-4">Ngày</th>
+                        <th className="px-3 py-4">Nhiệt độ TB (°C)</th>
+                        <th className="px-3 py-4">Lượng mưa (mm)</th>
+                        <th className="px-3 py-4">Độ ẩm TB (%)</th>
+                        <th className="px-3 py-4">Gió max (km/h)</th>
+                        <th className="px-3 py-4">Nắng (h)</th>
+                        <th className="pl-3 pr-5 py-4">Mùa</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {currentRows.length > 0 ? (
+                        currentRows.map((row, index) => (
+                          <tr key={index} className="hover:bg-slate-50/50 text-slate-700 transition-colors">
+                            <td className="pl-5 pr-3 py-3.5 font-bold text-slate-900 whitespace-nowrap">{row.province}</td>
+                            <td className="px-3 py-3.5 text-slate-600 min-w-[165px] max-w-[185px] leading-normal">{row.region}</td>
+                            <td className="px-3 py-3.5 font-mono text-slate-500 whitespace-nowrap">{row.date}</td>
+                            <td className="px-3 py-3.5 font-mono text-brand-primary font-bold whitespace-nowrap">{row.temp?.toFixed(1)}</td>
+                            <td className="px-3 py-3.5 font-mono text-brand-accent font-bold whitespace-nowrap">{row.rain?.toFixed(2)}</td>
+                            <td className="px-3 py-3.5 font-mono whitespace-nowrap">{row.humidity?.toFixed(1)}%</td>
+                            <td className="px-3 py-3.5 font-mono text-slate-600 whitespace-nowrap">{row.wind?.toFixed(1)}</td>
+                            <td className="px-3 py-3.5 font-mono text-amber-600 font-bold whitespace-nowrap">{row.sunshine?.toFixed(1)}</td>
+                            <td className="pl-3 pr-5 py-3.5 whitespace-nowrap">
+                              <span className="px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-[10px] text-brand-primary font-bold">
+                                {row.season || '—'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="9" className="text-center py-8 text-slate-400">Không tìm thấy bản ghi phù hợp.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               )}
 
               {/* Pagination Controls for Data table */}
@@ -205,7 +200,7 @@ export default function DatasetManagement() {
                     Hiển thị {indexOfFirstRow + 1} - {Math.min(indexOfLastRow, filteredRows.length)} của {filteredRows.length.toLocaleString()} dòng dữ liệu thực
                   </span>
                   <div className="flex gap-2.5 items-center">
-                    <button 
+                    <button
                       disabled={currentPage === 1}
                       onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                       className="bg-slate-50 hover:bg-slate-100 disabled:opacity-40 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
@@ -235,7 +230,7 @@ export default function DatasetManagement() {
                       />
                       <span className="text-slate-400">/ {totalPages}</span>
                     </div>
-                    <button 
+                    <button
                       disabled={currentPage === totalPages}
                       onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                       className="bg-slate-50 hover:bg-slate-100 disabled:opacity-40 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
@@ -256,7 +251,7 @@ export default function DatasetManagement() {
                   <Info className="h-4 w-4 text-brand-accent" />
                   <span className="text-xs font-bold text-slate-700">Chi tiết cấu trúc cột (Hiển thị trang {schemaPage} / {totalSchemaPages})</span>
                 </div>
-                
+
                 <div className="divide-y divide-slate-100 bg-white">
                   {currentSchemaRows.map((col, idx) => (
                     <div key={idx} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-2 hover:bg-slate-50/30 text-xs animate-fade-in">
@@ -289,32 +284,31 @@ export default function DatasetManagement() {
                     Hiển thị {indexOfFirstSchemaRow + 1} - {Math.min(indexOfLastSchemaRow, mockDatasetInfo.columns.length)} trên tổng số {mockDatasetInfo.columns.length} thuộc tính của dataset
                   </span>
                   <div className="flex gap-2">
-                    <button 
+                    <button
                       disabled={schemaPage === 1}
                       onClick={() => setSchemaPage(prev => Math.max(prev - 1, 1))}
                       className="bg-slate-50 hover:bg-slate-100 disabled:opacity-40 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 font-bold"
                     >
                       <ChevronLeft className="h-4 w-4" /> Trước
                     </button>
-                    
+
                     {/* Render page numbers */}
                     <div className="flex items-center gap-1">
                       {Array.from({ length: totalSchemaPages }, (_, i) => i + 1).map((p) => (
                         <button
                           key={p}
                           onClick={() => setSchemaPage(p)}
-                          className={`w-7 h-7 text-xs font-bold rounded-lg transition-all ${
-                            schemaPage === p 
-                              ? 'bg-brand-primary text-white' 
+                          className={`w-7 h-7 text-xs font-bold rounded-lg transition-all ${schemaPage === p
+                              ? 'bg-brand-primary text-white'
                               : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
-                          }`}
+                            }`}
                         >
                           {p}
                         </button>
                       ))}
                     </div>
 
-                    <button 
+                    <button
                       disabled={schemaPage === totalSchemaPages}
                       onClick={() => setSchemaPage(prev => Math.min(prev + 1, totalSchemaPages))}
                       className="bg-slate-50 hover:bg-slate-100 disabled:opacity-40 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 font-bold"

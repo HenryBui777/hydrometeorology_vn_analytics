@@ -11,11 +11,11 @@ import {
   ResponsiveContainer,
   ZAxis
 } from 'recharts';
-import { 
-  BarChart4, 
-  HelpCircle, 
-  Activity, 
-  Flame, 
+import {
+  BarChart4,
+  HelpCircle,
+  Activity,
+  Flame,
   Layers,
   ChevronDown
 } from 'lucide-react';
@@ -35,13 +35,13 @@ const VARIABLES = [
 ];
 
 const REGION_COLORS = {
-  RedRiverDelta:      '#8B5CF6',
-  NorthMountain:      '#F59E0B',
-  NorthCentral:       '#2563EB',
-  SouthCentral:       '#06B6D4',
-  CentralHighlands:   '#10B981',
-  Southeast:          '#EC4899',
-  MekongDelta:        '#EF4444',
+  RedRiverDelta: '#8B5CF6',
+  NorthMountain: '#F59E0B',
+  NorthCentral: '#2563EB',
+  SouthCentral: '#06B6D4',
+  CentralHighlands: '#10B981',
+  Southeast: '#EC4899',
+  MekongDelta: '#EF4444',
 };
 
 
@@ -54,14 +54,14 @@ function getMean(arr) {
 function calculatePearson(x, y) {
   const n = x.length;
   if (n === 0 || n !== y.length) return 0;
-  
+
   const meanX = getMean(x);
   const meanY = getMean(y);
-  
+
   let num = 0;
   let denX = 0;
   let denY = 0;
-  
+
   for (let i = 0; i < n; i++) {
     const diffX = x[i] - meanX;
     const diffY = y[i] - meanY;
@@ -69,7 +69,7 @@ function calculatePearson(x, y) {
     denX += diffX * diffX;
     denY += diffY * diffY;
   }
-  
+
   if (denX === 0 || denY === 0) return 0;
   return num / Math.sqrt(denX * denY);
 }
@@ -78,7 +78,7 @@ function calculatePearson(x, y) {
 function calculateBoxStats(values) {
   if (!values.length) return null;
   const sorted = [...values].sort((a, b) => a - b);
-  
+
   const getPercentile = (p) => {
     const pos = (sorted.length - 1) * p;
     const base = Math.floor(pos);
@@ -158,7 +158,7 @@ export default function AnalysisView() {
   // State for Box Plot
   const [boxMetric, setBoxMetric] = useState('temp');
   const [boxGroupBy, setBoxGroupBy] = useState('season'); // 'season' | 'region'
-  
+
   // Interactive hover states
   const [hoveredCell, setHoveredCell] = useState(null); // { xKey, yKey, r }
   const [hoveredBox, setHoveredBox] = useState(null); // Box details for tooltip
@@ -168,7 +168,7 @@ export default function AnalysisView() {
   // Calculates Pearson matrix dynamically based on active rawRows (filtered state)
   const correlationMatrix = useMemo(() => {
     if (!rawRows.length) return [];
-    
+
     // Extract arrays of values for all variables (omit null/NaN entries)
     const datasets = {};
     VARIABLES.forEach(v => {
@@ -191,7 +191,7 @@ export default function AnalysisView() {
   const getCellColor = (r) => {
     if (r === 1) return 'rgba(239, 68, 68, 0.9)'; // Deep red for perfect positive
     if (r === -1) return 'rgba(37, 99, 235, 0.9)'; // Deep blue for perfect negative
-    
+
     // Scale color values
     if (r > 0) {
       // Red gradient
@@ -212,12 +212,12 @@ export default function AnalysisView() {
     rawRows.forEach(row => {
       const key = `${row.province}_${row.month}`;
       if (!grouped[key]) {
-        grouped[key] = { 
-          province: row.province, 
+        grouped[key] = {
+          province: row.province,
           regionKey: row.regionKey,
           region: row.region,
-          xVals: [], 
-          yVals: [] 
+          xVals: [],
+          yVals: []
         };
       }
       grouped[key].xVals.push(row[scatterX]);
@@ -273,7 +273,7 @@ export default function AnalysisView() {
       else if (boxGroupBy === 'province') groupKey = row.province;
 
       if (!grouped[groupKey]) grouped[groupKey] = [];
-      
+
       const val = row[boxMetric];
       if (val !== null && !isNaN(val)) {
         grouped[groupKey].push(val);
@@ -306,14 +306,14 @@ export default function AnalysisView() {
 
     // Calculate global bounds for scaling the Y-axis
     const allValues = boxPlotData.flatMap(b => [
-      b.stats.whiskerMin, 
-      b.stats.whiskerMax, 
+      b.stats.whiskerMin,
+      b.stats.whiskerMax,
       ...b.stats.outliers
     ]);
     const maxVal = Math.max(...allValues);
     const minVal = Math.min(...allValues);
     const range = maxVal - minVal;
-    
+
     // Leave 10% padding at top and bottom of values range
     const graphMin = minVal - range * 0.1;
     const graphMax = maxVal + range * 0.1;
@@ -340,18 +340,18 @@ export default function AnalysisView() {
             const y = scaleY(val);
             return (
               <g key={idx}>
-                <line 
-                  x1={paddingLeft} 
-                  y1={y} 
-                  x2={width - paddingRight} 
-                  y2={y} 
-                  stroke="#e2e8f0" 
+                <line
+                  x1={paddingLeft}
+                  y1={y}
+                  x2={width - paddingRight}
+                  y2={y}
+                  stroke="#e2e8f0"
                   strokeDasharray="3 3"
                 />
-                <text 
-                  x={paddingLeft - 15} 
-                  y={y + 4} 
-                  textAnchor="end" 
+                <text
+                  x={paddingLeft - 15}
+                  y={y + 4}
+                  textAnchor="end"
                   className="fill-slate-400 font-bold font-mono text-[9px]"
                 >
                   {Math.round(val * 10) / 10}
@@ -364,7 +364,7 @@ export default function AnalysisView() {
           {boxPlotData.map((group, index) => {
             const { groupName, stats } = group;
             const centerX = paddingLeft + (index * groupWidth) + (groupWidth / 2);
-            
+
             // X bounds for drawing box
             const boxW = Math.min(groupWidth * 0.5, 45); // Limit maximum box width
             const boxX = centerX - boxW / 2;
@@ -379,7 +379,7 @@ export default function AnalysisView() {
 
 
             return (
-              <g 
+              <g
                 key={groupName}
                 onMouseEnter={(e) => {
                   setHoveredBox({ groupName, stats });
@@ -392,40 +392,40 @@ export default function AnalysisView() {
                 className="cursor-pointer group"
               >
                 {/* Whiskers - Vertical dashed lines */}
-                <line 
-                  x1={centerX} 
-                  y1={yMin} 
-                  x2={centerX} 
-                  y2={yQ1} 
-                  stroke="#64748B" 
-                  strokeWidth={1.5} 
+                <line
+                  x1={centerX}
+                  y1={yMin}
+                  x2={centerX}
+                  y2={yQ1}
+                  stroke="#64748B"
+                  strokeWidth={1.5}
                   strokeDasharray="2 2"
                 />
-                <line 
-                  x1={centerX} 
-                  y1={yQ3} 
-                  x2={centerX} 
-                  y2={yMax} 
-                  stroke="#64748B" 
-                  strokeWidth={1.5} 
+                <line
+                  x1={centerX}
+                  y1={yQ3}
+                  x2={centerX}
+                  y2={yMax}
+                  stroke="#64748B"
+                  strokeWidth={1.5}
                   strokeDasharray="2 2"
                 />
 
                 {/* Whiskers Caps - Horizontal ticks */}
-                <line 
-                  x1={centerX - 8} 
-                  y1={yMin} 
-                  x2={centerX + 8} 
-                  y2={yMin} 
-                  stroke="#475569" 
+                <line
+                  x1={centerX - 8}
+                  y1={yMin}
+                  x2={centerX + 8}
+                  y2={yMin}
+                  stroke="#475569"
                   strokeWidth={1.5}
                 />
-                <line 
-                  x1={centerX - 8} 
-                  y1={yMax} 
-                  x2={centerX + 8} 
-                  y2={yMax} 
-                  stroke="#475569" 
+                <line
+                  x1={centerX - 8}
+                  y1={yMax}
+                  x2={centerX + 8}
+                  y2={yMax}
+                  stroke="#475569"
                   strokeWidth={1.5}
                 />
 
@@ -491,7 +491,7 @@ export default function AnalysisView() {
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
-      
+
 
       {/* Row 1: Heatmap + Scatter Plot */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -512,9 +512,9 @@ export default function AnalysisView() {
                 <div className="w-[80px]" />
                 <div className="flex-1 grid grid-cols-10 gap-1">
                   {VARIABLES.map(v => (
-                    <div 
-                      key={v.key} 
-                      className="text-[9px] font-bold text-slate-700 text-center whitespace-normal break-words leading-tight flex items-end justify-center pb-1 h-9 select-none" 
+                    <div
+                      key={v.key}
+                      className="text-[9px] font-bold text-slate-700 text-center whitespace-normal break-words leading-tight flex items-end justify-center pb-1 h-9 select-none"
                       title={v.label}
                     >
                       {v.shortLabel}
@@ -537,18 +537,17 @@ export default function AnalysisView() {
                         const rValue = row[colVar.key];
                         const color = getCellColor(rValue);
                         const isSelected = scatterX === colVar.key && scatterY === row.key;
-                        
+
                         return (
                           <div
                             key={colVar.key}
                             onClick={() => handleCellClick(colVar.key, row.key)}
                             onMouseEnter={() => setHoveredCell({ xKey: colVar.label, yKey: row.label, r: rValue })}
                             onMouseLeave={() => setHoveredCell(null)}
-                            className={`aspect-square rounded flex items-center justify-center font-mono text-[8px] font-extrabold cursor-pointer border transition-all hover:scale-105 active:scale-95 ${
-                              isSelected ? 'border-slate-800 scale-102 ring-1 ring-slate-800 shadow-md' : 'border-transparent'
-                            }`}
+                            className={`aspect-square rounded flex items-center justify-center font-mono text-[8px] font-extrabold cursor-pointer border transition-all hover:scale-105 active:scale-95 ${isSelected ? 'border-slate-800 scale-102 ring-1 ring-slate-800 shadow-md' : 'border-transparent'
+                              }`}
                             style={{ backgroundColor: color, color: Math.abs(rValue) > 0.45 ? '#fff' : '#1e293b' }}
-                            title={`${row.label} vs ${colVar.label}: r = ${Math.round(rValue*100)/100}`}
+                            title={`${row.label} vs ${colVar.label}: r = ${Math.round(rValue * 100) / 100}`}
                           >
                             {Math.round(rValue * 10) / 10}
                           </div>
@@ -582,7 +581,7 @@ export default function AnalysisView() {
                 <span>{VARIABLES.find(v => v.key === scatterX)?.label}</span>
                 <ChevronDown className="h-3 w-3 text-slate-400" />
               </button>
-              
+
               {isXDropdownOpen && (
                 <div className="absolute left-0 mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-30 max-h-60 overflow-y-auto text-[11px] font-bold text-slate-700 animate-fade-in">
                   {VARIABLES.map(v => (
@@ -612,7 +611,7 @@ export default function AnalysisView() {
                 <span>{VARIABLES.find(v => v.key === scatterY)?.label}</span>
                 <ChevronDown className="h-3 w-3 text-slate-400" />
               </button>
-              
+
               {isYDropdownOpen && (
                 <div className="absolute left-0 mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-30 max-h-60 overflow-y-auto text-[11px] font-bold text-slate-700 animate-fade-in">
                   {VARIABLES.map(v => (
@@ -638,24 +637,24 @@ export default function AnalysisView() {
             <ResponsiveContainer width="100%" height="100%">
               <ScatterChart margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.6} />
-                <XAxis 
-                  type="number" 
-                  dataKey="x" 
-                  name={VARIABLES.find(v => v.key === scatterX)?.label} 
+                <XAxis
+                  type="number"
+                  dataKey="x"
+                  name={VARIABLES.find(v => v.key === scatterX)?.label}
                   stroke="#70859c"
                   tick={{ fontSize: 9, fontWeight: 600 }}
                   domain={['auto', 'auto']}
                 />
-                <YAxis 
-                  type="number" 
-                  dataKey="y" 
-                  name={VARIABLES.find(v => v.key === scatterY)?.label} 
+                <YAxis
+                  type="number"
+                  dataKey="y"
+                  name={VARIABLES.find(v => v.key === scatterY)?.label}
                   stroke="#70859c"
                   tick={{ fontSize: 9, fontWeight: 600 }}
                   domain={['auto', 'auto']}
                 />
                 <ZAxis type="category" dataKey="name" name="Tỉnh thành" />
-                <RechartsTooltip 
+                <RechartsTooltip
                   cursor={{ strokeDasharray: '3 3' }}
                   contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '10px' }}
                   formatter={(value, name, _props) => {
@@ -693,12 +692,12 @@ export default function AnalysisView() {
 
       {/* Row 2: Distribution Box Plot */}
       <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-        
+
         {/* Controls header */}
         <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
           <div>
             <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider">
-              Biểu đồ phân phối Box & Whisker (Box Plot)
+              Biểu đồ phân phối Box và Whisker
             </h3>
           </div>
 
@@ -715,7 +714,7 @@ export default function AnalysisView() {
                   <span>{VARIABLES.find(v => v.key === boxMetric)?.label}</span>
                   <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
                 </button>
-                
+
                 {isBoxMetricDropdownOpen && (
                   <div className="absolute left-0 mt-1 w-48 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-30 max-h-60 overflow-y-auto text-xs font-bold text-slate-700 animate-fade-in">
                     {VARIABLES.map(v => (
@@ -748,7 +747,7 @@ export default function AnalysisView() {
                   <span>{boxGroupBy === 'season' ? 'Mùa khí hậu' : 'Vùng miền'}</span>
                   <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
                 </button>
-                
+
                 {isBoxGroupByDropdownOpen && (
                   <div className="absolute right-0 mt-1 w-40 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-30 text-xs font-bold text-slate-700 animate-fade-in">
                     <button
@@ -787,10 +786,10 @@ export default function AnalysisView() {
 
       {/* Floating Tukey Box stats tooltip */}
       {hoveredBox && createPortal(
-        <div 
+        <div
           className="fixed bg-white/95 backdrop-blur border border-slate-200 rounded-xl p-4 shadow-xl pointer-events-none z-50 text-[11px] font-medium text-slate-750 min-w-[220px] transition-all duration-75 space-y-3.5"
-          style={{ 
-            left: `${tooltipPos.x + 15}px`, 
+          style={{
+            left: `${tooltipPos.x + 15}px`,
             top: `${tooltipPos.y + 15}px`,
             transform: tooltipPos.x > window.innerWidth - 260 ? 'translateX(-110%)' : 'none'
           }}

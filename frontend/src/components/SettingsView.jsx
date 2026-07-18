@@ -97,7 +97,7 @@ export default function SettingsView() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
             <div className="space-y-1.5">
-              <label className="text-slate-650 font-bold">Primary LLM Model</label>
+              <label className="text-slate-650 font-bold cursor-pointer">Primary LLM Model</label>
               <CustomSelect
                 value={model}
                 onChange={(e) => setModel(e.target.value)}

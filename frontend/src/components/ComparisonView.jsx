@@ -435,7 +435,7 @@ export default function ComparisonView() {
               : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
           }`}
         >
-          <Building className="h-4 w-4" /> So sánh các tỉnh (Provinces)
+          <Building className="h-4 w-4" /> So sánh các tỉnh
         </button>
         <button
           onClick={() => setSubTab('regions')}
@@ -445,7 +445,7 @@ export default function ComparisonView() {
               : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
           }`}
         >
-          <Compass className="h-4 w-4" /> So sánh các vùng (Regions)
+          <Compass className="h-4 w-4" /> So sánh các vùng
         </button>
         <button
           onClick={() => setSubTab('seasons')}
@@ -455,7 +455,7 @@ export default function ComparisonView() {
               : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
           }`}
         >
-          <CalendarDays className="h-4 w-4" /> So sánh các mùa (Seasons)
+          <CalendarDays className="h-4 w-4" /> So sánh các mùa
         </button>
       </div>
 

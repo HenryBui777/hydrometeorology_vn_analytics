@@ -107,7 +107,7 @@ Mã nguồn đã được tạo thành công và đang chuyển sang trạng th�
               <div className="space-y-1">
                 <h3 className="font-bold text-slate-800 text-base">Chào mừng tới AI Data Assistant!</h3>
                 <p className="text-xs text-slate-550 font-semibold leading-relaxed">
-                  Tôi là mô hình AI tích hợp. Hãy gửi câu hỏi phân tích dữ liệu thời tiết Việt Nam (ví dụ: nhiệt độ, lượng mưa, gió, bức xạ mặt trời). Tôi sẽ lập trình Python để phân tích cho bạn duyệt.
+                  Tôi là mô hình AI tích hợp. Hãy gửi câu hỏi phân tích dữ liệu thời tiết Việt Nam (ví dụ: nhiệt độ, lượng mưa, gió, bức xạ mặt trời). Tôi sẽ phân tích cho bạn.
                 </p>
               </div>
             </div>
@@ -126,8 +126,8 @@ Mã nguồn đã được tạo thành công và đang chuyển sang trạng th�
 
                 {/* Message Bubble */}
                 <div className={`max-w-[75%] rounded-lg p-4 border text-xs sm:text-sm leading-relaxed space-y-4 ${msg.sender === 'user'
-                    ? 'bg-brand-primary text-white border-transparent shadow-md shadow-blue-500/10'
-                    : 'bg-slate-50 border-slate-200 text-slate-855'
+                  ? 'bg-brand-primary text-white border-transparent shadow-md shadow-blue-500/10'
+                  : 'bg-slate-50 border-slate-200 text-slate-855'
                   }`}>
                   <p className="whitespace-pre-wrap font-semibold">{msg.text}</p>
 

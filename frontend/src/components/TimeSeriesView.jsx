@@ -14,13 +14,13 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
-import { 
-  Calendar, 
-  MapPin, 
-  Settings, 
-  Search, 
-  Check, 
-  ChevronDown, 
+import {
+  Calendar,
+  MapPin,
+  Settings,
+  Search,
+  Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   X,
@@ -45,7 +45,7 @@ const METRICS = [
 
 // Color palette for lines on the multi-line chart (12 distinctive colors)
 const PALETTE = [
-  '#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', 
+  '#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
   '#06B6D4', '#EC4899', '#F97316', '#14B8A6', '#4B5563',
   '#059669', '#D97706', '#DC2626', '#7C3AED', '#0891B2'
 ];
@@ -179,7 +179,7 @@ export default function TimeSeriesView() {
   // Filter provinces list by search input
   const filteredProvincesList = useMemo(() => {
     if (!fullStats?.provinces) return [];
-    return fullStats.provinces.filter(p => 
+    return fullStats.provinces.filter(p =>
       p.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [fullStats, searchTerm]);
@@ -360,15 +360,15 @@ export default function TimeSeriesView() {
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
-      
+
 
       {/* Control Filter Bar */}
       <div className="glass-panel rounded-2xl p-5 bg-white border border-slate-200 shadow-sm grid grid-cols-1 lg:grid-cols-12 gap-5 items-end">
-        
+
         {/* Province Multi-select Dropdown (Col Span 4) */}
         <div className="lg:col-span-4 space-y-1.5" ref={dropdownRef}>
           <label className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
-            <MapPin className="h-3.5 w-3.5 text-brand-primary" /> Chọn tỉnh thành ({selectedProvinces.length})
+            <MapPin className="h-3.5 w-3.5 text-brand-primary" /> Tỉnh thành ({selectedProvinces.length})
           </label>
           <div className="relative">
             <button
@@ -377,8 +377,8 @@ export default function TimeSeriesView() {
               className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-250 rounded-xl px-4 py-2.5 text-left text-xs font-bold text-slate-800 flex justify-between items-center transition-all shadow-sm cursor-pointer outline-none"
             >
               <span className="truncate max-w-[85%]">
-                {selectedProvinces.length === fullStats?.provinces?.length 
-                  ? 'Tất cả 34 tỉnh thành' 
+                {selectedProvinces.length === fullStats?.provinces?.length
+                  ? 'Tất cả 34 tỉnh thành'
                   : selectedProvinces.join(', ')
                 }
               </span>
@@ -398,7 +398,7 @@ export default function TimeSeriesView() {
                     className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:border-brand-primary"
                   />
                   {searchTerm && (
-                    <button 
+                    <button
                       onClick={() => setSearchTerm('')}
                       className="absolute right-3 top-2 text-slate-400 hover:text-slate-600"
                     >
@@ -425,9 +425,8 @@ export default function TimeSeriesView() {
                       <button
                         key={prov}
                         onClick={() => toggleProvince(prov)}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs font-semibold transition-all hover:bg-slate-50 ${
-                          isSelected ? 'bg-blue-50/50 text-brand-primary font-bold' : 'text-slate-700'
-                        }`}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs font-semibold transition-all hover:bg-slate-50 ${isSelected ? 'bg-blue-50/50 text-brand-primary font-bold' : 'text-slate-700'
+                          }`}
                       >
                         <span>{prov}</span>
                         {isSelected && <Check className="h-4 w-4 text-brand-primary" />}
@@ -446,7 +445,7 @@ export default function TimeSeriesView() {
         {/* Metric Selector (Col Span 3) */}
         <div className="lg:col-span-3 space-y-1.5" ref={metricDropdownRef}>
           <label className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
-            <Settings className="h-3.5 w-3.5 text-brand-accent" /> Chọn biến khí hậu
+            <Settings className="h-3.5 w-3.5 text-brand-accent" /> biến khí hậu
           </label>
           <div className="relative">
             <button
@@ -468,11 +467,10 @@ export default function TimeSeriesView() {
                       setHiddenLines({}); // Reset hidden logic on metric change
                       setIsMetricDropdownOpen(false);
                     }}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-all hover:bg-slate-50 ${
-                      activeMetric === m.key 
-                        ? 'bg-blue-50 text-brand-primary' 
-                        : 'text-slate-700'
-                    }`}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-all hover:bg-slate-50 ${activeMetric === m.key
+                      ? 'bg-blue-50 text-brand-primary'
+                      : 'text-slate-700'
+                      }`}
                   >
                     {m.label}
                   </button>
@@ -501,9 +499,8 @@ export default function TimeSeriesView() {
                   }
                 }
               }}
-              className={`w-1/2 bg-slate-50 border ${
-                isCalendarOpen && calendarTarget === 'start' ? 'border-brand-primary ring-1 ring-blue-100' : 'border-slate-250'
-              } rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 text-left shadow-sm cursor-pointer transition-all flex justify-between items-center outline-none`}
+              className={`w-1/2 bg-slate-50 border ${isCalendarOpen && calendarTarget === 'start' ? 'border-brand-primary ring-1 ring-blue-100' : 'border-slate-250'
+                } rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 text-left shadow-sm cursor-pointer transition-all flex justify-between items-center outline-none`}
             >
               <span>{startDate ? formatDateVN(startDate) : 'Từ ngày'}</span>
               <Calendar className="h-3.5 w-3.5 text-slate-400" />
@@ -524,9 +521,8 @@ export default function TimeSeriesView() {
                   }
                 }
               }}
-              className={`w-1/2 bg-slate-50 border ${
-                isCalendarOpen && calendarTarget === 'end' ? 'border-brand-primary ring-1 ring-blue-100' : 'border-slate-250'
-              } rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 text-left shadow-sm cursor-pointer transition-all flex justify-between items-center outline-none`}
+              className={`w-1/2 bg-slate-50 border ${isCalendarOpen && calendarTarget === 'end' ? 'border-brand-primary ring-1 ring-blue-100' : 'border-slate-250'
+                } rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 text-left shadow-sm cursor-pointer transition-all flex justify-between items-center outline-none`}
             >
               <span>{endDate ? formatDateVN(endDate) : 'Đến ngày'}</span>
               <Calendar className="h-3.5 w-3.5 text-slate-400" />
@@ -573,22 +569,21 @@ export default function TimeSeriesView() {
                       ? (endDate && day.dateStr > endDate)
                       : (startDate && day.dateStr < startDate);
                     const isDisabled = isMinMaxBound || isDateInvalid;
-                    
+
                     return (
                       <button
                         key={idx}
                         type="button"
                         disabled={isDisabled}
                         onClick={() => handleDateClick(day.dateStr)}
-                        className={`py-1 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center cursor-pointer ${
-                          isDisabled 
-                            ? 'text-slate-200 cursor-not-allowed opacity-40' 
-                            : !day.isCurrentMonth
+                        className={`py-1 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center cursor-pointer ${isDisabled
+                          ? 'text-slate-200 cursor-not-allowed opacity-40'
+                          : !day.isCurrentMonth
                             ? 'text-slate-300 hover:bg-slate-50'
                             : isSelected
-                            ? 'bg-brand-primary text-white font-extrabold shadow-sm'
-                            : 'text-slate-600 hover:bg-slate-50'
-                        }`}
+                              ? 'bg-brand-primary text-white font-extrabold shadow-sm'
+                              : 'text-slate-600 hover:bg-slate-50'
+                          }`}
                       >
                         {day.dayNum}
                       </button>
@@ -612,9 +607,6 @@ export default function TimeSeriesView() {
         <div className="flex justify-between items-center flex-wrap gap-2 border-b border-slate-100 pb-3">
           <div>
             <h3 className="text-sm font-bold text-slate-800">Biểu đồ diễn biến thời gian liên tục</h3>
-            <p className="text-[11px] text-slate-400 font-semibold mt-0.5">
-              Rê chuột lên điểm nút để xem chi tiết. Click vào chú giải (Legend) để ẩn/hiện đường dữ liệu của tỉnh thành.
-            </p>
           </div>
         </div>
 
@@ -623,21 +615,21 @@ export default function TimeSeriesView() {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={lineChartData} margin={{ top: 15, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.6} />
-                <XAxis 
-                  dataKey="date" 
-                  stroke="#70859c" 
+                <XAxis
+                  dataKey="date"
+                  stroke="#70859c"
                   tick={{ fontSize: 9, fontWeight: 600 }}
                   ticks={lineChartTicks}
                 />
-                <YAxis 
+                <YAxis
                   stroke="#70859c"
                   tick={{ fontSize: 9, fontWeight: 600 }}
                   domain={['auto', 'auto']}
                 />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#0f172a', fontSize: '11px', fontWeight: 600 }} 
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#0f172a', fontSize: '11px', fontWeight: 600 }}
                 />
-                <Legend 
+                <Legend
                   onClick={handleLegendClick}
                   wrapperStyle={{ fontSize: '11px', fontWeight: 600, paddingTop: '10px', cursor: 'pointer' }}
                 />
@@ -678,7 +670,6 @@ export default function TimeSeriesView() {
           <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
             <div>
               <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Lượng mưa trung bình theo tuần</h3>
-              <p className="text-[10px] text-slate-400 font-semibold">Tính theo chỉ số trung bình tuần của các tỉnh đã chọn</p>
             </div>
           </div>
 
@@ -694,15 +685,15 @@ export default function TimeSeriesView() {
                     const color = PALETTE[index % PALETTE.length];
                     const isHidden = !!hiddenLines[prov];
                     return (
-                      <Area 
+                      <Area
                         key={prov}
-                        type="monotone" 
+                        type="monotone"
                         dataKey={prov}
                         name={prov}
-                        stroke={color} 
+                        stroke={color}
                         strokeWidth={2}
-                        fillOpacity={0.1} 
-                        fill={color} 
+                        fillOpacity={0.1}
+                        fill={color}
                         hide={isHidden}
                         connectNulls
                       />
@@ -721,7 +712,6 @@ export default function TimeSeriesView() {
           <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
             <div>
               <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Số giờ nắng trung bình theo tuần</h3>
-              <p className="text-[10px] text-slate-400 font-semibold">Tính theo chỉ số trung bình tuần của các tỉnh đã chọn</p>
             </div>
           </div>
 
@@ -733,9 +723,9 @@ export default function TimeSeriesView() {
                   <XAxis dataKey="name" stroke="#70859c" tick={{ fontSize: 9, fontWeight: 600 }} />
                   <YAxis stroke="#70859c" tick={{ fontSize: 9, fontWeight: 600 }} />
                   <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '11px' }} />
-                  <Bar 
-                    dataKey="Số giờ nắng (h)" 
-                    fill="#F59E0B" 
+                  <Bar
+                    dataKey="Số giờ nắng (h)"
+                    fill="#F59E0B"
                     radius={[4, 4, 0, 0]}
                     maxBarSize={40}
                   />

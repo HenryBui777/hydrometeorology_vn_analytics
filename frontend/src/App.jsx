@@ -12,11 +12,11 @@ import ExecutionMonitor from './components/ExecutionMonitor';
 import ResultsView from './components/ResultsView';
 import HistoryView from './components/HistoryView';
 import SettingsView from './components/SettingsView';
-import { 
-  Bell, 
-  User, 
-  Cpu, 
-  Activity, 
+import {
+  Bell,
+  User,
+  Cpu,
+  Activity,
   Database,
   CheckCircle,
   AlertCircle
@@ -33,7 +33,7 @@ export default function App() {
     status: 'approved'
   });
   const [executionStatus, setExecutionStatus] = useState('success'); // 'idle' | 'running' | 'success' | 'failed'
-  
+
   // Start with some history items to show past activities
   const [historyList, setHistoryList] = useState([
     {
@@ -58,15 +58,15 @@ export default function App() {
       setChatHistory(prev => [...prev, { sender: 'user', text }]);
     } else if (sender === 'ai' && queryObj) {
       setChatHistory(prev => [
-        ...prev, 
-        { 
-          sender: 'ai', 
-          text, 
-          code: queryObj.code, 
-          explanation: queryObj.explanation 
+        ...prev,
+        {
+          sender: 'ai',
+          text,
+          code: queryObj.code,
+          explanation: queryObj.explanation
         }
       ]);
-      
+
       // Set the active query to pending review
       setActiveQuery({
         ...queryObj,
@@ -104,7 +104,7 @@ export default function App() {
     if (status === 'success' && activeQuery) {
       const updatedQuery = { ...activeQuery, status: 'approved' };
       setActiveQuery(updatedQuery);
-      
+
       // Save to analysis history list
       setHistoryList(prev => {
         // Prevent duplicate IDs
@@ -129,11 +129,11 @@ export default function App() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-brand-bg text-brand-text">
-      
+
       {/* Sidebar Navigation */}
-      <Sidebar 
-        currentTab={currentTab} 
-        setCurrentTab={setCurrentTab} 
+      <Sidebar
+        currentTab={currentTab}
+        setCurrentTab={setCurrentTab}
         isCollapsed={isSidebarCollapsed}
         setIsCollapsed={setIsSidebarCollapsed}
         pendingCount={pendingReviewCount}
@@ -141,16 +141,16 @@ export default function App() {
 
       {/* Main Panel Content Area */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        
+
         {/* Top Header Bar */}
         <header className="h-16 border-b border-slate-200 bg-white/80 backdrop-blur-md px-8 flex justify-between items-center z-20 flex-shrink-0">
-          
+
           {/* Page Title */}
           <div className="text-lg md:text-xl font-bold text-slate-800 tracking-tight">
             {currentTab === 'dashboard' && 'Dashboard tổng quan'}
-            {currentTab === 'timeseries' && 'Xu hướng thời gian (Time Series)'}
-            {currentTab === 'comparison' && 'So sánh khí hậu (Comparison)'}
-            {currentTab === 'analysis' && 'Tương quan & Phân phối (Analysis)'}
+            {currentTab === 'timeseries' && 'Xu hướng thời gian'}
+            {currentTab === 'comparison' && 'So sánh khí hậu'}
+            {currentTab === 'analysis' && 'Tương quan và phân phối'}
             {currentTab === 'datasets' && 'Quản lý dữ liệu'}
             {currentTab === 'chat' && 'AI Chat phân tích'}
             {currentTab === 'code' && 'Duyệt mã nguồn'}
@@ -162,7 +162,7 @@ export default function App() {
 
           {/* Quick Metrics & User tools */}
           <div className="flex items-center gap-6">
-            
+
 
 
             {/* Profile Tools */}
@@ -188,9 +188,9 @@ export default function App() {
         {/* View Router Render Area */}
         <main className={`flex-1 bg-brand-bg ${currentTab === 'chat' ? 'p-0 overflow-hidden flex flex-col' : 'p-8 overflow-y-auto'}`}>
           {currentTab === 'dashboard' && (
-            <HomeDashboard 
-              datasetUploaded={datasetUploaded} 
-              setCurrentTab={setCurrentTab} 
+            <HomeDashboard
+              datasetUploaded={datasetUploaded}
+              setCurrentTab={setCurrentTab}
             />
           )}
 
@@ -207,15 +207,15 @@ export default function App() {
           )}
 
           {currentTab === 'datasets' && (
-            <DatasetManagement 
-              datasetUploaded={datasetUploaded} 
-              setDatasetUploaded={setDatasetUploaded} 
+            <DatasetManagement
+              datasetUploaded={datasetUploaded}
+              setDatasetUploaded={setDatasetUploaded}
             />
           )}
 
           {currentTab === 'chat' && (
-            <AIChat 
-              datasetUploaded={datasetUploaded} 
+            <AIChat
+              datasetUploaded={datasetUploaded}
               chatHistory={chatHistory}
               setChatHistory={setChatHistory}
               submitQuery={submitQuery}
@@ -226,7 +226,7 @@ export default function App() {
           )}
 
           {currentTab === 'code' && (
-            <CodeReview 
+            <CodeReview
               activeQuery={activeQuery}
               approveQuery={approveQuery}
               rejectQuery={rejectQuery}
@@ -235,7 +235,7 @@ export default function App() {
           )}
 
           {currentTab === 'monitor' && (
-            <ExecutionMonitor 
+            <ExecutionMonitor
               activeQuery={activeQuery}
               executionStatus={executionStatus}
               setExecutionStatus={(status) => handleExecutionFinished(status)}
@@ -244,14 +244,14 @@ export default function App() {
           )}
 
           {currentTab === 'results' && (
-            <ResultsView 
+            <ResultsView
               activeQuery={activeQuery}
               executionStatus={executionStatus}
             />
           )}
 
           {currentTab === 'history' && (
-            <HistoryView 
+            <HistoryView
               historyList={historyList}
               onRestoreRun={handleRestoreRun}
               onDeleteRun={handleDeleteRun}
