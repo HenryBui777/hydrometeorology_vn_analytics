@@ -84,7 +84,7 @@ function CustomSelect({ value, onChange, options, className }) {
 
 export default function HomeDashboard({ datasetUploaded, setCurrentTab, submitQuery }) {
   // --- Real CSV data from context ---
-  const { loading, error, fullStats, filteredStats, filters, setFilters } = useData();
+  const { rawRows, filteredRows, loading, error, fullStats, filteredStats, filters, setFilters } = useData();
 
   const [mapMetric, setMapMetric] = useState('temp'); // 'temp' | 'rain'
   const [selectedRegion, setSelectedRegion] = useState('NorthCentral');
@@ -369,13 +369,25 @@ export default function HomeDashboard({ datasetUploaded, setCurrentTab, submitQu
 
   // Pre-calculate average statistics for each province
   const provinceStats = useMemo(() => {
-    if (!rawRows.length) return {};
+    // Filter rawRows only by month and season (ignore regionKey filter so all provinces have data on hover)
+    let activeRows = rawRows || [];
+    if (filters.month && filters.month !== 'All') {
+      const targetMonth = parseInt(filters.month, 10);
+      activeRows = activeRows.filter(r => r.month === targetMonth);
+    }
+    if (filters.season && filters.season !== 'All') {
+      activeRows = activeRows.filter(r => r.season === filters.season);
+    }
+
+    if (!activeRows.length) return {};
     const grouped = {};
-    rawRows.forEach(r => {
-      if (!grouped[r.province]) {
-        grouped[r.province] = { temp: [], rain: [], humidity: [], wind: [], sunshine: [] };
+    activeRows.forEach(r => {
+      // Normalize province name to NFC to avoid Unicode matching anomalies
+      const provKey = (r.province || '').normalize('NFC').trim();
+      if (!grouped[provKey]) {
+        grouped[provKey] = { temp: [], rain: [], humidity: [], wind: [], sunshine: [] };
       }
-      const g = grouped[r.province];
+      const g = grouped[provKey];
       if (r.temp !== null && !isNaN(r.temp)) g.temp.push(r.temp);
       if (r.rain !== null && !isNaN(r.rain)) g.rain.push(r.rain);
       if (r.humidity !== null && !isNaN(r.humidity)) g.humidity.push(r.humidity);
@@ -396,16 +408,32 @@ export default function HomeDashboard({ datasetUploaded, setCurrentTab, submitQu
       };
     });
     return result;
-  }, [rawRows]);
+  }, [rawRows, filters.month, filters.season]);
 
   const getProvinceStats = (name) => {
     if (!name) return null;
-    if (provinceStats[name]) return provinceStats[name];
     
+    // Normalize input to NFC and resolve special naming conventions between GeoJSON and CSV
+    const targetName = (() => {
+      const n = name.normalize('NFC').trim();
+      if (n === "Thành phố Hồ Chí Minh") return "Hồ Chí Minh";
+      if (n === "Thừa Thiên - Huế") return "Huế";
+      return n;
+    })();
+
+    // Exact check
+    if (provinceStats[targetName]) return provinceStats[targetName];
+    
+    // Fallback loose check
     const keys = Object.keys(provinceStats);
-    const matchedKey = keys.find(k => k.toLowerCase() === name.toLowerCase() || 
-                                     name.toLowerCase().includes(k.toLowerCase()) ||
-                                     k.toLowerCase().includes(name.toLowerCase()));
+    const searchLower = targetName.toLowerCase();
+    const matchedKey = keys.find(k => {
+      const kNorm = k.normalize('NFC').toLowerCase();
+      return kNorm === searchLower || 
+             searchLower.includes(kNorm) ||
+             kNorm.includes(searchLower);
+    });
+    
     if (matchedKey) return provinceStats[matchedKey];
     return null;
   };
@@ -592,24 +620,24 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
       </div>
 
       {/* 3. Climate KPI Cards Grid (with trend lines and sparklines) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
 
         {/* KPI 1: Avg Temp */}
-        <div className="glass-card rounded-2xl p-4 relative overflow-hidden bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
+        <div className="glass-card rounded-2xl p-5 relative overflow-hidden bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Nhiệt độ trung bình</span>
             <img src="https://img.icons8.com/fluency/48/thermometer.png" alt="Nhiệt độ" className="h-6 w-6 object-contain flex-shrink-0" />
           </div>
           <div className="flex justify-between items-end">
             <div className="space-y-0.5">
-              <span className="text-xl font-extrabold text-slate-800 tracking-tight">{displayTemp} °C</span>
-              <div className="flex items-center gap-0.5 text-[9px] text-emerald-600 font-bold">
-                <TrendingUp className="h-3 w-3" /> +0.4°C vs tháng trước
+              <span className="text-2xl font-extrabold text-slate-800 tracking-tight">{displayTemp} °C</span>
+              <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-bold">
+                <TrendingUp className="h-3.5 w-3.5" /> +0.4°C vs tháng trước
               </div>
             </div>
             {/* Tiny Sparkline */}
             <div className="pb-1">
-              <svg className="w-12 h-6 text-orange-400" viewBox="0 0 50 20">
+              <svg className="w-16 h-8 text-orange-400" viewBox="0 0 50 20">
                 <path d="M0,15 L10,13 L20,10 L30,12 L40,6 L50,3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
               </svg>
             </div>
@@ -617,21 +645,21 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         </div>
 
         {/* KPI 2: Avg Rain */}
-        <div className="glass-card rounded-2xl p-4 relative overflow-hidden bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
+        <div className="glass-card rounded-2xl p-5 relative overflow-hidden bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Lượng mưa trung bình</span>
             <img src="https://img.icons8.com/fluency/48/rain.png" alt="Lượng mưa" className="h-6 w-6 object-contain flex-shrink-0" />
           </div>
           <div className="flex justify-between items-end">
             <div className="space-y-0.5">
-              <span className="text-xl font-extrabold text-slate-800 tracking-tight">{displayRain} mm</span>
-              <div className="flex items-center gap-0.5 text-[9px] text-cyan-600 font-bold">
-                <TrendingDown className="h-3 w-3" /> -12% vs tháng trước
+              <span className="text-2xl font-extrabold text-slate-800 tracking-tight">{displayRain} mm</span>
+              <div className="flex items-center gap-1 text-[10px] text-cyan-600 font-bold">
+                <TrendingDown className="h-3.5 w-3.5" /> -12% vs tháng trước
               </div>
             </div>
             {/* Tiny Sparkline */}
             <div className="pb-1">
-              <svg className="w-12 h-6 text-blue-400" viewBox="0 0 50 20">
+              <svg className="w-16 h-8 text-blue-400" viewBox="0 0 50 20">
                 <path d="M0,5 L10,8 L20,12 L30,9 L40,15 L50,16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
               </svg>
             </div>
@@ -639,21 +667,21 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         </div>
 
         {/* KPI 3: Avg Humidity */}
-        <div className="glass-card rounded-2xl p-4 relative overflow-hidden bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
+        <div className="glass-card rounded-2xl p-5 relative overflow-hidden bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Độ ẩm trung bình</span>
             <img src="https://img.icons8.com/fluency/48/humidity.png" alt="Độ ẩm" className="h-6 w-6 object-contain flex-shrink-0" />
           </div>
           <div className="flex justify-between items-end">
             <div className="space-y-0.5">
-              <span className="text-xl font-extrabold text-slate-800 tracking-tight">{displayHumidity} %</span>
-              <div className="flex items-center gap-0.5 text-[9px] text-emerald-600 font-bold">
-                <TrendingUp className="h-3 w-3" /> +1.2% vs tháng trước
+              <span className="text-2xl font-extrabold text-slate-800 tracking-tight">{displayHumidity} %</span>
+              <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-bold">
+                <TrendingUp className="h-3.5 w-3.5" /> +1.2% vs tháng trước
               </div>
             </div>
             {/* Tiny Sparkline */}
             <div className="pb-1">
-              <svg className="w-12 h-6 text-cyan-400" viewBox="0 0 50 20">
+              <svg className="w-16 h-8 text-cyan-400" viewBox="0 0 50 20">
                 <path d="M0,12 L10,10 L20,14 L30,8 L40,10 L50,4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
               </svg>
             </div>
@@ -661,72 +689,31 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
         </div>
 
         {/* KPI 4: Avg Wind Speed */}
-        <div className="glass-card rounded-2xl p-4 relative overflow-hidden bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
+        <div className="glass-card rounded-2xl p-5 relative overflow-hidden bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Tốc độ gió trung bình</span>
             <img src="https://img.icons8.com/fluency/48/wind.png" alt="Tốc độ gió" className="h-6 w-6 object-contain flex-shrink-0" />
           </div>
           <div className="flex justify-between items-end">
             <div className="space-y-0.5">
-              <span className="text-xl font-extrabold text-slate-800 tracking-tight">{displayWind} km/h</span>
-              <div className="flex items-center gap-0.5 text-[9px] text-emerald-600 font-bold">
-                <TrendingUp className="h-3 w-3" /> +0.8 km/h vs tháng trước
+              <span className="text-2xl font-extrabold text-slate-800 tracking-tight">{displayWind} km/h</span>
+              <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-bold">
+                <TrendingUp className="h-3.5 w-3.5" /> +0.8 km/h vs tháng trước
               </div>
             </div>
             {/* Tiny Sparkline */}
             <div className="pb-1">
-              <svg className="w-12 h-6 text-slate-400" viewBox="0 0 50 20">
+              <svg className="w-16 h-8 text-slate-400" viewBox="0 0 50 20">
                 <path d="M0,10 L10,11 L20,9 L30,10 L40,8 L50,7" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
               </svg>
             </div>
           </div>
         </div>
 
-        {/* KPI 5: Avg Sunshine Hours */}
-        <div className="glass-card rounded-2xl p-4 relative overflow-hidden bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Tổng giờ nắng</span>
-            <img src="https://img.icons8.com/fluency/48/sun.png" alt="Giờ nắng" className="h-6 w-6 object-contain flex-shrink-0" />
-          </div>
-          <div className="flex justify-between items-end">
-            <div className="space-y-0.5">
-              <span className="text-xl font-extrabold text-slate-800 tracking-tight">{displaySunshine} giờ</span>
-              <div className="flex items-center gap-0.5 text-[9px] text-emerald-600 font-bold">
-                <TrendingUp className="h-3 w-3" /> +15.4 giờ vs tháng trước
-              </div>
-            </div>
-            {/* Tiny Sparkline */}
-            <div className="pb-1">
-              <svg className="w-12 h-6 text-amber-550" viewBox="0 0 50 20">
-                <path d="M0,10 L10,8 L20,5 L30,9 L40,4 L50,2" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        {/* KPI 6: Avg Evapotranspiration ET0 */}
-        <div className="glass-card rounded-2xl p-4 relative overflow-hidden bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Lượng bốc hơi ET₀</span>
-            <img src="https://img.icons8.com/fluency/48/water.png" alt="Bốc hơi ET0" className="h-6 w-6 object-contain flex-shrink-0" />
-          </div>
-          <div className="flex justify-between items-end">
-            <div className="space-y-0.5">
-              <span className="text-xl font-extrabold text-slate-800 tracking-tight">{displayET0} mm</span>
-              <div className="flex items-center gap-0.5 text-[9px] text-cyan-600 font-bold">
-                <TrendingDown className="h-3 w-3" /> -4% vs tháng trước
-              </div>
-            </div>
-            {/* Tiny Sparkline */}
-            <div className="pb-1">
-              <svg className="w-12 h-6 text-cyan-550" viewBox="0 0 50 20">
-                <path d="M0,14 L10,12 L20,13 L30,9 L40,11 L50,8" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
       </div>
+
+      {/* 2A. Vietnam Weather Map Section (Main visual focus) */}
+
 
       {/* 2A. Vietnam Weather Map Section (Main visual focus) */}
       <div className="glass-panel rounded-2xl p-6 bg-white border border-slate-200 shadow-sm grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -738,7 +725,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
               <MapPin className="h-5 w-5 text-brand-primary" /> Bản đồ khí hậu Việt Nam
             </h2>
             <p className="text-xs text-slate-500 font-semibold mt-1">
-              Bản đồ phân vùng địa lý Việt Nam. Rê chuột hoặc click vào một khu vực để hiển thị báo cáo chi tiết thời tiết.
+              Bản đồ phân vùng địa lý Việt Nam. Chọn một khu vực để hiển thị báo cáo chi tiết thời tiết.
             </p>
 
 
