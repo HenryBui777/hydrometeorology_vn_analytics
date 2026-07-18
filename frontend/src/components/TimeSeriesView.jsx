@@ -36,7 +36,7 @@ const METRICS = [
   { key: 'wind', label: 'Tốc độ gió (km/h)', color: '#8B5CF6' },
   { key: 'sunshine', label: 'Số giờ nắng (h)', color: '#F59E0B' },
   { key: 'et0', label: 'Lượng bốc hơi ET₀ (mm)', color: '#EC4899' },
-  { key: 'uvMax', label: 'Chỉ số UV lớn nhất', color: '#F97316' },
+  // { key: 'uvMax', label: 'Chỉ số UV lớn nhất', color: '#F97316' }, // Note: Column has 0 valid values in current CSV
   { key: 'cloud', label: 'Độ phủ mây (%)', color: '#6B7280' },
   { key: 'pressure', label: 'Khí áp (hPa)', color: '#14B8A6' }
 ];
@@ -167,42 +167,80 @@ export default function TimeSeriesView() {
     return [...new Set(ticks)].sort();
   }, [lineChartData]);
 
-  // 2. Weekly Aggregation Data for sub-charts (Precipitation & Sunshine)
-  const weeklyData = useMemo(() => {
+  // 2. Weekly Aggregation Data for sub-charts
+  // 2a. Weekly Precipitation data (pivoted by province for multiple Area series)
+  const weeklyRainData = useMemo(() => {
     if (!filteredRows.length) return [];
 
-    // Group rows by week and year
-    const byWeekYear = {};
+    const groups = {};
     filteredRows.forEach(row => {
       const year = (row.date || '').substring(0, 4);
       const wk = row.week;
       const key = `${year}-W${wk.toString().padStart(2, '0')}`;
 
-      if (!byWeekYear[key]) {
-        byWeekYear[key] = { 
-          week: wk, 
+      if (!groups[key]) {
+        groups[key] = {
+          week: wk,
           year,
-          rainSum: 0, 
-          sunshineSum: 0, 
-          count: 0,
-          minDate: row.date 
+          minDate: row.date,
+          provinces: {}
         };
       }
-      byWeekYear[key].rainSum += row.rain;
-      byWeekYear[key].sunshineSum += row.sunshine;
-      byWeekYear[key].count += 1;
-      if (row.date < byWeekYear[key].minDate) {
-        byWeekYear[key].minDate = row.date;
+      if (!groups[key].provinces[row.province]) {
+        groups[key].provinces[row.province] = [];
+      }
+      groups[key].provinces[row.province].push(row.rain);
+      if (row.date < groups[key].minDate) {
+        groups[key].minDate = row.date;
       }
     });
 
-    // Map to formatted objects, sorted chronologically by minDate
-    return Object.values(byWeekYear)
-      .map(w => ({
-        name: `Tuần ${w.week} (${w.year})`,
-        minDate: w.minDate,
-        'Lượng mưa (mm)': Math.round((w.rainSum / w.count) * 100) / 100,
-        'Số giờ nắng (h)': Math.round((w.sunshineSum / w.count) * 100) / 100
+    return Object.values(groups)
+      .map(g => {
+        const item = {
+          name: `Tuần ${g.week} (${g.year})`,
+          minDate: g.minDate
+        };
+        selectedProvinces.forEach(prov => {
+          const vals = g.provinces[prov] || [];
+          item[prov] = vals.length ? Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 100) / 100 : 0;
+        });
+        return item;
+      })
+      .sort((a, b) => a.minDate.localeCompare(b.minDate));
+  }, [filteredRows, selectedProvinces]);
+
+  // 2b. Weekly Sunshine data (average of all selected provinces for Bar chart)
+  const weeklySunshineData = useMemo(() => {
+    if (!filteredRows.length) return [];
+
+    const groups = {};
+    filteredRows.forEach(row => {
+      const year = (row.date || '').substring(0, 4);
+      const wk = row.week;
+      const key = `${year}-W${wk.toString().padStart(2, '0')}`;
+
+      if (!groups[key]) {
+        groups[key] = {
+          week: wk,
+          year,
+          minDate: row.date,
+          sunshineSum: 0,
+          count: 0
+        };
+      }
+      groups[key].sunshineSum += row.sunshine;
+      groups[key].count += 1;
+      if (row.date < groups[key].minDate) {
+        groups[key].minDate = row.date;
+      }
+    });
+
+    return Object.values(groups)
+      .map(g => ({
+        name: `Tuần ${g.week} (${g.year})`,
+        minDate: g.minDate,
+        'Số giờ nắng (h)': Math.round((g.sunshineSum / g.count) * 100) / 100
       }))
       .sort((a, b) => a.minDate.localeCompare(b.minDate));
   }, [filteredRows]);
@@ -461,27 +499,31 @@ export default function TimeSeriesView() {
           </div>
 
           <div className="h-72">
-            {weeklyData.length > 0 ? (
+            {weeklyRainData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={weeklyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="rainGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#06B6D4" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#06B6D4" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
+                <AreaChart data={weeklyRainData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.6} />
                   <XAxis dataKey="name" stroke="#70859c" tick={{ fontSize: 9, fontWeight: 600 }} />
                   <YAxis stroke="#70859c" tick={{ fontSize: 9, fontWeight: 600 }} />
                   <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '11px' }} />
-                  <Area 
-                    type="monotone" 
-                    dataKey="Lượng mưa (mm)" 
-                    stroke="#06B6D4" 
-                    strokeWidth={2.5}
-                    fillOpacity={1} 
-                    fill="url(#rainGrad)" 
-                  />
+                  {selectedProvinces.map((prov, index) => {
+                    const color = PALETTE[index % PALETTE.length];
+                    const isHidden = !!hiddenLines[prov];
+                    return (
+                      <Area 
+                        key={prov}
+                        type="monotone" 
+                        dataKey={prov}
+                        name={prov}
+                        stroke={color} 
+                        strokeWidth={2}
+                        fillOpacity={0.1} 
+                        fill={color} 
+                        hide={isHidden}
+                        connectNulls
+                      />
+                    );
+                  })}
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
@@ -500,9 +542,9 @@ export default function TimeSeriesView() {
           </div>
 
           <div className="h-72">
-            {weeklyData.length > 0 ? (
+            {weeklySunshineData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={weeklyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <BarChart data={weeklySunshineData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.6} />
                   <XAxis dataKey="name" stroke="#70859c" tick={{ fontSize: 9, fontWeight: 600 }} />
                   <YAxis stroke="#70859c" tick={{ fontSize: 9, fontWeight: 600 }} />

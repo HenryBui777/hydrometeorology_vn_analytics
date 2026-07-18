@@ -27,7 +27,7 @@ const VARIABLES = [
   { key: 'wind', label: 'Tốc độ gió' },
   { key: 'sunshine', label: 'Giờ nắng' },
   { key: 'et0', label: 'Bốc hơi ET₀' },
-  { key: 'uvMax', label: 'UV Cực đại' },
+  // { key: 'uvMax', label: 'UV Cực đại' }, // Note: Column has 0 valid values in current CSV
   { key: 'cloud', label: 'Độ phủ mây' },
   { key: 'pressure', label: 'Khí áp' }
 ];
