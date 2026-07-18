@@ -88,6 +88,8 @@ export default function HomeDashboard({ datasetUploaded, setCurrentTab, submitQu
 
   const [mapMetric, setMapMetric] = useState('temp'); // 'temp' | 'rain'
   const [selectedRegion, setSelectedRegion] = useState('NorthCentral');
+  const [activeRankMetric, setActiveRankMetric] = useState('hottest');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [aiPromptInput, setAiPromptInput] = useState('');
   const [geoJson, setGeoJson] = useState(null);
   const [hoveredProvince, setHoveredProvince] = useState(null);
@@ -359,13 +361,27 @@ export default function HomeDashboard({ datasetUploaded, setCurrentTab, submitQu
     ? rainfallProvincesData
     : rainfallProvincesData.filter(p => getRegionOfProvince(p.name) === filterRegion);
 
-  // KPI display values — directly from real aggregated data
   const displayTemp = nationalKPIs.temp;
   const displayRain = nationalKPIs.rain;
   const displayHumidity = nationalKPIs.humidity;
   const displayWind = nationalKPIs.wind;
   const displaySunshine = nationalKPIs.sunshine;
   const displayET0 = nationalKPIs.et0;
+
+  const displayedRegionData = useMemo(() => {
+    const key = filterRegion;
+    if (key === 'All') {
+      return {
+        name: "Toàn quốc",
+        temp: displayTemp,
+        rain: displayRain,
+        humidity: displayHumidity,
+        wind: displayWind,
+        provinces: "Tất cả 34 tỉnh thành đang có trạm quan trắc số liệu"
+      };
+    }
+    return regionalData[key] || null;
+  }, [filterRegion, regionalData, displayTemp, displayRain, displayHumidity, displayWind]);
 
   // Pre-calculate average statistics for each province
   const provinceStats = useMemo(() => {
@@ -397,7 +413,7 @@ export default function HomeDashboard({ datasetUploaded, setCurrentTab, submitQu
 
     const result = {};
     const avg = arr => arr.length ? arr.reduce((sum, v) => sum + v, 0) / arr.length : 0;
-    
+
     Object.entries(grouped).forEach(([prov, data]) => {
       result[prov] = {
         temp: (avg(data.temp)).toFixed(1),
@@ -410,9 +426,43 @@ export default function HomeDashboard({ datasetUploaded, setCurrentTab, submitQu
     return result;
   }, [rawRows, filters.month, filters.season]);
 
+  const rankings = useMemo(() => {
+    if (!rawRows || !rawRows.length) return null;
+    const grouped = {};
+    rawRows.forEach(r => {
+      const provKey = (r.province || '').normalize('NFC').trim();
+      if (!grouped[provKey]) {
+        grouped[provKey] = { temp: [], rain: [], wind: [], sunshine: [] };
+      }
+      const g = grouped[provKey];
+      if (r.temp !== null && !isNaN(r.temp)) g.temp.push(r.temp);
+      if (r.rain !== null && !isNaN(r.rain)) g.rain.push(r.rain);
+      if (r.wind !== null && !isNaN(r.wind)) g.wind.push(r.wind);
+      if (r.sunshine !== null && !isNaN(r.sunshine)) g.sunshine.push(r.sunshine);
+    });
+
+    const avg = arr => arr.length ? arr.reduce((sum, v) => sum + v, 0) / arr.length : 0;
+    const list = Object.entries(grouped).map(([prov, data]) => ({
+      province: prov,
+      temp: avg(data.temp),
+      rain: avg(data.rain),
+      wind: avg(data.wind),
+      sunshine: avg(data.sunshine)
+    }));
+
+    const hottest = [...list].sort((a, b) => b.temp - a.temp).slice(0, 5).map(p => ({ name: p.province, value: p.temp.toFixed(1) + ' °C' }));
+    const coldest = [...list].sort((a, b) => a.temp - b.temp).slice(0, 5).map(p => ({ name: p.province, value: p.temp.toFixed(1) + ' °C' }));
+    const rainiest = [...list].sort((a, b) => b.rain - a.rain).slice(0, 5).map(p => ({ name: p.province, value: p.rain.toFixed(1) + ' mm' }));
+    const driest = [...list].sort((a, b) => a.rain - b.rain).slice(0, 5).map(p => ({ name: p.province, value: p.rain.toFixed(1) + ' mm' }));
+    const windiest = [...list].sort((a, b) => b.wind - a.wind).slice(0, 5).map(p => ({ name: p.province, value: p.wind.toFixed(1) + ' km/h' }));
+    const sunniest = [...list].sort((a, b) => b.sunshine - a.sunshine).slice(0, 5).map(p => ({ name: p.province, value: Math.round(p.sunshine) + ' giờ' }));
+
+    return { hottest, coldest, rainiest, driest, windiest, sunniest };
+  }, [rawRows]);
+
   const getProvinceStats = (name) => {
     if (!name) return null;
-    
+
     // Normalize input to NFC and resolve special naming conventions between GeoJSON and CSV
     const targetName = (() => {
       const n = name.normalize('NFC').trim();
@@ -423,17 +473,17 @@ export default function HomeDashboard({ datasetUploaded, setCurrentTab, submitQu
 
     // Exact check
     if (provinceStats[targetName]) return provinceStats[targetName];
-    
+
     // Fallback loose check
     const keys = Object.keys(provinceStats);
     const searchLower = targetName.toLowerCase();
     const matchedKey = keys.find(k => {
       const kNorm = k.normalize('NFC').toLowerCase();
-      return kNorm === searchLower || 
-             searchLower.includes(kNorm) ||
-             kNorm.includes(searchLower);
+      return kNorm === searchLower ||
+        searchLower.includes(kNorm) ||
+        kNorm.includes(searchLower);
     });
-    
+
     if (matchedKey) return provinceStats[matchedKey];
     return null;
   };
@@ -732,36 +782,38 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
           </div>
 
           {/* Region Weather Inspector details card */}
-          {selectedRegion && regionalData[selectedRegion] && (
+          {displayedRegionData && (
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
               <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-                <span className="font-bold text-slate-800 text-sm">{regionalData[selectedRegion].name}</span>
+                <span className="font-bold text-slate-800 text-sm">{displayedRegionData.name}</span>
                 <span className="text-[10px] bg-blue-50 border border-blue-100 text-brand-primary font-bold px-2 py-0.5 rounded-full">
-                  Khu vực
+                  {filterRegion === 'All' ? 'Toàn quốc' : 'Khu vực'}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div className="space-y-0.5">
                   <span className="text-slate-400 text-[10px] font-bold uppercase">Nhiệt độ TB</span>
-                  <p className="font-bold text-slate-800 text-base">{regionalData[selectedRegion].temp} °C</p>
+                  <p className="font-bold text-slate-800 text-base">{displayedRegionData.temp} °C</p>
                 </div>
                 <div className="space-y-0.5">
                   <span className="text-slate-400 text-[10px] font-bold uppercase">Lượng mưa TB</span>
-                  <p className="font-bold text-brand-primary text-base">{regionalData[selectedRegion].rain} mm</p>
+                  <p className="font-bold text-brand-primary text-base">{displayedRegionData.rain} mm</p>
                 </div>
                 <div className="space-y-0.5">
                   <span className="text-slate-400 text-[10px] font-bold uppercase">Độ ẩm TB</span>
-                  <p className="font-bold text-slate-800">{regionalData[selectedRegion].humidity} %</p>
+                  <p className="font-bold text-slate-800">{displayedRegionData.humidity} %</p>
                 </div>
                 <div className="space-y-0.5">
                   <span className="text-slate-400 text-[10px] font-bold uppercase">Tốc độ gió</span>
-                  <p className="font-bold text-slate-800">{regionalData[selectedRegion].wind} km/h</p>
+                  <p className="font-bold text-slate-800">{displayedRegionData.wind} km/h</p>
                 </div>
               </div>
               <div className="pt-2 border-t border-slate-200">
-                <span className="text-[10px] text-slate-400 font-bold uppercase">Tỉnh thành đại diện:</span>
+                <span className="text-[10px] text-slate-400 font-bold uppercase">
+                  {filterRegion === 'All' ? 'Phạm vi dữ liệu:' : 'Tỉnh thành đại diện:'}
+                </span>
                 <p className="text-[11px] text-slate-600 leading-relaxed font-semibold mt-0.5">
-                  {regionalData[selectedRegion].provinces}
+                  {displayedRegionData.provinces}
                 </p>
               </div>
             </div>
@@ -776,10 +828,10 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
             (() => {
               const pStats = getProvinceStats(hoveredProvince.originalName);
               return (
-                <div 
+                <div
                   className="fixed bg-slate-900/95 backdrop-blur border border-slate-800 text-white rounded-xl p-3 shadow-xl pointer-events-none z-50 text-[10px] font-medium min-w-[180px] transition-all space-y-2"
-                  style={{ 
-                    left: `${mapTooltipPos.x + 15}px`, 
+                  style={{
+                    left: `${mapTooltipPos.x + 15}px`,
                     top: `${mapTooltipPos.y + 15}px`,
                     transform: mapTooltipPos.x > window.innerWidth - 220 ? 'translateX(-110%)' : 'none'
                   }}
@@ -992,7 +1044,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
                   const regionKey = getRegionOfProvince(provName);
                   const isSelected = selectedRegion === regionKey;
 
-                   return (
+                  return (
                     <path
                       key={idx}
                       d={pathData}
@@ -1063,6 +1115,127 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
             </svg>
           )}
 
+        </div>
+
+      </div>
+
+      {/* 2B. Ranking Panel Section */}
+      <div className="glass-panel rounded-2xl p-6 bg-white border border-slate-200 shadow-sm space-y-6">
+
+        {/* Header Row */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <img src="https://img.icons8.com/fluency/48/trophy.png" alt="Xếp hạng" className="h-7 w-7 object-contain flex-shrink-0" />
+            <h3 className="text-base font-bold text-slate-800">Xếp hạng khí hậu toàn quốc</h3>
+          </div>
+
+          <div className="relative min-w-[320px] z-30">
+            <button
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              className="w-full flex items-center justify-between bg-slate-50 border border-slate-200 text-slate-700 font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-sm focus:outline-none focus:border-brand-primary hover:bg-slate-100 transition-all select-none"
+            >
+              <span>
+                {activeRankMetric === 'hottest' && '🔥 Nhiệt độ trung bình cao nhất (Nóng nhất)'}
+                {activeRankMetric === 'coldest' && '❄️ Nhiệt độ trung bình thấp nhất (Lạnh nhất)'}
+                {activeRankMetric === 'rainiest' && '🌧️ Lượng mưa trung bình cao nhất (Mưa nhiều nhất)'}
+                {activeRankMetric === 'driest' && '☀️ Lượng mưa trung bình thấp nhất (Mưa ít nhất)'}
+                {activeRankMetric === 'windiest' && '💨 Tốc độ gió trung bình cao nhất (Gió mạnh nhất)'}
+                {activeRankMetric === 'sunniest' && '🔆 Tổng giờ nắng trung bình cao nhất (Nắng nhiều nhất)'}
+              </span>
+              <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {dropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setDropdownOpen(false)} />
+                <div className="absolute right-0 mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-xl z-40 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                  {[
+                    { value: 'hottest', label: '🔥 Nhiệt độ trung bình cao nhất (Nóng nhất)' },
+                    { value: 'coldest', label: '❄️ Nhiệt độ trung bình thấp nhất (Lạnh nhất)' },
+                    { value: 'rainiest', label: '🌧️ Lượng mưa trung bình cao nhất (Mưa nhiều nhất)' },
+                    { value: 'driest', label: '☀️ Lượng mưa trung bình thấp nhất (Mưa ít nhất)' },
+                    { value: 'windiest', label: '💨 Tốc độ gió trung bình cao nhất (Gió mạnh nhất)' },
+                    { value: 'sunniest', label: '🔆 Tổng giờ nắng trung bình cao nhất (Nắng nhiều nhất)' }
+                  ].map((opt) => (
+                    <div
+                      key={opt.value}
+                      onClick={() => {
+                        setActiveRankMetric(opt.value);
+                        setDropdownOpen(false);
+                      }}
+                      className={`px-4 py-2.5 text-xs font-bold cursor-pointer transition-all hover:bg-slate-50 flex items-center ${activeRankMetric === opt.value ? 'text-brand-primary bg-slate-50/50' : 'text-slate-600'}`}
+                    >
+                      {opt.label}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Ranking List */}
+        <div className="bg-slate-50/40 border border-slate-100 rounded-2xl p-5">
+          {rankings && (() => {
+            const activeList = (() => {
+              if (activeRankMetric === 'coldest') return rankings.coldest;
+              if (activeRankMetric === 'rainiest') return rankings.rainiest;
+              if (activeRankMetric === 'driest') return rankings.driest;
+              if (activeRankMetric === 'windiest') return rankings.windiest;
+              if (activeRankMetric === 'sunniest') return rankings.sunniest;
+              return rankings.hottest;
+            })();
+
+            const activeColorClass = (() => {
+              if (activeRankMetric === 'hottest') return 'bg-rose-500';
+              if (activeRankMetric === 'coldest') return 'bg-sky-400';
+              if (activeRankMetric === 'rainiest') return 'bg-blue-500';
+              if (activeRankMetric === 'driest') return 'bg-amber-500';
+              if (activeRankMetric === 'windiest') return 'bg-teal-500';
+              if (activeRankMetric === 'sunniest') return 'bg-yellow-500';
+              return 'bg-rose-500';
+            })();
+
+            const maxVal = Math.max(...activeList.map(item => parseFloat(item.value) || 1));
+
+            return (
+              <div className="space-y-4">
+                {activeList.map((item, index) => {
+                  const rank = index + 1;
+                  const valNum = parseFloat(item.value) || 0;
+                  const pct = Math.min(100, Math.max(12, (valNum / maxVal) * 100));
+
+                  const badgeClasses = (() => {
+                    if (rank === 1) return "bg-amber-500 text-white font-extrabold shadow-sm";
+                    if (rank === 2) return "bg-slate-400 text-white font-bold shadow-sm";
+                    if (rank === 3) return "bg-amber-700 text-white font-bold shadow-sm";
+                    return "bg-slate-200 text-slate-650 font-bold";
+                  })();
+
+                  return (
+                    <div key={index} className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs font-semibold">
+                        <div className="flex items-center gap-2.5">
+                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] ${badgeClasses}`}>
+                            {rank}
+                          </span>
+                          <span className="text-slate-700 font-extrabold text-sm">{item.name}</span>
+                        </div>
+                        <span className="text-slate-800 font-mono font-bold text-xs">{item.value}</span>
+                      </div>
+                      {/* Premium progress bar */}
+                      <div className="w-full bg-slate-200/50 h-2 rounded-full overflow-hidden ml-8 w-[calc(100%-32px)]">
+                        <div
+                          className={`h-full ${activeColorClass} rounded-full transition-all duration-500`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
 
       </div>
