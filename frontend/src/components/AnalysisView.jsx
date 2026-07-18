@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useData } from '../context/DataContext';
 import {
   ScatterChart,
@@ -15,21 +16,22 @@ import {
   HelpCircle, 
   Activity, 
   Flame, 
-  Layers
+  Layers,
+  ChevronDown
 } from 'lucide-react';
 
 const VARIABLES = [
-  { key: 'temp', label: 'Nhiệt độ TB' },
-  { key: 'tempMax', label: 'Nhiệt độ Max' },
-  { key: 'tempMin', label: 'Nhiệt độ Min' },
-  { key: 'rain', label: 'Lượng mưa' },
-  { key: 'humidity', label: 'Độ ẩm' },
-  { key: 'wind', label: 'Tốc độ gió' },
-  { key: 'sunshine', label: 'Giờ nắng' },
-  { key: 'et0', label: 'Bốc hơi ET₀' },
-  // { key: 'uvMax', label: 'UV Cực đại' }, // Note: Column has 0 valid values in current CSV
-  { key: 'cloud', label: 'Độ phủ mây' },
-  { key: 'pressure', label: 'Khí áp' }
+  { key: 'temp', label: 'Nhiệt độ TB', shortLabel: 'N.độ TB' },
+  { key: 'tempMax', label: 'Nhiệt độ Max', shortLabel: 'N.độ Max' },
+  { key: 'tempMin', label: 'Nhiệt độ Min', shortLabel: 'N.độ Min' },
+  { key: 'rain', label: 'Lượng mưa', shortLabel: 'Lượng mưa' },
+  { key: 'humidity', label: 'Độ ẩm', shortLabel: 'Độ ẩm' },
+  { key: 'wind', label: 'Tốc độ gió', shortLabel: 'Tốc độ gió' },
+  { key: 'sunshine', label: 'Giờ nắng', shortLabel: 'Giờ nắng' },
+  { key: 'et0', label: 'Bốc hơi ET₀', shortLabel: 'Bốc hơi ET₀' },
+  // { key: 'uvMax', label: 'UV Cực đại', shortLabel: 'UV Cực đại' }, // Note: Column has 0 valid values in current CSV
+  { key: 'cloud', label: 'Độ phủ mây', shortLabel: 'Đ.phủ mây' },
+  { key: 'pressure', label: 'Khí áp', shortLabel: 'Khí áp' }
 ];
 
 const REGION_COLORS = {
@@ -124,13 +126,43 @@ export default function AnalysisView() {
   const [scatterX, setScatterX] = useState('temp');
   const [scatterY, setScatterY] = useState('humidity');
 
+  const [isXDropdownOpen, setIsXDropdownOpen] = useState(false);
+  const [isYDropdownOpen, setIsYDropdownOpen] = useState(false);
+  const [isBoxMetricDropdownOpen, setIsBoxMetricDropdownOpen] = useState(false);
+  const [isBoxGroupByDropdownOpen, setIsBoxGroupByDropdownOpen] = useState(false);
+
+  const xDropdownRef = React.useRef(null);
+  const yDropdownRef = React.useRef(null);
+  const boxMetricDropdownRef = React.useRef(null);
+  const boxGroupByDropdownRef = React.useRef(null);
+
+  React.useEffect(() => {
+    function handleClickOutside(event) {
+      if (xDropdownRef.current && !xDropdownRef.current.contains(event.target)) {
+        setIsXDropdownOpen(false);
+      }
+      if (yDropdownRef.current && !yDropdownRef.current.contains(event.target)) {
+        setIsYDropdownOpen(false);
+      }
+      if (boxMetricDropdownRef.current && !boxMetricDropdownRef.current.contains(event.target)) {
+        setIsBoxMetricDropdownOpen(false);
+      }
+      if (boxGroupByDropdownRef.current && !boxGroupByDropdownRef.current.contains(event.target)) {
+        setIsBoxGroupByDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // State for Box Plot
   const [boxMetric, setBoxMetric] = useState('temp');
-  const [boxGroupBy, setBoxGroupBy] = useState('season'); // 'season' | 'region' | 'province'
+  const [boxGroupBy, setBoxGroupBy] = useState('season'); // 'season' | 'region'
   
   // Interactive hover states
   const [hoveredCell, setHoveredCell] = useState(null); // { xKey, yKey, r }
   const [hoveredBox, setHoveredBox] = useState(null); // Box details for tooltip
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
   // --- 1. Dynamic Heatmap Calculation ---
   // Calculates Pearson matrix dynamically based on active rawRows (filtered state)
@@ -146,7 +178,7 @@ export default function AnalysisView() {
     // Compute coefficients matrix
     const matrix = [];
     VARIABLES.forEach(rowVar => {
-      const row = { key: rowVar.key, label: rowVar.label };
+      const row = { key: rowVar.key, label: rowVar.label, shortLabel: rowVar.shortLabel };
       VARIABLES.forEach(colVar => {
         row[colVar.key] = calculatePearson(datasets[rowVar.key], datasets[colVar.key]);
       });
@@ -265,10 +297,10 @@ export default function AnalysisView() {
     if (!boxPlotData.length) return null;
 
     // Define dimensions of the SVG container
-    const width = 800;
+    const width = 1000;
     const height = 300;
-    const paddingLeft = 120;
-    const paddingRight = 30;
+    const paddingLeft = 60;
+    const paddingRight = 60;
     const paddingTop = 20;
     const paddingBottom = 40;
 
@@ -301,7 +333,7 @@ export default function AnalysisView() {
 
     return (
       <div className="w-full overflow-x-auto">
-        <svg viewBox={`0 0 ${width} ${height}`} className="w-full min-w-[700px] h-80 bg-slate-50/20 border border-slate-100 rounded-xl">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full min-w-[900px] h-80 bg-slate-50/20 border border-slate-100 rounded-xl">
           {/* Horizontal Grid lines */}
           {[0, 0.25, 0.5, 0.75, 1].map((p, idx) => {
             const val = graphMin + graphRange * p;
@@ -344,10 +376,18 @@ export default function AnalysisView() {
             const yQ3 = scaleY(stats.q3);
             const yMax = scaleY(stats.whiskerMax);
 
+
+
             return (
               <g 
                 key={groupName}
-                onMouseEnter={() => setHoveredBox({ groupName, stats })}
+                onMouseEnter={(e) => {
+                  setHoveredBox({ groupName, stats });
+                  setTooltipPos({ x: e.clientX, y: e.clientY });
+                }}
+                onMouseMove={(e) => {
+                  setTooltipPos({ x: e.clientX, y: e.clientY });
+                }}
                 onMouseLeave={() => setHoveredBox(null)}
                 className="cursor-pointer group"
               >
@@ -435,9 +475,9 @@ export default function AnalysisView() {
                   x={centerX}
                   y={height - 15}
                   textAnchor="middle"
-                  className="fill-slate-600 font-bold text-[9px] group-hover:fill-brand-primary transition-colors"
+                  className="fill-slate-600 font-bold text-[9.5px] group-hover:fill-brand-primary transition-colors"
                 >
-                  {groupName.length > 12 ? `${groupName.slice(0, 10)}...` : groupName}
+                  {groupName}
                 </text>
               </g>
             );
@@ -459,118 +499,137 @@ export default function AnalysisView() {
         {/* Heatmap Grid (Col Span 7) */}
         <div className="lg:col-span-7 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3 flex flex-col justify-between">
           <div>
-            <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-              <Flame className="h-4.5 w-4.5 text-rose-500" /> Ma trận hệ số tương quan Pearson
+            <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider">
+              Ma trận hệ số tương quan Pearson
             </h3>
-            <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
-              Đỏ/Cam biểu thị tương quan thuận (+). Xanh biểu thị tương quan nghịch (-). Click vào một ô bất kỳ để tự động đổi trục cho biểu đồ Scatter bên phải.
-            </p>
           </div>
 
           {/* Grid Heatmap Container */}
-          <div className="overflow-auto mt-4 pr-1">
-            <div className="min-w-[480px]">
+          <div className="overflow-x-auto overflow-y-visible mt-4 pr-1 pb-1">
+            <div className="min-w-[480px] space-y-1.5">
               {/* Header variables labels */}
-              <div className="grid grid-cols-12 gap-1 mb-1 text-[8px] font-bold text-slate-400 text-center">
-                <div className="col-span-2 text-left pr-1 text-slate-500">Biến số</div>
-                {VARIABLES.map(v => (
-                  <div key={v.key} className="truncate" title={v.label}>{v.label.replace('TB', '').replace('Nhiệt độ', 'N.độ')}</div>
-                ))}
+              <div className="flex items-end gap-1 text-[9px] font-bold text-slate-700 text-center">
+                <div className="w-[80px]" />
+                <div className="flex-1 grid grid-cols-10 gap-1">
+                  {VARIABLES.map(v => (
+                    <div 
+                      key={v.key} 
+                      className="text-[9px] font-bold text-slate-700 text-center whitespace-normal break-words leading-tight flex items-end justify-center pb-1 h-9 select-none" 
+                      title={v.label}
+                    >
+                      {v.shortLabel}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Rows */}
               <div className="space-y-1">
                 {correlationMatrix.map(row => (
-                  <div key={row.key} className="grid grid-cols-12 gap-1 items-center">
+                  <div key={row.key} className="flex items-center gap-1">
                     {/* Row Label */}
-                    <div className="col-span-2 text-[8px] font-bold text-slate-650 truncate" title={row.label}>
-                      {row.label}
+                    <div className="w-[80px] text-[9px] font-bold text-slate-700 truncate select-none" title={row.label}>
+                      {row.shortLabel}
                     </div>
                     {/* Cells */}
-                    {VARIABLES.map(colVar => {
-                      const rValue = row[colVar.key];
-                      const color = getCellColor(rValue);
-                      const isSelected = scatterX === colVar.key && scatterY === row.key;
-                      
-                      return (
-                        <div
-                          key={colVar.key}
-                          onClick={() => handleCellClick(colVar.key, row.key)}
-                          onMouseEnter={() => setHoveredCell({ xKey: colVar.label, yKey: row.label, r: rValue })}
-                          onMouseLeave={() => setHoveredCell(null)}
-                          className={`aspect-square rounded flex items-center justify-center font-mono text-[8px] font-extrabold cursor-pointer border transition-all hover:scale-105 active:scale-95 ${
-                            isSelected ? 'border-slate-800 scale-102 ring-1 ring-slate-800 shadow-md' : 'border-transparent'
-                          }`}
-                          style={{ backgroundColor: color, color: Math.abs(rValue) > 0.45 ? '#fff' : '#1e293b' }}
-                          title={`${row.label} vs ${colVar.label}: r = ${Math.round(rValue*100)/100}`}
-                        >
-                          {Math.round(rValue * 10) / 10}
-                        </div>
-                      );
-                    })}
+                    <div className="flex-1 grid grid-cols-10 gap-1">
+                      {VARIABLES.map(colVar => {
+                        const rValue = row[colVar.key];
+                        const color = getCellColor(rValue);
+                        const isSelected = scatterX === colVar.key && scatterY === row.key;
+                        
+                        return (
+                          <div
+                            key={colVar.key}
+                            onClick={() => handleCellClick(colVar.key, row.key)}
+                            onMouseEnter={() => setHoveredCell({ xKey: colVar.label, yKey: row.label, r: rValue })}
+                            onMouseLeave={() => setHoveredCell(null)}
+                            className={`aspect-square rounded flex items-center justify-center font-mono text-[8px] font-extrabold cursor-pointer border transition-all hover:scale-105 active:scale-95 ${
+                              isSelected ? 'border-slate-800 scale-102 ring-1 ring-slate-800 shadow-md' : 'border-transparent'
+                            }`}
+                            style={{ backgroundColor: color, color: Math.abs(rValue) > 0.45 ? '#fff' : '#1e293b' }}
+                            title={`${row.label} vs ${colVar.label}: r = ${Math.round(rValue*100)/100}`}
+                          >
+                            {Math.round(rValue * 10) / 10}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
-          </div>
-
-          {/* Interactive Cell Info banner */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 mt-4 text-[10px] text-slate-500 flex justify-between items-center font-bold">
-            {hoveredCell ? (
-              <>
-                <span className="text-slate-650">
-                  Tương quan: <span className="text-brand-primary">{hoveredCell.yKey}</span> × <span className="text-brand-accent">{hoveredCell.xKey}</span>
-                </span>
-                <span className={`px-2 py-0.5 rounded ${Math.abs(hoveredCell.r) > 0.5 ? 'bg-red-50 text-red-650' : 'bg-slate-100 text-slate-600'}`}>
-                  r = {Math.round(hoveredCell.r * 100) / 100} ({Math.abs(hoveredCell.r) > 0.65 ? 'Tương quan mạnh' : Math.abs(hoveredCell.r) > 0.35 ? 'Trung bình' : 'Yếu'})
-                </span>
-              </>
-            ) : (
-              <div className="flex items-center gap-1 opacity-70">
-                <HelpCircle className="h-4 w-4" />
-                <span>Rê chuột lên các ô số để đọc hệ số tương quan chi tiết.</span>
-              </div>
-            )}
           </div>
         </div>
 
         {/* Scatter Plot (Col Span 5) */}
         <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between">
           <div>
-            <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-              <Activity className="h-4.5 w-4.5 text-brand-primary" /> Đồ thị phân tán tương tác
+            <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider">
+              Đồ thị phân tán tương tác
             </h3>
-            <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
-              Phân tích cụm điểm dữ liệu (tính trung bình tháng của các tỉnh thành) để xác định xu hướng phân tán.
-            </p>
           </div>
 
           {/* Custom Selectors for axes */}
           <div className="grid grid-cols-2 gap-3 mt-2">
-            <div className="space-y-1">
+            <div className="space-y-1 relative" ref={xDropdownRef}>
               <span className="text-[9px] text-slate-400 font-extrabold uppercase">Trục X</span>
-              <select
-                value={scatterX}
-                onChange={(e) => setScatterX(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-slate-800 outline-none"
+              <button
+                type="button"
+                onClick={() => setIsXDropdownOpen(!isXDropdownOpen)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-[11px] font-bold text-slate-800 flex justify-between items-center outline-none hover:bg-slate-100/80 transition-colors"
               >
-                {VARIABLES.map(v => (
-                  <option key={v.key} value={v.key}>{v.label}</option>
-                ))}
-              </select>
+                <span>{VARIABLES.find(v => v.key === scatterX)?.label}</span>
+                <ChevronDown className="h-3 w-3 text-slate-400" />
+              </button>
+              
+              {isXDropdownOpen && (
+                <div className="absolute left-0 mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-30 max-h-60 overflow-y-auto text-[11px] font-bold text-slate-700 animate-fade-in">
+                  {VARIABLES.map(v => (
+                    <button
+                      key={v.key}
+                      type="button"
+                      onClick={() => {
+                        setScatterX(v.key);
+                        setIsXDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 hover:bg-slate-50 transition-colors ${scatterX === v.key ? 'text-brand-primary bg-blue-50/50' : 'text-slate-700'}`}
+                    >
+                      {v.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-1 relative" ref={yDropdownRef}>
               <span className="text-[9px] text-slate-400 font-extrabold uppercase">Trục Y</span>
-              <select
-                value={scatterY}
-                onChange={(e) => setScatterY(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-slate-800 outline-none"
+              <button
+                type="button"
+                onClick={() => setIsYDropdownOpen(!isYDropdownOpen)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-[11px] font-bold text-slate-800 flex justify-between items-center outline-none hover:bg-slate-100/80 transition-colors"
               >
-                {VARIABLES.map(v => (
-                  <option key={v.key} value={v.key}>{v.label}</option>
-                ))}
-              </select>
+                <span>{VARIABLES.find(v => v.key === scatterY)?.label}</span>
+                <ChevronDown className="h-3 w-3 text-slate-400" />
+              </button>
+              
+              {isYDropdownOpen && (
+                <div className="absolute left-0 mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-30 max-h-60 overflow-y-auto text-[11px] font-bold text-slate-700 animate-fade-in">
+                  {VARIABLES.map(v => (
+                    <button
+                      key={v.key}
+                      type="button"
+                      onClick={() => {
+                        setScatterY(v.key);
+                        setIsYDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 hover:bg-slate-50 transition-colors ${scatterY === v.key ? 'text-brand-primary bg-blue-50/50' : 'text-slate-700'}`}
+                    >
+                      {v.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -611,6 +670,7 @@ export default function AnalysisView() {
                     name={series.name}
                     data={series.data}
                     fill={series.color}
+                    isAnimationActive={false}
                   />
                 ))}
               </ScatterChart>
@@ -637,107 +697,138 @@ export default function AnalysisView() {
         {/* Controls header */}
         <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
           <div>
-            <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-              <Layers className="h-4.5 w-4.5 text-blue-600" /> Biểu đồ phân phối Box & Whisker (Box Plot)
+            <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider">
+              Biểu đồ phân phối Box & Whisker (Box Plot)
             </h3>
-            <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
-              Khảo sát phân phối mật độ dữ liệu, biên sai số cực đại/cực tiểu (whiskers), các khoảng tứ phân vị (Q1, Median, Q3) và dị biệt ngoại lai (Outliers).
-            </p>
           </div>
 
           <div className="flex items-center gap-3">
             {/* Box Metric Selection */}
             <div className="flex items-center gap-1.5 text-xs font-semibold">
               <span className="text-slate-400 font-bold">Chỉ số:</span>
-              <select
-                value={boxMetric}
-                onChange={(e) => setBoxMetric(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none"
-              >
-                {VARIABLES.map(v => (
-                  <option key={v.key} value={v.key}>{v.label}</option>
-                ))}
-              </select>
+              <div className="relative" ref={boxMetricDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsBoxMetricDropdownOpen(!isBoxMetricDropdownOpen)}
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-800 flex items-center gap-1 hover:bg-slate-100/80 transition-colors"
+                >
+                  <span>{VARIABLES.find(v => v.key === boxMetric)?.label}</span>
+                  <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                </button>
+                
+                {isBoxMetricDropdownOpen && (
+                  <div className="absolute left-0 mt-1 w-48 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-30 max-h-60 overflow-y-auto text-xs font-bold text-slate-700 animate-fade-in">
+                    {VARIABLES.map(v => (
+                      <button
+                        key={v.key}
+                        type="button"
+                        onClick={() => {
+                          setBoxMetric(v.key);
+                          setIsBoxMetricDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 hover:bg-slate-50 transition-colors ${boxMetric === v.key ? 'text-brand-primary bg-blue-50/50' : 'text-slate-700'}`}
+                      >
+                        {v.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Box GroupBy selector */}
             <div className="flex items-center gap-1.5 text-xs font-semibold">
               <span className="text-slate-400 font-bold">Gom nhóm theo:</span>
-              <select
-                value={boxGroupBy}
-                onChange={(e) => setBoxGroupBy(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none"
-              >
-                <option value="season">Mùa khí hậu</option>
-                <option value="region">Vùng miền</option>
-                <option value="province">Tỉnh thành (34 tỉnh)</option>
-              </select>
+              <div className="relative" ref={boxGroupByDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsBoxGroupByDropdownOpen(!isBoxGroupByDropdownOpen)}
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-800 flex items-center gap-1 hover:bg-slate-100/80 transition-colors"
+                >
+                  <span>{boxGroupBy === 'season' ? 'Mùa khí hậu' : 'Vùng miền'}</span>
+                  <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                </button>
+                
+                {isBoxGroupByDropdownOpen && (
+                  <div className="absolute right-0 mt-1 w-40 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-30 text-xs font-bold text-slate-700 animate-fade-in">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBoxGroupBy('season');
+                        setIsBoxGroupByDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 hover:bg-slate-50 transition-colors ${boxGroupBy === 'season' ? 'text-brand-primary bg-blue-50/50' : 'text-slate-700'}`}
+                    >
+                      Mùa khí hậu
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBoxGroupBy('region');
+                        setIsBoxGroupByDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 hover:bg-slate-50 transition-colors ${boxGroupBy === 'region' ? 'text-brand-primary bg-blue-50/50' : 'text-slate-700'}`}
+                    >
+                      Vùng miền
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Boxplot chart and Side panel */}
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 items-center">
-          
-          {/* Main SVG Boxplot (Col span 3) */}
-          <div className="xl:col-span-3">
-            {renderSvgBoxPlot()}
-          </div>
-
-          {/* Detailed box stats inspector (Col span 1) */}
-          <div className="xl:col-span-1 bg-slate-50 border border-slate-200 rounded-2xl p-5 min-h-[250px] flex flex-col justify-between">
-            {hoveredBox ? (
-              <div className="space-y-3.5">
-                <div className="border-b border-slate-200 pb-2">
-                  <span className="text-[10px] text-brand-primary font-extrabold uppercase">Nhóm đang xem</span>
-                  <h4 className="text-sm font-extrabold text-slate-800 mt-0.5">{hoveredBox.groupName}</h4>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 font-mono text-xs">
-                  <div>
-                    <span className="text-[9px] text-slate-400 font-extrabold uppercase block font-sans">Whisker Max</span>
-                    <p className="font-bold text-slate-750">{hoveredBox.stats.whiskerMax}</p>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-400 font-extrabold uppercase block font-sans">Thượng phân vị (Q3)</span>
-                    <p className="font-bold text-slate-750">{hoveredBox.stats.q3}</p>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-red-500/80 font-extrabold uppercase block font-sans">Trung vị (Median)</span>
-                    <p className="font-bold text-red-600 text-base">{hoveredBox.stats.median}</p>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-400 font-extrabold uppercase block font-sans">Hạ phân vị (Q1)</span>
-                    <p className="font-bold text-slate-750">{hoveredBox.stats.q1}</p>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-400 font-extrabold uppercase block font-sans">Whisker Min</span>
-                    <p className="font-bold text-slate-750">{hoveredBox.stats.whiskerMin}</p>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-400 font-extrabold uppercase block font-sans">Số điểm dị biệt</span>
-                    <p className="font-bold text-slate-750">{hoveredBox.stats.outliers.length} điểm</p>
-                  </div>
-                </div>
-
-                <div className="text-[9px] text-slate-400 font-semibold leading-relaxed pt-2 border-t border-slate-200 font-sans">
-                  Hộp râu thể hiện dải phân phối IQR từ Q1 đến Q3. Đường đỏ thể hiện mức trung vị.
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center text-center text-slate-400 gap-2 h-full py-8">
-                <HelpCircle className="h-7 w-7 text-slate-300 animate-bounce" />
-                <p className="text-xs font-bold text-slate-500">Rê chuột vào một Box</p>
-                <p className="text-[10px] text-slate-400 leading-normal max-w-[180px]">
-                  Di chuột qua các khối hộp hình chữ nhật trên biểu đồ để xem chi tiết các chỉ số phân vị thống kê.
-                </p>
-              </div>
-            )}
-          </div>
-
+        {/* Boxplot chart */}
+        <div className="w-full relative">
+          {renderSvgBoxPlot()}
         </div>
 
       </div>
+
+      {/* Floating Tukey Box stats tooltip */}
+      {hoveredBox && createPortal(
+        <div 
+          className="fixed bg-white/95 backdrop-blur border border-slate-200 rounded-xl p-4 shadow-xl pointer-events-none z-50 text-[11px] font-medium text-slate-750 min-w-[220px] transition-all duration-75 space-y-3.5"
+          style={{ 
+            left: `${tooltipPos.x + 15}px`, 
+            top: `${tooltipPos.y + 15}px`,
+            transform: tooltipPos.x > window.innerWidth - 260 ? 'translateX(-110%)' : 'none'
+          }}
+        >
+          <div className="border-b border-slate-200 pb-1.5">
+            <span className="text-[9px] text-brand-primary font-extrabold uppercase">Nhóm đang xem</span>
+            <h4 className="text-xs font-extrabold text-slate-800 mt-0.5">{hoveredBox.groupName}</h4>
+          </div>
+
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 font-mono text-[10px]">
+            <div>
+              <span className="text-[8px] text-slate-400 font-extrabold uppercase block font-sans">Whisker Max</span>
+              <p className="font-bold text-slate-750">{hoveredBox.stats.whiskerMax}</p>
+            </div>
+            <div>
+              <span className="text-[8px] text-slate-400 font-extrabold uppercase block font-sans">Q3 (Thượng phân vị)</span>
+              <p className="font-bold text-slate-750">{hoveredBox.stats.q3}</p>
+            </div>
+            <div>
+              <span className="text-[8px] text-red-500 font-extrabold uppercase block font-sans">Median (Trung vị)</span>
+              <p className="font-bold text-red-650 text-xs">{hoveredBox.stats.median}</p>
+            </div>
+            <div>
+              <span className="text-[8px] text-slate-400 font-extrabold uppercase block font-sans">Q1 (Hạ phân vị)</span>
+              <p className="font-bold text-slate-750">{hoveredBox.stats.q1}</p>
+            </div>
+            <div>
+              <span className="text-[8px] text-slate-400 font-extrabold uppercase block font-sans">Whisker Min</span>
+              <p className="font-bold text-slate-750">{hoveredBox.stats.whiskerMin}</p>
+            </div>
+            <div>
+              <span className="text-[8px] text-slate-400 font-extrabold uppercase block font-sans">Số điểm dị biệt</span>
+              <p className="font-bold text-slate-750">{hoveredBox.stats.outliers.length} điểm</p>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
     </div>
   );

@@ -36,13 +36,13 @@ const METRICS = [
 ];
 
 const REGION_COLORS = {
-  RedRiverDelta:      '#8B5CF6', // Purple
-  NorthMountain:      '#F59E0B', // Amber
-  NorthCentral:       '#2563EB', // Royal Blue
-  SouthCentral:       '#06B6D4', // Cyan
-  CentralHighlands:   '#10B981', // Emerald
-  Southeast:          '#EC4899', // Pink
-  MekongDelta:        '#EF4444', // Red
+  RedRiverDelta:      '#6D28D9', // Darker Purple
+  NorthMountain:      '#D97706', // Darker Amber
+  NorthCentral:       '#1D4ED8', // Darker Royal Blue
+  SouthCentral:       '#0891B2', // Darker Cyan
+  CentralHighlands:   '#047857', // Darker Emerald
+  Southeast:          '#BE185D', // Darker Pink/Magenta
+  MekongDelta:        '#B91C1C', // Darker Red
 };
 
 const REGION_NAMES = {
@@ -83,11 +83,19 @@ export default function ComparisonView() {
   // Province comparison states
   const [activeMetric, setActiveMetric] = useState('temp');
   const [sortOrder, setSortOrder] = useState('desc'); // 'desc' | 'asc'
-  const [radarProvinces, setRadarProvinces] = useState(['Hà Nội', 'Hồ Chí Minh']);
+  const [radarProvinces, setRadarProvinces] = useState([]);
+
+  // Region and Season comparison states
+  const [radarRegions, setRadarRegions] = useState(['Đồng bằng sông Hồng', 'Đông Nam Bộ']);
+  const [radarSeasons, setRadarSeasons] = useState(['Mùa Hè', 'Mùa Đông']);
 
   // Metric dropdown custom UI states
   const [isMetricDropdownOpen, setIsMetricDropdownOpen] = useState(false);
   const metricDropdownRef = useRef(null);
+
+  // General utility helpers
+  const avg = arr => arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0;
+  const round = n => Math.round(n * 100) / 100;
 
   // Close metric dropdown when clicking outside
   useEffect(() => {
@@ -125,8 +133,7 @@ export default function ComparisonView() {
       byProvince[p].et0.push(row.et0);
     });
 
-    const avg = arr => arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0;
-    const round = n => Math.round(n * 100) / 100;
+
 
     return Object.values(byProvince).map(p => ({
       name: p.name,
@@ -153,6 +160,13 @@ export default function ComparisonView() {
       return sortOrder === 'desc' ? valB - valA : valA - valB;
     });
   }, [provinceAverages, activeMetric, sortOrder]);
+
+  // Automatically select the highest ranking province whenever the sorted data changes (e.g. on active metric switch)
+  useEffect(() => {
+    if (sortedProvinceData.length > 0) {
+      setRadarProvinces([sortedProvinceData[0].name]);
+    }
+  }, [sortedProvinceData]);
 
   // --- Calculate Regional Aggregates for Tab 2 ---
   const regionalData = useMemo(() => {
@@ -284,6 +298,126 @@ export default function ComparisonView() {
     });
   };
 
+  // --- Generate Radar Chart Data for Tab 2 (Regions) ---
+  const radarRegionsData = useMemo(() => {
+    if (radarRegions.length === 0) return [];
+    
+    const keys = ['temp', 'rain', 'humidity', 'wind', 'sunshine', 'et0'];
+    const regionAvgs = {};
+    
+    radarRegions.forEach(rName => {
+      const rKey = Object.keys(REGION_NAMES).find(k => REGION_NAMES[k] === rName) || '';
+      const rRows = rawRows.filter(row => row.regionKey === rKey || row.region === rName);
+      
+      if (rRows.length > 0) {
+        regionAvgs[rName] = {
+          temp: avg(rRows.map(r => r.temp)),
+          rain: avg(rRows.map(r => r.rain)),
+          humidity: avg(rRows.map(r => r.humidity)),
+          wind: avg(rRows.map(r => r.wind)),
+          sunshine: avg(rRows.map(r => r.sunshine)),
+          et0: avg(rRows.map(r => r.et0))
+        };
+      }
+    });
+
+    const p1 = regionAvgs[radarRegions[0]];
+    const p2 = regionAvgs[radarRegions[1]];
+
+    return keys.map(key => {
+      const maxVal = METRIC_MAXIMA[key] || 100;
+      const res = {
+        subject: RADAR_METRIC_LABELS[key] || key,
+        fullMark: 100
+      };
+
+      if (p1) {
+        res[`raw_${radarRegions[0]}`] = Math.round(p1[key] * 100) / 100;
+        res[radarRegions[0]] = Math.min(Math.round((p1[key] / maxVal) * 100), 100);
+      }
+      if (p2) {
+        res[`raw_${radarRegions[1]}`] = Math.round(p2[key] * 100) / 100;
+        res[radarRegions[1]] = Math.min(Math.round((p2[key] / maxVal) * 100), 100);
+      }
+      return res;
+    });
+  }, [rawRows, radarRegions]);
+
+  // --- Generate Radar Chart Data for Tab 3 (Seasons) ---
+  const radarSeasonsData = useMemo(() => {
+    if (radarSeasons.length === 0) return [];
+    
+    const keys = ['temp', 'rain', 'humidity', 'wind', 'sunshine', 'et0'];
+    const seasonAvgs = {};
+    
+    radarSeasons.forEach(sName => {
+      const sVal = sName.replace('Mùa ', '');
+      const sRows = rawRows.filter(row => row.season === sVal);
+      
+      if (sRows.length > 0) {
+        seasonAvgs[sName] = {
+          temp: avg(sRows.map(r => r.temp)),
+          rain: avg(sRows.map(r => r.rain)),
+          humidity: avg(sRows.map(r => r.humidity)),
+          wind: avg(sRows.map(r => r.wind)),
+          sunshine: avg(sRows.map(r => r.sunshine)),
+          et0: avg(sRows.map(r => r.et0))
+        };
+      }
+    });
+
+    const p1 = seasonAvgs[radarSeasons[0]];
+    const p2 = seasonAvgs[radarSeasons[1]];
+
+    return keys.map(key => {
+      const maxVal = METRIC_MAXIMA[key] || 100;
+      const res = {
+        subject: RADAR_METRIC_LABELS[key] || key,
+        fullMark: 100
+      };
+
+      if (p1) {
+        res[`raw_${radarSeasons[0]}`] = Math.round(p1[key] * 100) / 100;
+        res[radarSeasons[0]] = Math.min(Math.round((p1[key] / maxVal) * 100), 100);
+      }
+      if (p2) {
+        res[`raw_${radarSeasons[1]}`] = Math.round(p2[key] * 100) / 100;
+        res[radarSeasons[1]] = Math.min(Math.round((p2[key] / maxVal) * 100), 100);
+      }
+      return res;
+    });
+  }, [rawRows, radarSeasons]);
+
+  // Toggle selected regions on radar chart (Limit to max 2)
+  const toggleRadarRegion = (regionName) => {
+    setRadarRegions(prev => {
+      if (prev.includes(regionName)) {
+        if (prev.length <= 1) return prev;
+        return prev.filter(r => r !== regionName);
+      } else {
+        if (prev.length >= 2) {
+          return [prev[1], regionName]; // Slide window
+        }
+        return [...prev, regionName];
+      }
+    });
+  };
+
+  // Toggle selected seasons on radar chart (Limit to max 2)
+  const toggleRadarSeason = (seasonName) => {
+    setRadarSeasons(prev => {
+      if (prev.includes(seasonName)) {
+        if (prev.length <= 1) return prev;
+        return prev.filter(s => s !== seasonName);
+      } else {
+        if (prev.length >= 2) {
+          return [prev[1], seasonName]; // Slide window
+        }
+        return [...prev, seasonName];
+      }
+    });
+  };
+
   if (loading) return null;
   if (error) return null;
 
@@ -327,18 +461,15 @@ export default function ComparisonView() {
 
       {/* RENDER TAB 1: PROVINCES COMPARISON */}
       {subTab === 'provinces' && (
-        <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
           
           {/* Horizontal Bar Chart card */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 pb-3 shadow-sm space-y-4">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 pb-3 shadow-sm space-y-4 flex flex-col justify-between lg:col-span-2">
             
             {/* Filter controls */}
             <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
               <div>
                 <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Xếp hạng 34 tỉnh thành Việt Nam</h3>
-                <p className="text-[11px] text-slate-400 font-semibold mt-0.5">
-                  Tô màu tự động theo vùng miền. Click vào một thanh cột của tỉnh bất kỳ để chọn so sánh đối đầu bên dưới.
-                </p>
               </div>
 
               <div className="flex items-center gap-3">
@@ -399,7 +530,9 @@ export default function ComparisonView() {
                       layout="vertical"
                       margin={{ top: 10, right: 15, left: 10, bottom: 0 }}
                       onClick={(state) => {
-                        if (state && state.activeLabel) {
+                        if (state && state.activePayload && state.activePayload.length > 0) {
+                          toggleRadarProvince(state.activePayload[0].payload.name);
+                        } else if (state && state.activeLabel) {
                           toggleRadarProvince(state.activeLabel);
                         }
                       }}
@@ -424,7 +557,6 @@ export default function ComparisonView() {
                       />
                       <Bar 
                         dataKey={activeMetric} 
-                        fill="#3B82F6"
                         radius={[0, 4, 4, 0]}
                         className="cursor-pointer"
                       >
@@ -433,8 +565,10 @@ export default function ComparisonView() {
                           return (
                             <Cell 
                               key={`cell-${index}`} 
-                              fill={isSelected ? '#1D4ED8' : '#3B82F6'} 
-                              fillOpacity={isSelected ? 1 : 0.85}
+                              fill={entry.color} 
+                              fillOpacity={isSelected ? 1.0 : 0.6}
+                              stroke={isSelected ? '#1e293b' : 'none'}
+                              strokeWidth={isSelected ? 2 : 0}
                             />
                           );
                         })}
@@ -470,121 +604,57 @@ export default function ComparisonView() {
 
           </div>
 
-          {/* Radar Chart (Side-by-side Dual Inspector) */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-            {/* Province Selection Inspector panel */}
-            <div className="lg:col-span-1 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between">
-              <div>
-                <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1">
-                  Cấu hình đối đầu 2 tỉnh thành
-                </h3>
-                <p className="text-[10px] text-slate-400 font-semibold mt-1">
-                  Chọn đúng tối đa 2 tỉnh thành bất kỳ bằng cách click dưới đây hoặc click trực tiếp vào biểu đồ thanh phía trên.
-                </p>
-
-                {/* Selected Display */}
-                <div className="flex flex-col gap-2 mt-4">
-                  {radarProvinces.map((prov, index) => {
-                    const info = provinceAverages.find(p => p.name === prov);
-                    const color = index === 0 ? '#3B82F6' : '#EF4444';
-                    return (
-                      <div key={prov} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                        <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-                          <span>{prov}</span>
-                          <span className="text-[9px] font-semibold text-slate-400">({info?.region})</span>
-                        </div>
-                        {radarProvinces.length > 1 && (
-                          <button 
-                            onClick={() => toggleRadarProvince(prov)}
-                            className="text-slate-400 hover:text-rose-500 cursor-pointer"
-                          >
-                            Bỏ chọn
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Selector List */}
-              <div className="space-y-1">
-                <span className="text-[10px] text-slate-400 font-extrabold uppercase">Danh sách tỉnh thành nhanh:</span>
-                <div className="grid grid-cols-3 gap-1.5 max-h-48 overflow-y-auto pr-1">
-                  {provinceAverages.map(p => {
-                    const isSelected = radarProvinces.includes(p.name);
-                    return (
-                      <button
-                        key={p.name}
-                        onClick={() => toggleRadarProvince(p.name)}
-                        className={`py-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer truncate ${
-                          isSelected 
-                            ? 'bg-slate-900 border-slate-900 text-white font-extrabold shadow-sm' 
-                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                        }`}
-                      >
-                        {p.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-            </div>
-
-            {/* Radar Visual */}
-            <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-center items-center relative min-h-[350px]">
-              <span className="absolute top-4 left-4 text-xs font-extrabold text-slate-800 uppercase tracking-wider">
-                Biểu đồ Radar liên chiều khí hậu (6 biến cốt lõi)
+          {/* Radar Chart */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between items-stretch lg:col-span-1 min-h-[450px]">
+            <div className="flex justify-between items-start flex-wrap gap-2 border-b border-slate-100 pb-3">
+              <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                Radar liên chiều khí hậu
               </span>
-
-              {radarProvinces.length > 0 ? (
-                <div className="w-full h-80 flex justify-center items-center mt-4">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarChartData}>
-                      <PolarGrid stroke="#e2e8f0" />
-                      <PolarAngleAxis dataKey="subject" tick={{ fontSize: 9, fontWeight: 700, fill: '#475569' }} />
-                      <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 8 }} />
-                      
-                      {radarProvinces[0] && (
-                        <Radar
-                          name={radarProvinces[0]}
-                          dataKey={radarProvinces[0]}
-                          stroke="#3B82F6"
-                          fill="#3B82F6"
-                          fillOpacity={0.25}
-                          strokeWidth={2}
-                        />
-                      )}
-                      
-                      {radarProvinces[1] && (
-                        <Radar
-                          name={radarProvinces[1]}
-                          dataKey={radarProvinces[1]}
-                          stroke="#EF4444"
-                          fill="#EF4444"
-                          fillOpacity={0.25}
-                          strokeWidth={2}
-                        />
-                      )}
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '10px' }}
-                        formatter={(value, name, props) => {
-                          const rawVal = props.payload[`raw_${name}`];
-                          return [`${rawVal} (Chỉ số: ${value}%)`, name];
-                        }}
-                      />
-                      <Legend wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="text-slate-400 text-xs font-semibold">Chọn ít nhất một tỉnh để vẽ đồ thị radar.</div>
-              )}
             </div>
 
+            {radarProvinces.length > 0 ? (
+              <div className="w-full flex-1 flex justify-center items-center mt-4">
+                <ResponsiveContainer width="100%" height={320}>
+                  <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarChartData}>
+                    <PolarGrid stroke="#e2e8f0" />
+                    <PolarAngleAxis dataKey="subject" tick={{ fontSize: 9, fontWeight: 700, fill: '#475569' }} />
+                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 8 }} />
+                    
+                    {radarProvinces[0] && (
+                      <Radar
+                        name={radarProvinces[0]}
+                        dataKey={radarProvinces[0]}
+                        stroke="#3B82F6"
+                        fill="#3B82F6"
+                        fillOpacity={0.25}
+                        strokeWidth={2}
+                      />
+                    )}
+                    
+                    {radarProvinces[1] && (
+                      <Radar
+                        name={radarProvinces[1]}
+                        dataKey={radarProvinces[1]}
+                        stroke="#EF4444"
+                        fill="#EF4444"
+                        fillOpacity={0.25}
+                        strokeWidth={2}
+                      />
+                    )}
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '10px' }}
+                      formatter={(value, name, props) => {
+                        const rawVal = props?.payload?.[`raw_${name}`] ?? value;
+                        return [`${rawVal} (Chỉ số: ${value}%)`, name];
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="text-slate-400 text-xs font-semibold">Chọn ít nhất một tỉnh để vẽ đồ thị radar.</div>
+            )}
           </div>
 
         </div>
@@ -592,42 +662,107 @@ export default function ComparisonView() {
 
       {/* RENDER TAB 2: REGIONS COMPARISON */}
       {subTab === 'regions' && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-          <div className="border-b border-slate-100 pb-3 flex justify-between items-center flex-wrap gap-2">
-            <div>
-              <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
-                So sánh 7 vùng địa lý trên các biến số chính
-              </h3>
-              <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
-                Các chỉ số đã được chuẩn hóa theo thang điểm 100% để hiển thị trực quan trực tiếp. Xem số liệu thực tế qua hộp Tooltip.
-              </p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4 flex flex-col justify-between lg:col-span-2">
+            <div className="border-b border-slate-100 pb-3 flex justify-between items-center flex-wrap gap-2">
+              <div>
+                <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                  So sánh 7 vùng địa lý trên các biến số chính
+                </h3>
+              </div>
+            </div>
+
+            <div className="h-96">
+              {regionalData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart 
+                    data={regionalData} 
+                    margin={{ top: 15, right: 10, left: -10, bottom: 0 }}
+                    onClick={(state) => {
+                      if (state && state.activePayload && state.activePayload.length > 0) {
+                        toggleRadarRegion(state.activePayload[0].payload.name);
+                      } else if (state && state.activeLabel) {
+                        toggleRadarRegion(state.activeLabel);
+                      }
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.6} />
+                    <XAxis dataKey="name" stroke="#70859c" tick={{ fontSize: 9, fontWeight: 700 }} />
+                    <YAxis stroke="#70859c" tick={{ fontSize: 9, fontWeight: 600 }} domain={[0, 100]} unit="%" />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '11px' }}
+                      formatter={(value, name, props) => {
+                        const rawName = name.replace(' (chỉ số)', '');
+                        const payload = props?.payload;
+                        const rawVal = payload 
+                          ? (payload[`${rawName} (°C)`] || payload[`${rawName} (mm)`] || payload[`${rawName} (%)`] || payload[`${rawName} (km/h)`] || value) 
+                          : value;
+                        return [`${rawVal} (Chỉ số: ${value}%)`, rawName];
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', paddingTop: '10px' }} />
+                    <Bar dataKey="Nhiệt độ (chỉ số)" name="Nhiệt độ" fill="#F59E0B" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Lượng mưa (chỉ số)" name="Lượng mưa" fill="#06B6D4" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Độ ẩm (chỉ số)" name="Độ ẩm" fill="#10B981" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Tốc độ gió (chỉ số)" name="Tốc độ gió" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="text-slate-400 text-xs font-semibold text-center py-20">Không có dữ liệu vùng</div>
+              )}
             </div>
           </div>
 
-          <div className="h-96">
-            {regionalData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={regionalData} margin={{ top: 15, right: 10, left: -10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.6} />
-                  <XAxis dataKey="name" stroke="#70859c" tick={{ fontSize: 9, fontWeight: 700 }} />
-                  <YAxis stroke="#70859c" tick={{ fontSize: 9, fontWeight: 600 }} domain={[0, 100]} unit="%" />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '11px' }}
-                    formatter={(value, name, props) => {
-                      const rawName = name.replace(' (chỉ số)', '');
-                      const rawVal = props.payload[`${rawName} (°C)`] || props.payload[`${rawName} (mm)`] || props.payload[`${rawName} (%)`] || props.payload[`${rawName} (km/h)`] || value;
-                      return [`${rawVal} (Chỉ số: ${value}%)`, rawName];
-                    }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', paddingTop: '10px' }} />
-                  <Bar dataKey="Nhiệt độ (chỉ số)" name="Nhiệt độ" fill="#F59E0B" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Lượng mưa (chỉ số)" name="Lượng mưa" fill="#06B6D4" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Độ ẩm (chỉ số)" name="Độ ẩm" fill="#10B981" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Tốc độ gió (chỉ số)" name="Tốc độ gió" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+          {/* Radar Visual for Regions */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between items-stretch lg:col-span-1 min-h-[450px]">
+            <div className="flex justify-between items-start flex-wrap gap-2 border-b border-slate-100 pb-3">
+              <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                Radar so sánh vùng địa lý
+              </span>
+            </div>
+
+            {radarRegions.length > 0 ? (
+              <div className="w-full flex-1 flex justify-center items-center mt-4">
+                <ResponsiveContainer width="100%" height={320}>
+                  <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarRegionsData}>
+                    <PolarGrid stroke="#e2e8f0" />
+                    <PolarAngleAxis dataKey="subject" tick={{ fontSize: 9, fontWeight: 700, fill: '#475569' }} />
+                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 8 }} />
+                    
+                    {radarRegions[0] && (
+                      <Radar
+                        name={radarRegions[0]}
+                        dataKey={radarRegions[0]}
+                        stroke="#3B82F6"
+                        fill="#3B82F6"
+                        fillOpacity={0.25}
+                        strokeWidth={2}
+                      />
+                    )}
+                    
+                    {radarRegions[1] && (
+                      <Radar
+                        name={radarRegions[1]}
+                        dataKey={radarRegions[1]}
+                        stroke="#EF4444"
+                        fill="#EF4444"
+                        fillOpacity={0.25}
+                        strokeWidth={2}
+                      />
+                    )}
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '10px' }}
+                      formatter={(value, name, props) => {
+                        const rawVal = props?.payload?.[`raw_${name}`] ?? value;
+                        return [`${rawVal} (Chỉ số: ${value}%)`, name];
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
             ) : (
-              <div className="text-slate-400 text-xs font-semibold text-center py-20">Không có dữ liệu vùng</div>
+              <div className="text-slate-400 text-xs font-semibold">Chọn ít nhất một vùng để vẽ đồ thị radar.</div>
             )}
           </div>
         </div>
@@ -635,42 +770,107 @@ export default function ComparisonView() {
 
       {/* RENDER TAB 3: SEASONS COMPARISON */}
       {subTab === 'seasons' && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-          <div className="border-b border-slate-100 pb-3 flex justify-between items-center flex-wrap gap-2">
-            <div>
-              <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
-                So sánh sự khác biệt khí tượng theo các Mùa khí hậu Việt Nam
-              </h3>
-              <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
-                Xem diễn biến thay đổi các chỉ số thời tiết theo 4 mùa tự nhiên của Việt Nam.
-              </p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4 flex flex-col justify-between lg:col-span-2">
+            <div className="border-b border-slate-100 pb-3 flex justify-between items-center flex-wrap gap-2">
+              <div>
+                <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                  So sánh sự khác biệt khí tượng theo các Mùa khí hậu Việt Nam
+                </h3>
+              </div>
+            </div>
+
+            <div className="h-96">
+              {seasonalData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart 
+                    data={seasonalData} 
+                    margin={{ top: 15, right: 10, left: -10, bottom: 0 }}
+                    onClick={(state) => {
+                      if (state && state.activePayload && state.activePayload.length > 0) {
+                        toggleRadarSeason(state.activePayload[0].payload.name);
+                      } else if (state && state.activeLabel) {
+                        toggleRadarSeason(state.activeLabel);
+                      }
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.6} />
+                    <XAxis dataKey="name" stroke="#70859c" tick={{ fontSize: 10, fontWeight: 700 }} />
+                    <YAxis stroke="#70859c" tick={{ fontSize: 9, fontWeight: 600 }} domain={[0, 100]} unit="%" />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '11px' }}
+                      formatter={(value, name, props) => {
+                        const rawName = name.replace(' (chỉ số)', '');
+                        const payload = props?.payload;
+                        const rawVal = payload 
+                          ? (payload[`${rawName} (°C)`] || payload[`${rawName} (mm)`] || payload[`${rawName} (%)`] || payload[`${rawName} (km/h)`] || value) 
+                          : value;
+                        return [`${rawVal} (Chỉ số: ${value}%)`, rawName];
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', paddingTop: '10px' }} />
+                    <Bar dataKey="Nhiệt độ (chỉ số)" name="Nhiệt độ" fill="#F59E0B" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Lượng mưa (chỉ số)" name="Lượng mưa" fill="#06B6D4" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Độ ẩm (chỉ số)" name="Độ ẩm" fill="#10B981" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Tốc độ gió (chỉ số)" name="Tốc độ gió" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="text-slate-400 text-xs font-semibold text-center py-20">Không có dữ liệu mùa</div>
+              )}
             </div>
           </div>
 
-          <div className="h-96">
-            {seasonalData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={seasonalData} margin={{ top: 15, right: 10, left: -10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.6} />
-                  <XAxis dataKey="name" stroke="#70859c" tick={{ fontSize: 10, fontWeight: 700 }} />
-                  <YAxis stroke="#70859c" tick={{ fontSize: 9, fontWeight: 600 }} domain={[0, 100]} unit="%" />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '11px' }}
-                    formatter={(value, name, props) => {
-                      const rawName = name.replace(' (chỉ số)', '');
-                      const rawVal = props.payload[`${rawName} (°C)`] || props.payload[`${rawName} (mm)`] || props.payload[`${rawName} (%)`] || props.payload[`${rawName} (km/h)`] || value;
-                      return [`${rawVal} (Chỉ số: ${value}%)`, rawName];
-                    }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', paddingTop: '10px' }} />
-                  <Bar dataKey="Nhiệt độ (chỉ số)" name="Nhiệt độ" fill="#F59E0B" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Lượng mưa (chỉ số)" name="Lượng mưa" fill="#06B6D4" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Độ ẩm (chỉ số)" name="Độ ẩm" fill="#10B981" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Tốc độ gió (chỉ số)" name="Tốc độ gió" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+          {/* Radar Visual for Seasons */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between items-stretch lg:col-span-1 min-h-[450px]">
+            <div className="flex justify-between items-start flex-wrap gap-2 border-b border-slate-100 pb-3">
+              <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                Radar so sánh mùa thời tiết
+              </span>
+            </div>
+
+            {radarSeasons.length > 0 ? (
+              <div className="w-full flex-1 flex justify-center items-center mt-4">
+                <ResponsiveContainer width="100%" height={320}>
+                  <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarSeasonsData}>
+                    <PolarGrid stroke="#e2e8f0" />
+                    <PolarAngleAxis dataKey="subject" tick={{ fontSize: 9, fontWeight: 700, fill: '#475569' }} />
+                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 8 }} />
+                    
+                    {radarSeasons[0] && (
+                      <Radar
+                        name={radarSeasons[0]}
+                        dataKey={radarSeasons[0]}
+                        stroke="#3B82F6"
+                        fill="#3B82F6"
+                        fillOpacity={0.25}
+                        strokeWidth={2}
+                      />
+                    )}
+                    
+                    {radarSeasons[1] && (
+                      <Radar
+                        name={radarSeasons[1]}
+                        dataKey={radarSeasons[1]}
+                        stroke="#EF4444"
+                        fill="#EF4444"
+                        fillOpacity={0.25}
+                        strokeWidth={2}
+                      />
+                    )}
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '10px' }}
+                      formatter={(value, name, props) => {
+                        const rawVal = props?.payload?.[`raw_${name}`] ?? value;
+                        return [`${rawVal} (Chỉ số: ${value}%)`, name];
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
             ) : (
-              <div className="text-slate-400 text-xs font-semibold text-center py-20">Không có dữ liệu mùa</div>
+              <div className="text-slate-400 text-xs font-semibold">Chọn ít nhất một mùa để vẽ đồ thị radar.</div>
             )}
           </div>
         </div>
