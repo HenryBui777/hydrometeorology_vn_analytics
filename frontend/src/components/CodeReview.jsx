@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Editor from '@monaco-editor/react';
 import { 
   Check, 
   X, 
@@ -111,21 +112,26 @@ export default function CodeReview({
             </button>
           </div>
 
-          {/* Textarea Editor - Nice dark visual coding panel */}
-          <div className="relative flex-1 bg-slate-955 p-4 font-mono text-xs overflow-hidden h-[420px]">
-            <textarea
-              readOnly={!isEditing}
+          {/* Monaco Editor - Nice dark visual coding panel */}
+          <div className="relative flex-1 bg-slate-955 overflow-hidden h-[420px]">
+            <Editor
+              height="100%"
+              defaultLanguage="python"
+              theme="vs-dark"
               value={editableCode}
-              onChange={handleCodeChange}
-              aria-label="Mã nguồn Python"
-              className="w-full h-full bg-transparent text-indigo-300 border-none outline-none resize-none overflow-y-auto leading-relaxed focus:ring-0"
-              style={{
+              onChange={(value) => handleCodeChange({ target: { value: value || '' } })}
+              options={{
+                readOnly: !isEditing,
+                minimap: { enabled: false },
+                fontSize: 13,
                 fontFamily: "'Courier New', Courier, monospace",
-                color: '#a5b4fc' // Light Indigo code color
+                lineHeight: 1.6,
+                padding: { top: 16 },
+                scrollBeyondLastLine: false,
               }}
             />
             {!isEditing && (
-              <div className="absolute top-4 right-4 bg-slate-900/90 px-2 py-0.5 rounded-md border border-slate-800 text-[10px] text-slate-400 pointer-events-none uppercase font-bold select-none">
+              <div className="absolute top-4 right-4 bg-slate-900/90 px-2 py-0.5 rounded-md border border-slate-800 text-[10px] text-slate-400 pointer-events-none uppercase font-bold select-none z-10">
                 Chỉ Xem
               </div>
             )}

@@ -11,7 +11,7 @@ export default function Sidebar({ currentTab, setCurrentTab, isCollapsed, setIsC
     { id: 'comparison', label: 'So sánh đối chiếu', iconUrl: 'https://img.icons8.com/fluency/48/scales.png' },
     { id: 'analysis', label: 'Phân tích tương quan', iconUrl: 'https://img.icons8.com/fluency/48/heat-map.png' },
     { id: 'datasets', label: 'Tập dữ liệu', iconUrl: 'https://img.icons8.com/fluency/48/database.png' },
-    { id: 'chat', label: 'AI chat phân tích', iconUrl: 'https://img.icons8.com/fluency/48/artificial-intelligence.png' },
+    { id: 'aianalyst', label: 'AI Analyst Portal', iconUrl: 'https://img.icons8.com/fluency/48/artificial-intelligence.png' },
     { id: 'settings', label: 'Cài đặt', iconUrl: 'https://img.icons8.com/fluency/48/gear.png' },
   ];
 

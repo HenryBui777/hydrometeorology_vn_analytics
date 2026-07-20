@@ -6,11 +6,7 @@ import TimeSeriesView from './components/TimeSeriesView';
 import ComparisonView from './components/ComparisonView';
 import AnalysisView from './components/AnalysisView';
 import DatasetManagement from './components/DatasetManagement';
-import AIChat from './components/AIChat';
-import CodeReview from './components/CodeReview';
-import ExecutionMonitor from './components/ExecutionMonitor';
-import ResultsView from './components/ResultsView';
-import HistoryView from './components/HistoryView';
+import AIAnalystPortal from './components/AIAnalystPortal';
 import SettingsView from './components/SettingsView';
 import {
   Bell,
@@ -56,70 +52,101 @@ export default function App() {
   const submitQuery = (text, sender, queryObj = null) => {
     if (sender === 'user') {
       setChatHistory(prev => [...prev, { sender: 'user', text }]);
-    } else if (sender === 'ai' && queryObj) {
+    } else if (sender === 'ai') {
       setChatHistory(prev => [
         ...prev,
         {
           sender: 'ai',
           text,
-          code: queryObj.code,
-          explanation: queryObj.explanation
+          code: queryObj ? queryObj.code : undefined,
+          explanation: queryObj ? queryObj.explanation : undefined
         }
       ]);
 
-      // Set the active query to pending review
-      setActiveQuery({
-        ...queryObj,
-        status: 'pending'
-      });
-      setExecutionStatus('idle');
+      // Set the active query to pending review (Only if it's a successful AI response with code)
+      if (queryObj) {
+        setActiveQuery({
+          ...queryObj,
+          status: 'pending'
+        });
+        setExecutionStatus('idle');
+      }
     }
   };
 
   // Human-in-the-Loop Actions
-  const approveQuery = () => {
+  const approveQuery = async () => {
     if (!activeQuery) return;
     setExecutionStatus('running');
-    setCurrentTab('monitor');
+
+    try {
+      const response = await fetch('http://localhost:8000/api/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          log_id: activeQuery.id,
+          code: activeQuery.code
+        })
+      });
+      const data = await response.json();
+
+      if (data.status === 'success') {
+        let parsedChartData = null;
+        try {
+          parsedChartData = JSON.parse(data.chart_data);
+        } catch(e) {
+          console.error("Failed to parse chart_data", e);
+        }
+        handleExecutionFinished('success', { chartData: parsedChartData, chartType: data.chart_type });
+      } else {
+        console.error("Execute error:", data.error_message);
+        handleExecutionFinished('failed');
+      }
+    } catch (error) {
+      console.error(error);
+      handleExecutionFinished('failed');
+    }
   };
 
   const rejectQuery = () => {
     if (!activeQuery) return;
     setActiveQuery(null);
     setExecutionStatus('idle');
-    setCurrentTab('chat');
   };
 
   const updateActiveCode = (newCode) => {
-    if (!activeQuery) return;
-    setActiveQuery(prev => ({
-      ...prev,
-      code: newCode
-    }));
+    if (activeQuery) {
+      setActiveQuery({ ...activeQuery, code: newCode });
+    }
   };
 
   // Triggered when Execution completes
-  const handleExecutionFinished = (status) => {
+  const handleExecutionFinished = (status, resultData = null) => {
     setExecutionStatus(status);
-    if (status === 'success' && activeQuery) {
-      const updatedQuery = { ...activeQuery, status: 'approved' };
-      setActiveQuery(updatedQuery);
-
-      // Save to analysis history list
-      setHistoryList(prev => {
-        // Prevent duplicate IDs
-        const exists = prev.some(item => item.id === updatedQuery.id);
-        if (exists) return prev;
-        return [...prev, updatedQuery];
+    if (status === 'success') {
+      setActiveQuery(prev => {
+        if (!prev) return prev;
+        const updatedQuery = { ...prev, status: 'approved' };
+        if (resultData) {
+          updatedQuery.chartData = resultData.chartData;
+          updatedQuery.chartType = resultData.chartType;
+        }
+        
+        // Save to analysis history list
+        setHistoryList(historyPrev => {
+          const exists = historyPrev.some(item => item.id === updatedQuery.id);
+          if (exists) return historyPrev;
+          return [...historyPrev, updatedQuery];
+        });
+        
+        return updatedQuery;
       });
     }
   };
 
-  // Restore past run from history
   const handleRestoreRun = (item) => {
     setActiveQuery(item);
     setExecutionStatus('success');
-    setCurrentTab('results');
   };
 
   // Delete run from history
@@ -152,11 +179,7 @@ export default function App() {
             {currentTab === 'comparison' && 'So sánh khí hậu'}
             {currentTab === 'analysis' && 'Tương quan và phân phối'}
             {currentTab === 'datasets' && 'Quản lý dữ liệu'}
-            {currentTab === 'chat' && 'AI Chat phân tích'}
-            {currentTab === 'code' && 'Duyệt mã nguồn'}
-            {currentTab === 'monitor' && 'Giám sát thực thi'}
-            {currentTab === 'results' && 'Kết quả trực quan'}
-            {currentTab === 'history' && 'Lịch sử chạy'}
+            {currentTab === 'aianalyst' && 'AI Analyst Portal'}
             {currentTab === 'settings' && 'Cài đặt'}
           </div>
 
@@ -213,48 +236,21 @@ export default function App() {
             />
           )}
 
-          {currentTab === 'chat' && (
-            <AIChat
+          {currentTab === 'aianalyst' && (
+            <AIAnalystPortal
               datasetUploaded={datasetUploaded}
               chatHistory={chatHistory}
-              setChatHistory={setChatHistory}
               submitQuery={submitQuery}
-              setCurrentTab={setCurrentTab}
-              setActiveQuery={setActiveQuery}
-              setExecutionStatus={setExecutionStatus}
-            />
-          )}
-
-          {currentTab === 'code' && (
-            <CodeReview
               activeQuery={activeQuery}
+              setActiveQuery={setActiveQuery}
+              executionStatus={executionStatus}
+              setExecutionStatus={setExecutionStatus}
               approveQuery={approveQuery}
               rejectQuery={rejectQuery}
               updateActiveCode={updateActiveCode}
-            />
-          )}
-
-          {currentTab === 'monitor' && (
-            <ExecutionMonitor
-              activeQuery={activeQuery}
-              executionStatus={executionStatus}
-              setExecutionStatus={(status) => handleExecutionFinished(status)}
-              setCurrentTab={setCurrentTab}
-            />
-          )}
-
-          {currentTab === 'results' && (
-            <ResultsView
-              activeQuery={activeQuery}
-              executionStatus={executionStatus}
-            />
-          )}
-
-          {currentTab === 'history' && (
-            <HistoryView
               historyList={historyList}
-              onRestoreRun={handleRestoreRun}
-              onDeleteRun={handleDeleteRun}
+              handleRestoreRun={handleRestoreRun}
+              handleDeleteRun={handleDeleteRun}
             />
           )}
 

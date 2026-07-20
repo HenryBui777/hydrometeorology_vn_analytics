@@ -1,0 +1,402 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import Editor from '@monaco-editor/react';
+import { 
+  Terminal, Sparkles, Send, Play, X, CheckCircle, AlertTriangle, 
+  Cpu, Workflow, Clock, FileText, ChevronRight, BarChart2,
+  Table
+} from 'lucide-react';
+import { 
+  BarChart, Bar, LineChart, Line, ScatterChart, Scatter, PieChart, Pie,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
+} from 'recharts';
+
+// Colors for charts
+const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
+
+export default function AIAnalystPortal({
+  datasetUploaded,
+  submitQuery,
+  activeQuery,
+  setActiveQuery,
+  executionStatus,
+  setExecutionStatus,
+  approveQuery,
+  rejectQuery,
+  updateActiveCode,
+  historyList
+}) {
+  const [promptInput, setPromptInput] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [viewMode, setViewMode] = useState('chart'); // 'chart' or 'table'
+  const [chartTypeUI, setChartTypeUI] = useState('bar');
+  
+  // Fake streaming state for execution monitor
+  const [streamedLogs, setStreamedLogs] = useState([]);
+  const [currentLineIdx, setCurrentLineIdx] = useState(0);
+
+  useEffect(() => {
+    if (activeQuery?.chartType) {
+      setChartTypeUI(activeQuery.chartType);
+    }
+  }, [activeQuery?.chartType]);
+
+  useEffect(() => {
+    if (executionStatus === 'running' && activeQuery) {
+      setStreamedLogs([]);
+      setCurrentLineIdx(0);
+      const logsToStream = activeQuery.logs || ['[System] Khởi tạo môi trường Python (venv_kttv)...', '[System] Đang nạp dữ liệu cleaned_data.csv...', '[System] Đang thực thi mã nguồn Pandas...'];
+      const interval = setInterval(() => {
+        setStreamedLogs(prev => {
+          if (currentLineIdx < logsToStream.length) {
+            const nextLogs = [...prev, logsToStream[currentLineIdx]];
+            setCurrentLineIdx(idx => idx + 1);
+            return nextLogs;
+          } else {
+            clearInterval(interval);
+            return prev;
+          }
+        });
+      }, 600);
+      return () => clearInterval(interval);
+    }
+  }, [executionStatus, currentLineIdx, activeQuery]);
+
+  const handleGenerate = async () => {
+    if (!promptInput.trim()) return;
+    setIsGenerating(true);
+    
+    try {
+      const response = await fetch('http://localhost:8000/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: promptInput, context: 'Dữ liệu thời tiết Việt Nam' })
+      });
+      const data = await response.json();
+      
+      submitQuery(
+        `Đã tạo xong mã nguồn phân tích bằng Python. Vui lòng kiểm tra và phê duyệt.`,
+        'ai',
+        {
+          id: data.log_id,
+          question: promptInput,
+          code: data.code,
+          explanation: data.explanation
+        }
+      );
+      setPromptInput('');
+    } catch (error) {
+      console.error(error);
+      alert('Lỗi kết nối tới Backend AI. Vui lòng thử lại sau.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const renderInteractiveChart = () => {
+    if (!activeQuery?.chartData || !Array.isArray(activeQuery.chartData) || activeQuery.chartData.length === 0) {
+      return <div className="p-10 text-center text-slate-500">Không có dữ liệu biểu đồ.</div>;
+    }
+    
+    const data = activeQuery.chartData;
+    // Auto-detect keys (first string key for X, remaining number keys for Y/series)
+    const keys = Object.keys(data[0]);
+    const xKey = keys.find(k => typeof data[0][k] === 'string') || keys[0];
+    const yKeys = keys.filter(k => k !== xKey);
+
+    return (
+      <div className="h-96 w-full mt-4">
+        <ResponsiveContainer width="100%" height="100%">
+          {chartTypeUI === 'bar' ? (
+            <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
+              <XAxis dataKey={xKey} stroke="#64748b" fontSize={12} />
+              <YAxis stroke="#64748b" fontSize={12} />
+              <Tooltip cursor={{fill: '#f1f5f9'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <Legend />
+              {yKeys.map((key, i) => <Bar key={key} dataKey={key} fill={COLORS[i % COLORS.length]} radius={[4, 4, 0, 0]} />)}
+            </BarChart>
+          ) : chartTypeUI === 'line' ? (
+            <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
+              <XAxis dataKey={xKey} stroke="#64748b" fontSize={12} />
+              <YAxis stroke="#64748b" fontSize={12} />
+              <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <Legend />
+              {yKeys.map((key, i) => <Line key={key} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />)}
+            </LineChart>
+          ) : chartTypeUI === 'scatter' ? (
+            <ScatterChart margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
+              <XAxis dataKey={xKey} name={xKey} stroke="#64748b" fontSize={12} />
+              <YAxis dataKey={yKeys[0]} name={yKeys[0]} stroke="#64748b" fontSize={12} />
+              <Tooltip cursor={{strokeDasharray: '3 3'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <Legend />
+              <Scatter name="Data" data={data} fill={COLORS[0]} />
+            </ScatterChart>
+          ) : (
+            <PieChart>
+              <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <Legend />
+              <Pie data={data} dataKey={yKeys[0]} nameKey={xKey} cx="50%" cy="50%" outerRadius={120} label>
+                {data.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+              </Pie>
+            </PieChart>
+          )}
+        </ResponsiveContainer>
+      </div>
+    );
+  };
+
+  const renderRawTable = () => {
+    if (!activeQuery?.chartData || !Array.isArray(activeQuery.chartData) || activeQuery.chartData.length === 0) {
+      return <div className="p-10 text-center text-slate-500">Không có dữ liệu bảng.</div>;
+    }
+    const data = activeQuery.chartData;
+    const columns = Object.keys(data[0]);
+
+    return (
+      <div className="overflow-x-auto rounded-lg border border-slate-200 mt-4">
+        <table className="min-w-full text-left text-sm bg-white">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              {columns.map(col => <th key={col} className="px-6 py-3 font-bold text-slate-600 uppercase tracking-wider">{col}</th>)}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {data.map((row, i) => (
+              <tr key={i} className="hover:bg-slate-50 transition-colors">
+                {columns.map(col => <td key={col} className="px-6 py-3 text-slate-800">{row[col]}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  return (
+    <div className="max-w-6xl mx-auto space-y-10 pb-20 font-sans">
+      
+      {/* Header Section */}
+      <div className="mb-8">
+        <h1 className="text-4xl font-serif font-bold text-slate-800 tracking-tight">Trợ lý phân tích AI</h1>
+        <p className="text-slate-500 mt-2 font-medium">Trợ lý chuyên gia dữ liệu, tự động sinh mã nguồn Python (Pandas) và vẽ biểu đồ tương tác.</p>
+      </div>
+
+      {/* 1. Input Section */}
+      <div className="bg-[#f9f9f5] border border-[#e5e5dd] rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-xs font-bold text-slate-600 uppercase tracking-widest flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-emerald-600" /> Khung yêu cầu phân tích
+          </span>
+          <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200">
+             <button className="px-3 py-1 text-[11px] font-bold rounded-md bg-slate-800 text-white">Python</button>
+             <button className="px-3 py-1 text-[11px] font-bold rounded-md text-slate-500 hover:bg-slate-100 transition-colors">SQL</button>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <textarea
+            value={promptInput}
+            onChange={(e) => setPromptInput(e.target.value)}
+            placeholder="Kiểm tra quan hệ lượng mưa và bức xạ mặt trời ở ba miền..."
+            className="w-full bg-white border border-[#e5e5dd] rounded-xl p-4 min-h-[120px] text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all resize-y"
+          />
+          <div className="flex flex-wrap items-center justify-between gap-4">
+             <div className="flex gap-2">
+               {["So sánh mưa Đà Nẵng & HCMC", "Nhiệt độ bất thường Hà Nội", "Top 5 tỉnh nóng nhất tháng 5"].map((tag) => (
+                 <button key={tag} onClick={() => setPromptInput(tag)} className="text-[11px] px-3 py-1.5 bg-white border border-slate-200 rounded-full text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors cursor-pointer">
+                   {tag}
+                 </button>
+               ))}
+             </div>
+             
+             <button
+              onClick={handleGenerate}
+              disabled={isGenerating || !promptInput.trim()}
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-sm px-6 py-2.5 rounded-lg transition-all shadow-md shadow-emerald-600/20 flex items-center gap-2 cursor-pointer"
+            >
+              {isGenerating ? <Cpu className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              {isGenerating ? 'Đang xử lý...' : 'Sinh đề xuất phân tích'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Draft Code Review Section */}
+      {activeQuery && (activeQuery.status === 'pending' || executionStatus !== 'idle') && (
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden animate-fade-in relative">
+          <div className="bg-slate-50 border-b border-slate-200 p-4 flex items-center justify-between">
+             <span className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                <FileText className="h-4 w-4 text-orange-500" /> Draft: Đề xuất phân tích
+             </span>
+             {activeQuery.status === 'pending' && <span className="bg-orange-100 text-orange-700 border border-orange-200 text-[10px] font-extrabold px-2 py-1 rounded-md uppercase">Chờ duyệt (Pending)</span>}
+          </div>
+          
+          <div className="p-6 space-y-6">
+            <div className="space-y-2">
+               <h3 className="text-lg font-bold text-slate-800 font-serif">"{activeQuery.question}"</h3>
+               <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-xl text-sm text-slate-700 leading-relaxed font-medium">
+                 <p className="font-semibold text-slate-800">Giải thích:</p>
+                 <p className="mt-1">{activeQuery.explanation}</p>
+               </div>
+            </div>
+
+            <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-900">
+               <div className="bg-slate-950 px-4 py-2 border-b border-slate-800 flex justify-between items-center">
+                 <span className="text-[11px] font-mono text-slate-400 font-bold">python_script.py (Có thể chỉnh sửa trực tiếp)</span>
+               </div>
+               <div className="h-[300px]">
+                  <Editor
+                    height="100%"
+                    defaultLanguage="python"
+                    theme="vs-dark"
+                    value={activeQuery.code}
+                    onChange={(value) => updateActiveCode(value || '')}
+                    options={{ minimap: { enabled: false }, fontSize: 13, padding: { top: 16 } }}
+                  />
+               </div>
+            </div>
+
+            {/* Approval Controls */}
+            {activeQuery.status === 'pending' && executionStatus === 'idle' && (
+              <div className="flex justify-end gap-3 pt-2">
+                 <button onClick={rejectQuery} className="px-5 py-2.5 text-xs font-bold bg-white border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer">
+                    Hủy đề xuất
+                 </button>
+                 <button onClick={approveQuery} className="px-5 py-2.5 text-xs font-bold bg-[#e06b4b] hover:bg-[#d45d3e] text-white rounded-lg shadow-md shadow-orange-600/20 transition-colors flex items-center gap-2 cursor-pointer">
+                    <Play className="h-4 w-4" /> Phê duyệt & chạy local
+                 </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 3. Execution & Results Section */}
+      {(executionStatus === 'running' || executionStatus === 'success' || executionStatus === 'failed') && (
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden animate-fade-in relative mt-8">
+          <div className="bg-slate-50 border-b border-slate-200 p-4 flex items-center justify-between">
+             <span className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                {executionStatus === 'success' ? <BarChart2 className="h-4 w-4 text-emerald-600" /> : <Terminal className="h-4 w-4 text-brand-primary" />}
+                {executionStatus === 'success' ? 'Kết quả truy vấn cục bộ' : 'Giám sát thực thi'}
+             </span>
+             {executionStatus === 'running' && <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-1 rounded-md uppercase animate-pulse">Đang chạy...</span>}
+             {executionStatus === 'success' && <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md uppercase">Đã thực thi (Executed)</span>}
+             {executionStatus === 'failed' && <span className="text-[10px] font-extrabold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-1 rounded-md uppercase">Lỗi (Failed)</span>}
+          </div>
+
+          <div className="p-6">
+            {executionStatus === 'running' && (
+              <div className="bg-slate-900 rounded-xl p-4 font-mono text-xs text-green-400 space-y-2 h-[200px] overflow-y-auto">
+                {streamedLogs.map((log, i) => (
+                  <div key={i} className="animate-fade-in opacity-80">{log}</div>
+                ))}
+                <div className="animate-pulse opacity-50">_</div>
+              </div>
+            )}
+
+            {executionStatus === 'failed' && (
+              <div className="bg-rose-50 border border-rose-200 rounded-xl p-6 text-center space-y-4">
+                 <AlertTriangle className="h-8 w-8 text-rose-500 mx-auto" />
+                 <div>
+                    <h4 className="font-bold text-rose-800">Thực thi đoạn mã thất bại</h4>
+                    <p className="text-sm text-rose-600 mt-1">Đã có lỗi xảy ra trong quá trình chạy mã Python. Vui lòng quay lại tạo đề xuất mới.</p>
+                 </div>
+                 <button onClick={rejectQuery} className="bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs px-6 py-2.5 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-2">
+                    <X className="h-4 w-4" /> Đóng & thử lại
+                 </button>
+              </div>
+            )}
+
+            {executionStatus === 'success' && activeQuery?.chartData && (
+              <div className="space-y-4">
+                 <div className="flex items-center justify-between bg-slate-50 border border-slate-200 p-3 rounded-lg">
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => setViewMode('chart')}
+                        className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${viewMode === 'chart' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-600 bg-transparent hover:bg-slate-200'}`}
+                      >
+                        Biểu đồ
+                      </button>
+                      <button 
+                        onClick={() => setViewMode('table')}
+                        className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${viewMode === 'table' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-600 bg-transparent hover:bg-slate-200'}`}
+                      >
+                        <Table className="h-3 w-3 inline mr-1"/> Bảng dữ liệu
+                      </button>
+                    </div>
+                    
+                    {viewMode === 'chart' && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold text-slate-500">LOẠI BIỂU ĐỒ:</span>
+                        <select 
+                          value={chartTypeUI} 
+                          onChange={(e) => setChartTypeUI(e.target.value)}
+                          className="bg-white border border-slate-200 text-slate-800 text-xs rounded-md px-2 py-1 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        >
+                          <option value="bar">Cột (Bar)</option>
+                          <option value="line">Đường (Line)</option>
+                          <option value="pie">Tròn (Pie)</option>
+                          <option value="scatter">Phân tán (Scatter)</option>
+                        </select>
+                      </div>
+                    )}
+                 </div>
+                 
+                 <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm overflow-hidden">
+                    {viewMode === 'chart' ? renderInteractiveChart() : renderRawTable()}
+                 </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 4. History Log Section */}
+      <div className="mt-12 space-y-4">
+        <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest flex items-center gap-2">
+           <Clock className="h-4 w-4" /> Nhật ký phiên AI - Truy xuất lại
+        </h3>
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <table className="w-full text-left text-xs">
+             <thead>
+                <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase font-bold">
+                   <th className="px-5 py-3">Trạng thái</th>
+                   <th className="px-5 py-3">Câu hỏi</th>
+                   <th className="px-5 py-3">Nguồn</th>
+                   <th className="px-5 py-3 text-right">Thao tác</th>
+                </tr>
+             </thead>
+             <tbody className="divide-y divide-slate-100">
+                {historyList.map((item, idx) => (
+                  <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                     <td className="px-5 py-4">
+                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 font-extrabold text-[10px] px-2 py-1 rounded-md uppercase">Executed</span>
+                     </td>
+                     <td className="px-5 py-4 font-bold text-slate-800 truncate max-w-[300px]">{item.question || item.title}</td>
+                     <td className="px-5 py-4 text-slate-500 font-mono">Python</td>
+                     <td className="px-5 py-4 text-right">
+                        <button 
+                          onClick={() => {
+                            setActiveQuery(item);
+                            setExecutionStatus('success');
+                          }}
+                          className="text-emerald-600 hover:text-emerald-800 font-bold flex items-center gap-1 justify-end ml-auto cursor-pointer"
+                        >
+                           Xem lại <ChevronRight className="h-3 w-3" />
+                        </button>
+                     </td>
+                  </tr>
+                ))}
+                {historyList.length === 0 && (
+                  <tr><td colSpan="4" className="text-center py-6 text-slate-500">Chưa có lịch sử phân tích nào.</td></tr>
+                )}
+             </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  );
+}

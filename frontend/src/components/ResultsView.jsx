@@ -32,11 +32,12 @@ import {
 } from 'recharts';
 import { predefinedQueries } from '../mockData';
 
-export default function ResultsView() {
+export default function ResultsView({ activeQuery, executionStatus }) {
   const [selectedQueryId, setSelectedQueryId] = useState(null); // null means show list, or number shows specific dashboard
   const [activeTab, setActiveTab] = useState('chart'); // 'chart' | 'table' | 'code'
 
-  const selectedQuery = predefinedQueries.find(q => q.id === selectedQueryId);
+  // Use activeQuery if available, else fallback to predefined
+  const selectedQuery = activeQuery || predefinedQueries.find(q => q.id === selectedQueryId) || predefinedQueries[0];
 
   const renderTrendIcon = (trend) => {
     switch (trend) {
@@ -411,10 +412,23 @@ export default function ResultsView() {
             {/* Tab 1: Interactive Charts Grid (Showing multiple charts!) */}
             {activeTab === 'chart' && (
               <div className="bg-slate-50/50 p-6 rounded-lg border border-slate-200 flex flex-col justify-center items-center space-y-4">
-                {renderMultiChartsGrid()}
+                
+                {/* HIỂN THỊ ẢNH TỪ BACKEND PYTHON (EXEC) */}
+                {selectedQuery.result_image_base64 ? (
+                  <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 w-full flex justify-center">
+                    <img 
+                      src={`data:image/png;base64,${selectedQuery.result_image_base64}`} 
+                      alt="Biểu đồ phân tích từ AI" 
+                      className="max-w-full h-auto rounded-lg shadow-sm border border-slate-100"
+                    />
+                  </div>
+                ) : (
+                  renderMultiChartsGrid()
+                )}
+
                 <div className="mt-4 p-3 bg-white rounded-lg border border-slate-200 flex items-center gap-2 text-xs text-slate-550 max-w-lg shadow-sm">
                   <FileText className="h-4 w-4 text-brand-primary flex-shrink-0" />
-                  <span>Hệ thống hiển thị kết hợp đa biểu đồ (Multi-chart) để phân tích sâu sắc các chiều tương quan thời tiết khác nhau.</span>
+                  <span>Kết quả được trực quan hóa dựa trên yêu cầu từ người dùng và dữ liệu khí tượng cục bộ.</span>
                 </div>
               </div>
             )}

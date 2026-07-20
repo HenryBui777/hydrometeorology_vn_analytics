@@ -33,35 +33,43 @@ export default function AIChat({
     executeSubmit(text);
   };
 
-  const executeSubmit = (text) => {
+  const executeSubmit = async (text) => {
     setIsTyping(true);
 
-    // Submit user message instantly
+    // Bắn tin nhắn của user lên giao diện
     submitQuery(text, 'user');
 
-    // Simulate AI thinking and generating code
-    setTimeout(() => {
-      setIsTyping(false);
-
-      // Look for keywords to match predefined queries
-      let matchedQuery = predefinedQueries[0];
-      if (text.toLowerCase().includes('mưa') || text.toLowerCase().includes('precipitation')) {
-        matchedQuery = predefinedQueries[0];
-      } else if (text.toLowerCase().includes('nhiệt độ') || text.toLowerCase().includes('temperature') || text.toLowerCase().includes('xu hướng')) {
-        matchedQuery = predefinedQueries[1];
-      } else if (text.toLowerCase().includes('nóng') || text.toLowerCase().includes('top 10')) {
-        matchedQuery = predefinedQueries[2];
+    try {
+      // Gọi API AI Backend
+      const response = await fetch('http://localhost:8000/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: text, context: "Dữ liệu thời tiết VN" })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
+      const data = await response.json();
 
-      // Submit AI response
+      // Cập nhật lại UI thông qua hàm truyền từ App.jsx
       submitQuery(
-        `Tôi đã phân tích yêu cầu: "${text}". 
-Tôi sẽ tạo ra một đoạn script Python sử dụng thư viện Pandas để đọc tệp CSV \`vietnam_kttv_34tinh_2025-12-06_2026-06-04.csv\` cục bộ, thực hiện tiền xử lý, tính toán giá trị thống kê và xuất kết quả. 
-Mã nguồn đã được tạo thành công và đang chuyển sang trạng thái **"Chờ Phê Duyệt"** dưới sự kiểm soát của bạn.`,
+        `Đã tạo xong mã nguồn phân tích bằng Python. Vui lòng kiểm tra và phê duyệt.`,
         'ai',
-        matchedQuery
+        {
+          id: data.log_id,
+          question: text,
+          code: data.code,
+          explanation: data.explanation
+        }
       );
-    }, 1800);
+    } catch (err) {
+      console.error(err);
+      submitQuery("Lỗi kết nối tới Backend AI hoặc Backend xử lý thất bại. Vui lòng thử lại sau.", 'ai', null);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   return (

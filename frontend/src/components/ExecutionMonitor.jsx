@@ -25,15 +25,18 @@ export default function ExecutionMonitor({
       setStreamedLogs([]);
       setCurrentLineIdx(0);
       
+      const logsToStream = activeQuery.logs || ['[System] Khởi tạo môi trường...', '[System] Đang thực thi mã nguồn...'];
+      
       const interval = setInterval(() => {
         setStreamedLogs(prev => {
-          if (currentLineIdx < activeQuery.logs.length) {
-            const nextLogs = [...prev, activeQuery.logs[currentLineIdx]];
+          if (currentLineIdx < logsToStream.length) {
+            const nextLogs = [...prev, logsToStream[currentLineIdx]];
             setCurrentLineIdx(idx => idx + 1);
             return nextLogs;
           } else {
             clearInterval(interval);
-            setExecutionStatus('success');
+            // We shouldn't auto-set success here if the API actually failed!
+            // Let App.jsx handle the final state change.
             return prev;
           }
         });
@@ -75,15 +78,20 @@ export default function ExecutionMonitor({
               ? 'bg-blue-50 border-brand-primary text-brand-primary animate-spin' 
               : executionStatus === 'success' 
                 ? 'bg-blue-50 border-blue-100 text-brand-primary font-bold' 
-                : 'bg-slate-100 border-slate-200 text-slate-400'
+                : executionStatus === 'failed'
+                  ? 'bg-rose-50 border-rose-200 text-rose-600 font-bold'
+                  : 'bg-slate-100 border-slate-200 text-slate-400'
           }`}>
-            {executionStatus === 'running' ? <Cpu className="h-5 w-5 animate-spin" /> : <ShieldCheck className="h-5 w-5" />}
+            {executionStatus === 'running' ? <Cpu className="h-5 w-5 animate-spin" /> 
+             : executionStatus === 'failed' ? <XCircle className="h-5 w-5" /> 
+             : <ShieldCheck className="h-5 w-5" />}
           </div>
           <div>
             <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Trạng thái</span>
             <p className="text-sm font-bold text-slate-800 mt-0.5">
               {executionStatus === 'running' && 'Đang thực thi...'}
               {executionStatus === 'success' && 'Đã hoàn thành'}
+              {executionStatus === 'failed' && 'Lỗi thực thi'}
               {executionStatus === 'idle' && 'Đang chờ lệnh'}
             </p>
           </div>
@@ -169,6 +177,16 @@ export default function ExecutionMonitor({
             className="bg-brand-primary hover:bg-brand-primary/90 text-white font-bold text-xs px-6 py-3 rounded-lg transition-all shadow-lg shadow-blue-500/25 flex items-center gap-2 cursor-pointer"
           >
             Thành công! Đi tới xem kết quả trực quan <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+      {executionStatus === 'failed' && (
+        <div className="flex justify-end">
+          <button 
+            onClick={() => setCurrentTab('chat')}
+            className="bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs px-6 py-3 rounded-lg transition-all shadow-lg shadow-rose-500/25 flex items-center gap-2 cursor-pointer"
+          >
+            Quay lại thử lại <ArrowRight className="h-4 w-4" />
           </button>
         </div>
       )}
