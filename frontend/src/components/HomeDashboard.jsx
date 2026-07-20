@@ -505,8 +505,8 @@ export default function HomeDashboard({ datasetUploaded, setCurrentTab, submitQu
       setCurrentTab('datasets');
       return;
     }
-    // Set chat tab and submit question
-    setCurrentTab('chat');
+    // Open the current AI Analyst portal and submit the requested analysis.
+    setCurrentTab('aianalyst');
     // Delay slightly to allow tab render
     setTimeout(() => {
       submitQuery(prompt, 'user');
@@ -575,7 +575,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
               </button>
             ) : (
               <button
-                onClick={() => setCurrentTab('chat')}
+                onClick={() => setCurrentTab('aianalyst')}
                 className="bg-white hover:bg-slate-50 text-brand-primary text-xs font-bold px-4 py-2 rounded-lg shadow-sm transition-all"
               >
                 Hỏi AI Phân Tích

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { predefinedQueries } from './mockData';
+import { useAppearance } from './context/AppearanceContext';
 import Sidebar from './components/Sidebar';
 import HomeDashboard from './components/HomeDashboard';
 import TimeSeriesView from './components/TimeSeriesView';
@@ -18,7 +19,10 @@ import {
   AlertCircle
 } from 'lucide-react';
 
+const VALID_TABS = ['dashboard', 'timeseries', 'comparison', 'analysis', 'datasets', 'aianalyst', 'settings'];
+
 export default function App() {
+  const { theme, setTheme } = useAppearance();
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [datasetUploaded, setDatasetUploaded] = useState(true);
@@ -29,6 +33,12 @@ export default function App() {
     status: 'approved'
   });
   const [executionStatus, setExecutionStatus] = useState('success'); // 'idle' | 'running' | 'success' | 'failed'
+
+  // Vite Fast Refresh can preserve state from an older version whose tab ids no longer exist.
+  // Always recover to the dashboard instead of rendering an empty content area.
+  useEffect(() => {
+    if (!VALID_TABS.includes(currentTab)) setCurrentTab('dashboard');
+  }, [currentTab]);
 
   // Start with some history items to show past activities
   const [historyList, setHistoryList] = useState([
@@ -85,7 +95,8 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           log_id: activeQuery.id,
-          code: activeQuery.code
+          code: activeQuery.code,
+          engine: activeQuery.engine || 'python'
         })
       });
       const data = await response.json();
@@ -184,7 +195,9 @@ export default function App() {
           </div>
 
           {/* Quick Metrics & User tools */}
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
+            <button onClick={() => window.print()} className="no-print text-xs font-bold px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50">Xuất PDF</button>
+            <button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} className="no-print text-xs font-bold px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50">{theme === 'light' ? 'Chế độ tối' : 'Chế độ sáng'}</button>
 
 
 
@@ -214,6 +227,7 @@ export default function App() {
             <HomeDashboard
               datasetUploaded={datasetUploaded}
               setCurrentTab={setCurrentTab}
+              submitQuery={submitQuery}
             />
           )}
 

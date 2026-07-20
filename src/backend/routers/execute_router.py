@@ -1,89 +1,73 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+"""Human-approved query execution with a deliberately small, read-only surface."""
+import ast
+import json
+import re
+import sqlite3
+from fastapi import APIRouter
+from pydantic import BaseModel, Field
 import pandas as pd
-import os
 
 from ..database import update_log_status
+from ..dataset import load_dataset
 
 router = APIRouter(prefix="/api/execute", tags=["Execute"])
+ALLOWED_CHARTS = {"bar", "line", "scatter", "pie"}
+BANNED_NAMES = {"open", "exec", "eval", "compile", "globals", "locals", "vars", "getattr", "setattr", "delattr", "__import__", "input", "help", "dir"}
+BANNED_ATTRIBUTES = {"to_csv", "to_excel", "to_pickle", "to_sql", "to_json", "to_parquet", "read_csv", "read_excel", "query", "eval"}
+SAFE_BUILTINS = {"len": len, "min": min, "max": max, "sum": sum, "round": round, "abs": abs, "sorted": sorted, "list": list, "dict": dict, "str": str, "int": int, "float": float}
 
 class ExecuteRequest(BaseModel):
     log_id: int
-    code: str
+    code: str = Field(min_length=1, max_length=12000)
+    engine: str = Field(default="python", pattern="^(python|sql)$")
 
 class ExecuteResponse(BaseModel):
     status: str
-    chart_data: str = None
-    chart_type: str = None
-    error_message: str = None
+    chart_data: str | None = None
+    chart_type: str | None = None
+    error_message: str | None = None
 
-# Đường dẫn đến file dữ liệu đã làm sạch
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-CSV_PATH = os.path.join(BASE_DIR, "data", "processed", "cleaned_data.csv")
+def validate_python(code: str) -> None:
+    tree = ast.parse(code, mode="exec")
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Import, ast.ImportFrom, ast.With, ast.Try, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.While, ast.For, ast.AsyncFor)):
+            raise ValueError("Chỉ hỗ trợ biến đổi DataFrame; import, vòng lặp và hàm không được phép.")
+        if isinstance(node, ast.Name) and (node.id in BANNED_NAMES or node.id.startswith("__")):
+            raise ValueError(f"Tên không được phép: {node.id}")
+        if isinstance(node, ast.Attribute) and (node.attr in BANNED_ATTRIBUTES or node.attr.startswith("__")):
+            raise ValueError(f"Thao tác không được phép: {node.attr}")
+
+def execute_python(code: str, df: pd.DataFrame):
+    validate_python(code)
+    env = {"df": df.copy(), "pd": pd, "chart_data": None, "chart_type": "bar"}
+    exec(compile(code, "<approved-analysis>", "exec"), {"__builtins__": SAFE_BUILTINS}, env)
+    return env.get("chart_data"), env.get("chart_type", "bar")
+
+def execute_sql(query: str, df: pd.DataFrame):
+    normalized = query.strip().rstrip(";")
+    if not re.match(r"^(select|with)\b", normalized, re.IGNORECASE) or ";" in normalized:
+        raise ValueError("SQL chỉ hỗ trợ một truy vấn SELECT hoặc WITH ở chế độ chỉ đọc.")
+    conn = sqlite3.connect(":memory:")
+    try:
+        df.to_sql("weather", conn, index=False, if_exists="replace")
+        result = pd.read_sql_query(normalized, conn)
+    finally:
+        conn.close()
+    return result.to_dict(orient="records"), "bar"
 
 @router.post("/", response_model=ExecuteResponse)
 async def execute_code(request: ExecuteRequest):
-    """
-    Nhận code từ Frontend (sau khi người dùng đã duyệt/chỉnh sửa), 
-    thực thi bằng exec() và trả về kết quả JSON.
-    """
-    if not os.path.exists(CSV_PATH):
-        raise HTTPException(status_code=500, detail="Data file not found. Please run preprocess step first.")
-
-    # Tải dữ liệu vào Pandas DataFrame
-    df = pd.read_csv(CSV_PATH)
-    
-    # Thiết lập môi trường an toàn (sandbox cơ bản)
-    # Chỉ truyền biến df vào môi trường cục bộ để code của AI có thể tương tác.
-    local_env = {
-        'df': df
-    }
-
     try:
-        # Thực thi đoạn mã Python mà AI sinh ra (và user đã duyệt)
-        # Bất kỳ biến nào được tạo trong đoạn mã (như chart_data) sẽ nằm trong local_env
-        exec(request.code, {}, local_env)
-        
-        # Lấy kết quả từ biến chart_data (AI được dặn phải lưu vào biến này dưới dạng dict/list)
-        chart_data = local_env.get('chart_data', None)
-        chart_type = local_env.get('chart_type', 'bar') # Default là bar
-        
-        if not chart_data:
-            raise ValueError("Đoạn code không tạo ra biến 'chart_data' (JSON). Vui lòng yêu cầu AI sinh lại đúng định dạng.")
-
-        import json
-        if not isinstance(chart_data, str):
-            chart_data_str = json.dumps(chart_data)
-        else:
-            chart_data_str = chart_data
-
-        # Cập nhật DB: Thành công
-        # Lưu chart_data vào cột result_image (tạm mượn cột này để khỏi phải đổi schema)
-        update_log_status(
-            log_id=request.log_id, 
-            status="Approved_And_Executed", 
-            final_code=request.code, 
-            result_image=chart_data_str
-        )
-
-        return ExecuteResponse(
-            status="success",
-            chart_data=chart_data_str,
-            chart_type=chart_type
-        )
-
-    except Exception as e:
-        error_msg = str(e)
-        
-        # Cập nhật DB: Lỗi
-        update_log_status(
-            log_id=request.log_id, 
-            status="Error", 
-            final_code=request.code, 
-            error_message=error_msg
-        )
-        
-        return ExecuteResponse(
-            status="error",
-            error_message=error_msg
-        )
+        df = load_dataset()
+        chart_data, chart_type = execute_sql(request.code, df) if request.engine == "sql" else execute_python(request.code, df)
+        if not isinstance(chart_data, list) or not chart_data:
+            raise ValueError("Truy vấn phải tạo `chart_data` là danh sách bản ghi không rỗng.")
+        if chart_type not in ALLOWED_CHARTS:
+            chart_type = "bar"
+        chart_data_str = json.dumps(chart_data, ensure_ascii=False, default=str)
+        update_log_status(request.log_id, "Approved_And_Executed", request.code, result_image=chart_data_str)
+        return ExecuteResponse(status="success", chart_data=chart_data_str, chart_type=chart_type)
+    except Exception as exc:
+        error_message = str(exc)
+        update_log_status(request.log_id, "Error", request.code, error_message=error_message)
+        return ExecuteResponse(status="error", error_message=error_message)

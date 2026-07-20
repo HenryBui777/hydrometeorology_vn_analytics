@@ -11,6 +11,7 @@ import {
   ChevronDown,
   Check
 } from 'lucide-react';
+import { useAppearance } from '../context/AppearanceContext';
 
 function CustomSelect({ value, onChange, options, className }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -63,6 +64,7 @@ function CustomSelect({ value, onChange, options, className }) {
 }
 
 export default function SettingsView() {
+  const { theme, setTheme, palette, setPalette } = useAppearance();
   const [model, setModel] = useState('gemini-flash');
   const [apiKey, setApiKey] = useState('••••••••••••••••••••••••••••••••');
   const [localDir, setLocalDir] = useState('d:/CODE/final_dataVisualization/hydrometeorology_vn_analytics/data');
@@ -87,6 +89,17 @@ export default function SettingsView() {
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
+
+        <div className="glass-panel bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+            <Settings className="h-5 w-5 text-brand-primary" />
+            <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Giao diện và khả năng tiếp cận</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+            <div className="space-y-2"><label className="text-slate-650 font-bold">Chế độ hiển thị</label><div className="flex gap-2"><button type="button" onClick={() => setTheme('light')} className={`px-4 py-2 rounded-lg border font-bold ${theme === 'light' ? 'bg-brand-primary text-white' : 'border-slate-200'}`}>Sáng</button><button type="button" onClick={() => setTheme('dark')} className={`px-4 py-2 rounded-lg border font-bold ${theme === 'dark' ? 'bg-brand-primary text-white' : 'border-slate-200'}`}>Tối</button></div></div>
+            <div className="space-y-2"><label className="text-slate-650 font-bold">Bảng màu biểu đồ</label><div className="flex gap-2"><button type="button" onClick={() => setPalette('standard')} className={`px-4 py-2 rounded-lg border font-bold ${palette === 'standard' ? 'bg-brand-primary text-white' : 'border-slate-200'}`}>Tiêu chuẩn</button><button type="button" onClick={() => setPalette('colorblind')} className={`px-4 py-2 rounded-lg border font-bold ${palette === 'colorblind' ? 'bg-brand-primary text-white' : 'border-slate-200'}`}>Thân thiện mù màu</button></div></div>
+          </div>
+        </div>
 
         {/* LLM Connection settings */}
         <div className="glass-panel bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">

@@ -16,6 +16,15 @@
   }
 }
 
+:root[data-theme='dark'] body { background: #0f172a; color: #e2e8f0; }
+:root[data-theme='dark'] .bg-white, :root[data-theme='dark'] .glass-panel, :root[data-theme='dark'] .tech-panel { background-color: #182235 !important; }
+:root[data-theme='dark'] .bg-slate-50 { background-color: #202c40 !important; }
+:root[data-theme='dark'] .text-slate-800, :root[data-theme='dark'] .text-slate-700, :root[data-theme='dark'] .text-slate-600 { color: #e2e8f0 !important; }
+:root[data-theme='dark'] .text-slate-500, :root[data-theme='dark'] .text-slate-400 { color: #aab8cc !important; }
+:root[data-theme='dark'] .border-slate-200, :root[data-theme='dark'] .border-slate-100 { border-color: #334155 !important; }
+:root[data-palette='colorblind'] { --chart-1: #0072B2; --chart-2: #E69F00; --chart-3: #009E73; --chart-4: #CC79A7; --chart-5: #56B4E9; --chart-6: #D55E00; }
+@media print { aside, header, button, .no-print { display: none !important; } main { padding: 0 !important; overflow: visible !important; } body { background: white !important; } }
+
 /* Custom Scrollbars - Light/Azure Style */
 ::-webkit-scrollbar {
   width: 6px;

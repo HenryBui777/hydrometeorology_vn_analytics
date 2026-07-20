@@ -9,7 +9,7 @@ if BASE_DIR not in sys.path:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.backend.database import init_db
-from src.backend.routers import ai_router, execute_router, data_router
+from src.backend.routers import ai_router, execute_router, data_router, insight_router
 
 app = FastAPI(title="HydroMeteorology VN API", version="1.0.0")
 
@@ -32,6 +32,7 @@ def startup_event():
 app.include_router(data_router.router)
 app.include_router(ai_router.router)
 app.include_router(execute_router.router)
+app.include_router(insight_router.router)
 
 @app.get("/")
 def read_root():
