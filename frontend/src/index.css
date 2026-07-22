@@ -5,6 +5,28 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --color-brand-primary: #3B82F6;
+    --color-brand-secondary: #1E3A8A;
+    --color-brand-accent: #60A5FA;
+    --color-brand-bg: #F0F4F8;
+    --color-brand-card: #FFFFFF;
+    --color-brand-text: #1E293B;
+  }
+
+  /* Colorblind mode (Okabe-Ito Palette) */
+  :root.colorblind {
+    --color-brand-primary: #0072B2;
+    --color-brand-secondary: #009E73;
+    --color-brand-accent: #D55E00;
+  }
+
+  .dark.colorblind {
+    --color-brand-primary: #56B4E9;
+    --color-brand-secondary: #F0E442;
+    --color-brand-accent: #E69F00;
+  }
+
   body {
     @apply bg-brand-bg text-brand-text antialiased overflow-x-hidden selection:bg-brand-primary selection:text-white;
     font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
@@ -14,6 +36,15 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
+}
+
+@keyframes siren-pulse {
+  0% { color: #ef4444; transform: scale(1); }
+  50% { color: #3b82f6; transform: scale(1.1); }
+  100% { color: #ef4444; transform: scale(1); }
+}
+.animate-siren {
+  animation: siren-pulse 0.8s infinite ease-in-out;
 }
 
 /* Custom Scrollbars - Light/Azure Style */
@@ -139,3 +170,77 @@ svg:focus, g:focus, rect:focus, path:focus, .recharts-wrapper:focus, .recharts-s
 .delay-3 { animation-delay: 150ms; }
 .delay-4 { animation-delay: 200ms; }
 .delay-5 { animation-delay: 250ms; }
+
+/* ==========================================================================
+   PRINT STYLES (Xuất PDF)
+   ========================================================================== */
+@media print {
+  @page {
+    margin: 1.2cm;
+    size: A4 portrait;
+  }
+
+  /* Hide UI elements that shouldn't be in the PDF */
+  .print-hidden, 
+  aside, 
+  nav, 
+  header, 
+  .news-ticker, 
+  .animate-siren,
+  ::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  /* Force white background and reset colors for clean document look */
+  body, html, main, #root {
+    background: #ffffff !important;
+    color: #000000 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Fix for 1-page cutoff: Ensure all scrollable/height-constrained wrappers expand fully */
+  body, html, #root, main, .h-screen, .w-screen, .overflow-hidden, .overflow-y-auto, .flex-1 {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    position: static !important;
+  }
+
+  /* Force light theme colors inside dark mode elements during print */
+  .dark .glass-card, 
+  .dark .glass-panel, 
+  .dark .tech-card, 
+  .dark .tech-panel {
+    background: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    color: #1e293b !important;
+  }
+
+  .dark p, .dark span, .dark h1, .dark h2, .dark h3, .dark h4 {
+    color: #1e293b !important;
+  }
+
+  /* Prevent elements from being cut in half across pages */
+  .glass-card, 
+  .tech-card, 
+  .glass-panel, 
+  .tech-panel, 
+  .recharts-wrapper, 
+  table, 
+  tr, 
+  img, 
+  svg {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Add some spacing between cards in print */
+  .glass-card, .tech-card, .glass-panel {
+    margin-bottom: 24px !important;
+    box-shadow: none !important;
+    border: 1px solid #cbd5e1 !important;
+  }
+}

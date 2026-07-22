@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import pandas as pd
 import os
+import duckdb
 
 from ..database import update_log_status
 
@@ -10,6 +11,8 @@ router = APIRouter(prefix="/api/execute", tags=["Execute"])
 class ExecuteRequest(BaseModel):
     log_id: int
     code: str
+    engine: str = "python"
+    dataset_path: str = None
 
 class ExecuteResponse(BaseModel):
     status: str
@@ -27,29 +30,42 @@ async def execute_code(request: ExecuteRequest):
     Nhận code từ Frontend (sau khi người dùng đã duyệt/chỉnh sửa), 
     thực thi bằng exec() và trả về kết quả JSON.
     """
-    if not os.path.exists(CSV_PATH):
-        raise HTTPException(status_code=500, detail="Data file not found. Please run preprocess step first.")
+    target_csv = request.dataset_path if request.dataset_path and os.path.exists(request.dataset_path) else CSV_PATH
+
+    if not os.path.exists(target_csv):
+        raise HTTPException(status_code=500, detail="Data file not found.")
 
     # Tải dữ liệu vào Pandas DataFrame
-    df = pd.read_csv(CSV_PATH)
+    df = pd.read_csv(target_csv)
     
-    # Thiết lập môi trường an toàn (sandbox cơ bản)
-    # Chỉ truyền biến df vào môi trường cục bộ để code của AI có thể tương tác.
-    local_env = {
-        'df': df
-    }
-
     try:
-        # Thực thi đoạn mã Python mà AI sinh ra (và user đã duyệt)
-        # Bất kỳ biến nào được tạo trong đoạn mã (như chart_data) sẽ nằm trong local_env
-        exec(request.code, {}, local_env)
+        chart_data = None
+        chart_type = 'bar'
         
-        # Lấy kết quả từ biến chart_data (AI được dặn phải lưu vào biến này dưới dạng dict/list)
-        chart_data = local_env.get('chart_data', None)
-        chart_type = local_env.get('chart_type', 'bar') # Default là bar
-        
+        if request.engine == 'sql':
+            # 1. Trích xuất chart_type từ comment nếu có
+            clean_query = []
+            for line in request.code.split('\n'):
+                if line.startswith('-- CHART_TYPE:'):
+                    chart_type = line.split(':')[1].strip().lower()
+                else:
+                    clean_query.append(line)
+            
+            final_query = "\n".join(clean_query)
+            
+            # 2. Thực thi SQL bằng DuckDB trên Pandas DataFrame 'df'
+            result_df = duckdb.query(final_query).df()
+            chart_data = result_df.to_dict(orient='records')
+            
+        else:
+            # Chế độ Python Pandas Sandbox
+            local_env = { 'df': df }
+            exec(request.code, {}, local_env)
+            chart_data = local_env.get('chart_data', None)
+            chart_type = local_env.get('chart_type', 'bar')
+            
         if not chart_data:
-            raise ValueError("Đoạn code không tạo ra biến 'chart_data' (JSON). Vui lòng yêu cầu AI sinh lại đúng định dạng.")
+            raise ValueError("Không thu được dữ liệu biểu đồ. Hãy thử sinh lại.")
 
         import json
         if not isinstance(chart_data, str):

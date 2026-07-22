@@ -3,15 +3,17 @@ import Editor from '@monaco-editor/react';
 import { 
   Terminal, Sparkles, Send, Play, X, CheckCircle, AlertTriangle, 
   Cpu, Workflow, Clock, FileText, ChevronRight, BarChart2,
-  Table
+  Table, Download, Eye
 } from 'lucide-react';
+import html2pdf from 'html2pdf.js';
 import { 
   BarChart, Bar, LineChart, Line, ScatterChart, Scatter, PieChart, Pie,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
 } from 'recharts';
 
 // Colors for charts
-const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
+const COLORS_DEFAULT = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
+const COLORS_COLORBLIND = ['#0072B2', '#E69F00', '#56B4E9', '#009E73', '#F0E442', '#D55E00', '#CC79A7'];
 
 export default function AIAnalystPortal({
   datasetUploaded,
@@ -29,6 +31,13 @@ export default function AIAnalystPortal({
   const [isGenerating, setIsGenerating] = useState(false);
   const [viewMode, setViewMode] = useState('chart'); // 'chart' or 'table'
   const [chartTypeUI, setChartTypeUI] = useState('bar');
+  const [isColorBlind, setIsColorBlind] = useState(false);
+  
+  // 4-Axis Analysis State
+  const [insight, setInsight] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  const COLORS = isColorBlind ? COLORS_COLORBLIND : COLORS_DEFAULT;
   
   // Fake streaming state for execution monitor
   const [streamedLogs, setStreamedLogs] = useState([]);
@@ -42,6 +51,7 @@ export default function AIAnalystPortal({
 
   useEffect(() => {
     if (executionStatus === 'running' && activeQuery) {
+      setInsight(null); // Reset insight when a new query runs
       setStreamedLogs([]);
       setCurrentLineIdx(0);
       const logsToStream = activeQuery.logs || ['[System] Khởi tạo môi trường Python (venv_kttv)...', '[System] Đang nạp dữ liệu cleaned_data.csv...', '[System] Đang thực thi mã nguồn Pandas...'];
@@ -104,7 +114,7 @@ export default function AIAnalystPortal({
     const yKeys = keys.filter(k => k !== xKey);
 
     return (
-      <div className="h-96 w-full mt-4">
+      <div className="h-96 w-full mt-4" id="chart-export-area">
         <ResponsiveContainer width="100%" height="100%">
           {chartTypeUI === 'bar' ? (
             <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -174,16 +184,59 @@ export default function AIAnalystPortal({
     );
   };
 
+  const exportToPDF = () => {
+    const element = document.getElementById('report-export-area');
+    if (!element) return;
+    const opt = {
+      margin:       0.5,
+      filename:     `ai_analysis_${Date.now()}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2 },
+      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+    html2pdf().set(opt).from(element).save();
+  };
+
+  const fetchInsight = async () => {
+    if (!activeQuery || !activeQuery.chartData) return;
+    setIsAnalyzing(true);
+    try {
+      const response = await fetch('http://localhost:8000/api/ai/analyze-chart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: activeQuery.question || "",
+          chart_data: activeQuery.chartData,
+          chart_type: chartTypeUI
+        })
+      });
+      const data = await response.json();
+      setInsight(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (executionStatus === 'success' && activeQuery?.chartData && !insight && !isAnalyzing) {
+      fetchInsight();
+    }
+  }, [executionStatus, activeQuery]);
+
   return (
-    <div className="max-w-6xl mx-auto space-y-10 pb-20 font-sans">
+    <div className="w-full h-full flex flex-col font-sans pb-10" id="report-export-area">
       
       {/* Header Section */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-serif font-bold text-slate-800 tracking-tight">Trợ lý phân tích AI</h1>
-        <p className="text-slate-500 mt-2 font-medium">Trợ lý chuyên gia dữ liệu, tự động sinh mã nguồn Python (Pandas) và vẽ biểu đồ tương tác.</p>
+      <div className="mb-8 flex justify-between items-start">
+        <div>
+          <h1 className="text-4xl font-serif font-bold text-slate-800 tracking-tight dark:text-white">Trợ lý phân tích AI</h1>
+          <p className="text-slate-500 mt-2 font-medium dark:text-slate-400">Trợ lý chuyên gia dữ liệu, tự động sinh mã nguồn Python (Pandas) và vẽ biểu đồ tương tác.</p>
+        </div>
       </div>
 
-      {/* 1. Input Section */}
+          {/* 1. Input Section */}
       <div className="bg-[#f9f9f5] border border-[#e5e5dd] rounded-2xl p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <span className="text-xs font-bold text-slate-600 uppercase tracking-widest flex items-center gap-2">
@@ -200,12 +253,12 @@ export default function AIAnalystPortal({
             value={promptInput}
             onChange={(e) => setPromptInput(e.target.value)}
             placeholder="Kiểm tra quan hệ lượng mưa và bức xạ mặt trời ở ba miền..."
-            className="w-full bg-white border border-[#e5e5dd] rounded-xl p-4 min-h-[120px] text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all resize-y"
+            className="w-full bg-white dark:bg-slate-800 border border-[#e5e5dd] dark:border-slate-700 rounded-xl p-4 min-h-[120px] text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all resize-y"
           />
           <div className="flex flex-wrap items-center justify-between gap-4">
              <div className="flex gap-2">
                {["So sánh mưa Đà Nẵng & HCMC", "Nhiệt độ bất thường Hà Nội", "Top 5 tỉnh nóng nhất tháng 5"].map((tag) => (
-                 <button key={tag} onClick={() => setPromptInput(tag)} className="text-[11px] px-3 py-1.5 bg-white border border-slate-200 rounded-full text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors cursor-pointer">
+                 <button key={tag} onClick={() => setPromptInput(tag)} className="text-[11px] px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full text-slate-600 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-emerald-900 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors cursor-pointer">
                    {tag}
                  </button>
                ))}
@@ -222,12 +275,12 @@ export default function AIAnalystPortal({
           </div>
         </div>
       </div>
-
+      
       {/* 2. Draft Code Review Section */}
       {activeQuery && (activeQuery.status === 'pending' || executionStatus !== 'idle') && (
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden animate-fade-in relative">
-          <div className="bg-slate-50 border-b border-slate-200 p-4 flex items-center justify-between">
-             <span className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+        <div className="mt-8 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm overflow-hidden animate-fade-in relative">
+          <div className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
+             <span className="text-xs font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest flex items-center gap-2">
                 <FileText className="h-4 w-4 text-orange-500" /> Draft: Đề xuất phân tích
              </span>
              {activeQuery.status === 'pending' && <span className="bg-orange-100 text-orange-700 border border-orange-200 text-[10px] font-extrabold px-2 py-1 rounded-md uppercase">Chờ duyệt (Pending)</span>}
@@ -235,9 +288,9 @@ export default function AIAnalystPortal({
           
           <div className="p-6 space-y-6">
             <div className="space-y-2">
-               <h3 className="text-lg font-bold text-slate-800 font-serif">"{activeQuery.question}"</h3>
-               <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-xl text-sm text-slate-700 leading-relaxed font-medium">
-                 <p className="font-semibold text-slate-800">Giải thích:</p>
+               <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 font-serif">"{activeQuery.question}"</h3>
+               <div className="bg-blue-50/50 dark:bg-slate-700/50 border border-blue-100 dark:border-slate-600 p-4 rounded-xl text-sm text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+                 <p className="font-semibold text-slate-800 dark:text-slate-200">Giải thích:</p>
                  <p className="mt-1">{activeQuery.explanation}</p>
                </div>
             </div>
@@ -275,9 +328,9 @@ export default function AIAnalystPortal({
 
       {/* 3. Execution & Results Section */}
       {(executionStatus === 'running' || executionStatus === 'success' || executionStatus === 'failed') && (
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden animate-fade-in relative mt-8">
-          <div className="bg-slate-50 border-b border-slate-200 p-4 flex items-center justify-between">
-             <span className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+        <div className="mt-8 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm overflow-hidden animate-fade-in relative">
+          <div className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
+             <span className="text-xs font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest flex items-center gap-2">
                 {executionStatus === 'success' ? <BarChart2 className="h-4 w-4 text-emerald-600" /> : <Terminal className="h-4 w-4 text-brand-primary" />}
                 {executionStatus === 'success' ? 'Kết quả truy vấn cục bộ' : 'Giám sát thực thi'}
              </span>
@@ -328,18 +381,26 @@ export default function AIAnalystPortal({
                     </div>
                     
                     {viewMode === 'chart' && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-bold text-slate-500">LOẠI BIỂU ĐỒ:</span>
-                        <select 
-                          value={chartTypeUI} 
-                          onChange={(e) => setChartTypeUI(e.target.value)}
-                          className="bg-white border border-slate-200 text-slate-800 text-xs rounded-md px-2 py-1 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      <div className="flex items-center gap-4">
+                        <button 
+                          onClick={() => setIsColorBlind(!isColorBlind)}
+                          className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-[11px] font-bold border transition-colors ${isColorBlind ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-white text-slate-500 border-slate-200'}`}
                         >
-                          <option value="bar">Cột (Bar)</option>
-                          <option value="line">Đường (Line)</option>
-                          <option value="pie">Tròn (Pie)</option>
-                          <option value="scatter">Phân tán (Scatter)</option>
-                        </select>
+                          <Eye className="h-3 w-3"/> Mù màu
+                        </button>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-bold text-slate-500">LOẠI BIỂU ĐỒ:</span>
+                          <select 
+                            value={chartTypeUI} 
+                            onChange={(e) => setChartTypeUI(e.target.value)}
+                            className="bg-white border border-slate-200 text-slate-800 text-xs rounded-md px-2 py-1 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                          >
+                            <option value="bar">Cột (Bar)</option>
+                            <option value="line">Đường (Line)</option>
+                            <option value="pie">Tròn (Pie)</option>
+                            <option value="scatter">Phân tán (Scatter)</option>
+                          </select>
+                        </div>
                       </div>
                     )}
                  </div>
@@ -347,6 +408,39 @@ export default function AIAnalystPortal({
                  <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm overflow-hidden">
                     {viewMode === 'chart' ? renderInteractiveChart() : renderRawTable()}
                  </div>
+
+                 {/* 4-Axis Insight Section */}
+                 {(isAnalyzing || insight) && (
+                   <div className="mt-8 border-t border-slate-200 pt-8">
+                     <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest flex items-center gap-2 mb-6">
+                        <Sparkles className="h-4 w-4 text-emerald-500" /> Báo cáo phân tích chuyên sâu (4-Axis Insight)
+                     </h3>
+                     {isAnalyzing ? (
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {[1,2,3,4].map(i => <div key={i} className="h-32 bg-slate-100 animate-pulse rounded-xl"></div>)}
+                       </div>
+                     ) : insight && (
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <div className="bg-blue-50/50 border border-blue-100 p-5 rounded-xl">
+                           <h4 className="font-bold text-blue-800 flex items-center gap-2"><span className="bg-blue-200 text-blue-800 w-6 h-6 flex items-center justify-center rounded-full text-xs">1</span> Phân tích Mô tả</h4>
+                           <p className="text-sm text-slate-700 mt-2">{insight.descriptive}</p>
+                         </div>
+                         <div className="bg-amber-50/50 border border-amber-100 p-5 rounded-xl">
+                           <h4 className="font-bold text-amber-800 flex items-center gap-2"><span className="bg-amber-200 text-amber-800 w-6 h-6 flex items-center justify-center rounded-full text-xs">2</span> Phân tích Chẩn đoán</h4>
+                           <p className="text-sm text-slate-700 mt-2">{insight.diagnostic}</p>
+                         </div>
+                         <div className="bg-purple-50/50 border border-purple-100 p-5 rounded-xl">
+                           <h4 className="font-bold text-purple-800 flex items-center gap-2"><span className="bg-purple-200 text-purple-800 w-6 h-6 flex items-center justify-center rounded-full text-xs">3</span> Phân tích Dự đoán</h4>
+                           <p className="text-sm text-slate-700 mt-2">{insight.predictive}</p>
+                         </div>
+                         <div className="bg-emerald-50/50 border border-emerald-100 p-5 rounded-xl">
+                           <h4 className="font-bold text-emerald-800 flex items-center gap-2"><span className="bg-emerald-200 text-emerald-800 w-6 h-6 flex items-center justify-center rounded-full text-xs">4</span> Đề xuất Hành động</h4>
+                           <p className="text-sm text-slate-700 mt-2">{insight.prescriptive}</p>
+                         </div>
+                       </div>
+                     )}
+                   </div>
+                 )}
               </div>
             )}
           </div>

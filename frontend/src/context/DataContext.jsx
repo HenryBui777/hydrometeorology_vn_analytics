@@ -1,7 +1,25 @@
-import React, { createContext, useContext, useState, useMemo } from 'react';
+import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
 import useCsvData, { applyFilters } from '../hooks/useCsvData';
 
 const DataContext = createContext(null);
+
+export const OKABE_ITO_PALETTE = [
+  '#E69F00', // Orange
+  '#56B4E9', // Sky Blue
+  '#009E73', // Bluish Green
+  '#F0E442', // Yellow
+  '#0072B2', // Blue
+  '#D55E00', // Vermilion
+  '#CC79A7', // Reddish Purple
+  '#000000', // Black
+  '#999999', // Grey
+  '#88CCEE', // Light Blue
+  '#DDCC77', // Sand
+  '#117733', // Dark Green
+  '#332288', // Dark Blue
+  '#AA4499', // Purple
+  '#44AA99'  // Teal
+];
 
 export function DataProvider({ children }) {
   const { rawRows, loading, error, fullStats } = useCsvData();
@@ -9,9 +27,36 @@ export function DataProvider({ children }) {
   // Global filter state shared across all views
   const [filters, setFilters] = useState({
     regionKey: 'All',
+    year: 'All',
     month: 'All',
     season: 'All',
   });
+
+  const [isColorblind, setIsColorblind] = useState(false);
+
+  useEffect(() => {
+    const savedColorblind = localStorage.getItem('colorblind');
+    if (savedColorblind === 'true') {
+      setIsColorblind(true);
+      document.documentElement.classList.add('colorblind');
+    } else {
+      setIsColorblind(false);
+      document.documentElement.classList.remove('colorblind');
+    }
+  }, []);
+
+  const toggleColorblind = () => {
+    setIsColorblind(prev => {
+      const newVal = !prev;
+      localStorage.setItem('colorblind', newVal.toString());
+      if (newVal) {
+        document.documentElement.classList.add('colorblind');
+      } else {
+        document.documentElement.classList.remove('colorblind');
+      }
+      return newVal;
+    });
+  };
 
   // Filtered rows based on active filters
   const filteredRows = useMemo(() => {
@@ -52,6 +97,8 @@ export function DataProvider({ children }) {
     filteredStats,
     filters,
     setFilters,
+    isColorblind,
+    toggleColorblind,
   };
 
   return (

@@ -4,20 +4,32 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
         brand: {
-          primary: '#3B82F6',    // Sky Blue
-          secondary: '#1E3A8A',  // Deep Royal Blue
-          accent: '#60A5FA',     // Soft Light Blue
-          bg: '#F0F4F8',         // Light Blue-Gray bg
-          card: '#FFFFFF',       // White
-          text: '#1E293B',       // Dark Slate
+          primary: 'var(--color-brand-primary)',
+          secondary: 'var(--color-brand-secondary)',
+          accent: 'var(--color-brand-accent)',
+          bg: 'var(--color-brand-bg)',
+          card: 'var(--color-brand-card)',
+          text: 'var(--color-brand-text)',
         }
       },
       fontFamily: {
-        sans: ['"Be Vietnam Pro"', 'system-ui', 'sans-serif'],
+        sans: ['"Inter"', 'system-ui', 'sans-serif'],
+        serif: ['"Outfit"', 'Georgia', 'serif'],
+        mono: ['"Roboto Mono"', 'monospace'],
+      },
+      keyframes: {
+        marquee: {
+          '0%': { transform: 'translateX(0%)' },
+          '100%': { transform: 'translateX(-50%)' },
+        }
+      },
+      animation: {
+        marquee: 'marquee 35s linear infinite',
       },
     },
   },

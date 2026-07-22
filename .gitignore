@@ -230,3 +230,8 @@ frontend/.vite/
 # PDF files
 *.pdf
 
+
+# Environment Variables
+.env
+.env.*
+!.env.example

@@ -58,6 +58,6 @@ def clean_data(input_path, output_path):
     print(f"Cleaned file size: {clean_size:.2f} MB")
 
 if __name__ == "__main__":
-    INPUT_FILE = "data/raw/vietnam_kttv_34tinh_2025-12-06_2026-06-04.csv"
+    INPUT_FILE = "data/raw/vietnam_kttv_34tinh_2025-07-21_2026-07-20.csv"
     OUTPUT_FILE = "data/processed/cleaned_data.csv"
     clean_data(INPUT_FILE, OUTPUT_FILE)

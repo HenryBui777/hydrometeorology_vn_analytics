@@ -55,14 +55,14 @@ export default function AIChat({
 
       // Cập nhật lại UI thông qua hàm truyền từ App.jsx
       submitQuery(
-        `Đã tạo xong mã nguồn phân tích bằng Python. Vui lòng kiểm tra và phê duyệt.`,
+        data.explanation,
         'ai',
-        {
+        data.code ? {
           id: data.log_id,
           question: text,
           code: data.code,
-          explanation: data.explanation
-        }
+          explanation: "Mã nguồn Python đi kèm"
+        } : null
       );
     } catch (err) {
       console.error(err);
