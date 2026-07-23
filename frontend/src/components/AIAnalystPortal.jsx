@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import { 
-  BarChart, Bar, LineChart, Line, ScatterChart, Scatter, PieChart, Pie,
+  BarChart, Bar, LineChart, Line, ScatterChart, Scatter, PieChart, Pie, ComposedChart,
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
 } from 'recharts';
 
@@ -40,7 +41,7 @@ export default function AIAnalystPortal({
 
   const COLORS = isColorBlind ? COLORS_COLORBLIND : COLORS_DEFAULT;
   const autoChartType = useMemo(() => {
-    const allowedTypes = new Set(['bar', 'line', 'scatter', 'pie']);
+    const allowedTypes = new Set(['bar', 'line', 'scatter', 'pie', 'composed', 'radar']);
     const requestedType = activeQuery?.chartType;
     if (allowedTypes.has(requestedType)) return requestedType;
 
@@ -53,7 +54,7 @@ export default function AIAnalystPortal({
     if (/tỷ trọng|tỉ trọng|cơ cấu|percentage|phần trăm/.test(question) && (data?.length || 0) <= 8) return 'pie';
     return 'bar';
   }, [activeQuery]);
-  const autoChartLabel = { bar: 'Biểu đồ cột', line: 'Biểu đồ đường', scatter: 'Biểu đồ phân tán', pie: 'Biểu đồ tròn' }[autoChartType];
+  const autoChartLabel = { bar: 'Biểu đồ cột', line: 'Biểu đồ đường', scatter: 'Biểu đồ phân tán', pie: 'Biểu đồ tròn', composed: 'Biểu đồ kết hợp', radar: 'Biểu đồ radar' }[autoChartType];
   
   // Fake streaming state for execution monitor
   const [streamedLogs, setStreamedLogs] = useState([]);
@@ -117,21 +118,24 @@ export default function AIAnalystPortal({
     }
   };
 
-  const renderInteractiveChart = () => {
-    if (!activeQuery?.chartData || !Array.isArray(activeQuery.chartData) || activeQuery.chartData.length === 0) {
+  const renderInteractiveChart = (chart = null) => {
+    const data = chart?.data || activeQuery?.chartData;
+    const chartType = chart?.type || autoChartType;
+    if (!Array.isArray(data) || data.length === 0) {
       return <div className="p-10 text-center text-slate-500">Không có dữ liệu biểu đồ.</div>;
     }
     
-    const data = activeQuery.chartData;
-    // Auto-detect keys (first string key for X, remaining number keys for Y/series)
+    // Detect the category key and only numeric series for chart axes.
     const keys = Object.keys(data[0]);
     const xKey = keys.find(k => typeof data[0][k] === 'string') || keys[0];
-    const yKeys = keys.filter(k => k !== xKey);
+    const yKeys = keys.filter(k => typeof data[0][k] === 'number');
+    const scatterX = yKeys[0];
+    const scatterY = yKeys[1] || yKeys[0];
 
     return (
       <div className="h-96 w-full mt-4" id="chart-export-area">
         <ResponsiveContainer width="100%" height="100%">
-          {autoChartType === 'bar' ? (
+          {chartType === 'bar' ? (
             <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
               <XAxis dataKey={xKey} stroke="#64748b" fontSize={12} />
@@ -140,7 +144,7 @@ export default function AIAnalystPortal({
               <Legend />
               {yKeys.map((key, i) => <Bar key={key} dataKey={key} fill={COLORS[i % COLORS.length]} radius={[4, 4, 0, 0]} />)}
             </BarChart>
-          ) : autoChartType === 'line' ? (
+          ) : chartType === 'line' ? (
             <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
               <XAxis dataKey={xKey} stroke="#64748b" fontSize={12} />
@@ -149,11 +153,31 @@ export default function AIAnalystPortal({
               <Legend />
               {yKeys.map((key, i) => <Line key={key} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />)}
             </LineChart>
-          ) : autoChartType === 'scatter' ? (
+          ) : chartType === 'composed' ? (
+            <ComposedChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
+              <XAxis dataKey={xKey} stroke="#64748b" fontSize={12} />
+              <YAxis yAxisId="left" stroke="#64748b" fontSize={12} />
+              <YAxis yAxisId="right" orientation="right" stroke="#64748b" fontSize={12} />
+              <Tooltip />
+              <Legend />
+              <Bar yAxisId="left" dataKey={yKeys[0]} fill={COLORS[0]} radius={[4, 4, 0, 0]} />
+              <Line yAxisId="right" type="monotone" dataKey={yKeys[1]} stroke={COLORS[2]} strokeWidth={3} />
+            </ComposedChart>
+          ) : chartType === 'radar' ? (
+            <RadarChart data={data} outerRadius="72%">
+              <PolarGrid />
+              <PolarAngleAxis dataKey={xKey} fontSize={12} />
+              <PolarRadiusAxis fontSize={10} />
+              {yKeys.map((key, index) => <Radar key={key} name={key} dataKey={key} stroke={COLORS[index % COLORS.length]} fill={COLORS[index % COLORS.length]} fillOpacity={0.22} />)}
+              <Legend />
+              <Tooltip />
+            </RadarChart>
+          ) : chartType === 'scatter' ? (
             <ScatterChart margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
-              <XAxis dataKey={xKey} name={xKey} stroke="#64748b" fontSize={12} />
-              <YAxis dataKey={yKeys[0]} name={yKeys[0]} stroke="#64748b" fontSize={12} />
+              <XAxis dataKey={scatterX} name={scatterX} stroke="#64748b" fontSize={12} />
+              <YAxis dataKey={scatterY} name={scatterY} stroke="#64748b" fontSize={12} />
               <Tooltip cursor={{strokeDasharray: '3 3'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               <Legend />
               <Scatter name="Data" data={data} fill={COLORS[0]} />
@@ -398,6 +422,13 @@ export default function AIAnalystPortal({
                  <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm overflow-hidden">
                     {renderInteractiveChart()}
                  </div>
+
+                 {(activeQuery.additionalCharts || []).map((chart, index) => (
+                   <div key={`${chart.title || 'supplement'}-${index}`} className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm overflow-hidden">
+                     <h4 className="mb-2 text-center text-sm font-extrabold uppercase tracking-wide text-slate-700">{chart.title || `Biểu đồ bổ sung ${index + 1}`}</h4>
+                     {renderInteractiveChart(chart)}
+                   </div>
+                 ))}
 
                  <details className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
                     <summary className="cursor-pointer text-xs font-bold text-slate-600"><Table className="mr-1 inline h-3.5 w-3.5"/>Xem bảng dữ liệu dùng để vẽ biểu đồ</summary>

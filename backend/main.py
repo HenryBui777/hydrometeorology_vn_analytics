@@ -48,24 +48,166 @@ class ChatRequest(BaseModel):
     engine: str = "python"
 
 
-def local_analysis_code(prompt: str) -> tuple[str, str]:
-    """A valid offline proposal. The executor always provides DataFrame ``df``."""
+def local_analysis_code(prompt: str) -> tuple[str, str, str]:
+    """Intent templates for the 15 approved KTTV analysis questions.
+
+    Every proposal uses the preloaded ``df`` and follows one output contract:
+    ``chart_data``, ``chart_type`` and optional ``additional_charts``.
+    """
     text = (prompt or "").lower()
-    metric = "precipitation_sum" if any(word in text for word in ("mưa", "mua", "rain")) else "temp_mean"
-    label = "lượng mưa" if metric == "precipitation_sum" else "nhiệt độ trung bình"
-    group = "region" if any(word in text for word in ("vùng", "vung", "miền", "mien")) else "province"
-    return (
-        f"""# Dữ liệu df đã được hệ thống nạp sẵn từ cleaned_data.csv
-result_df = (df.groupby('{group}', as_index=False)['{metric}']
-             .mean()
-             .rename(columns={{'{group}': 'name', '{metric}': 'value'}})
-             .sort_values('value', ascending=False)
-             .head(10))
+    north = "['Trung du miền núi Bắc Bộ', 'Đồng bằng sông Hồng']"
+    south_central = "'Duyên hải Nam Trung Bộ'"
+
+    # 1. Top hottest provinces
+    if "top 5" in text and ("nhiệt" in text or "nóng" in text):
+        return ("""result_df = (df.groupby('province', as_index=False)['temp_mean'].mean()
+    .rename(columns={'province': 'name', 'temp_mean': 'value'})
+    .nlargest(5, 'value'))
 chart_data = result_df.to_dict(orient='records')
-chart_type = 'bar'
-""",
-        f"Tổng hợp {label} trung bình theo {group} và hiển thị 10 nhóm có giá trị cao nhất."
-    )
+chart_type = 'bar'""", "Xếp hạng 5 tỉnh có nhiệt độ trung bình cao nhất trên toàn bộ dữ liệu.", "bar")
+
+    # 2. Hanoi monthly temperature trend
+    if "hà nội" in text and ("12 tháng" in text or "diễn biến" in text or "xu hướng" in text):
+        return ("""result_df = (df[df['province'].eq('Hà Nội')].groupby('month', as_index=False)['temp_mean'].mean()
+    .rename(columns={'month': 'name', 'temp_mean': 'value'}).sort_values('name'))
+result_df['name'] = result_df['name'].map(lambda month: f'Tháng {month}')
+chart_data = result_df.to_dict(orient='records')
+chart_type = 'line'""", "Theo dõi nhiệt độ trung bình của Hà Nội theo 12 tháng.", "line")
+
+    # 3. Rainfall by season
+    if "4 mùa" in text or ("mùa" in text and "lượng mưa" in text and "trung bình" in text):
+        return ("""result_df = (df.groupby('season', as_index=False)['precipitation_sum'].mean()
+    .rename(columns={'season': 'name', 'precipitation_sum': 'value'}))
+season_order = {'Xuân': 1, 'Hè': 2, 'Thu': 3, 'Đông': 4}
+result_df = result_df.sort_values('name', key=lambda series: series.map(season_order))
+chart_data = result_df.to_dict(orient='records')
+chart_type = 'bar'""", "So sánh lượng mưa trung bình giữa bốn mùa.", "bar")
+
+    # 4. Sunshine by macro region
+    if "giờ nắng" in text and ("miền bắc" in text or "miền trung" in text or "miền nam" in text):
+        return ("""df_work = df.copy()
+df_work['macro_region'] = df_work['region'].map({
+    'Trung du miền núi Bắc Bộ': 'Miền Bắc', 'Đồng bằng sông Hồng': 'Miền Bắc',
+    'Bắc Trung Bộ': 'Miền Trung', 'Duyên hải Nam Trung Bộ': 'Miền Trung',
+    'Tây Nguyên': 'Miền Trung', 'Đông Nam Bộ': 'Miền Nam',
+    'Đồng bằng sông Cửu Long': 'Miền Nam'})
+result_df = (df_work.groupby('macro_region', as_index=False)['sunshine_hours'].mean()
+    .rename(columns={'macro_region': 'name', 'sunshine_hours': 'value'}))
+chart_data = result_df.to_dict(orient='records')
+chart_type = 'bar'""", "So sánh số giờ nắng trung bình giữa ba miền Bắc, Trung và Nam.", "bar")
+
+    # 5. Driest provinces
+    if ("khô hạn" in text or "thấp nhất" in text) and ("mưa" in text or "lượng mưa" in text):
+        return ("""result_df = (df.groupby('province', as_index=False)['precipitation_sum'].mean()
+    .rename(columns={'province': 'name', 'precipitation_sum': 'value'})
+    .nsmallest(10, 'value'))
+chart_data = result_df.to_dict(orient='records')
+chart_type = 'bar'""", "Liệt kê 10 tỉnh có lượng mưa trung bình thấp nhất để nhận diện khu vực khô hạn.", "bar")
+
+    # 6. HCMC temperature and rainfall by month
+    if ("tp.hcm" in text or "tp hcm" in text or "hồ chí minh" in text) and "lượng mưa" in text and "nhiệt độ" in text:
+        return ("""result_df = (df[df['province'].eq('Hồ Chí Minh')].groupby('month', as_index=False)
+    .agg(precipitation_sum=('precipitation_sum', 'mean'), temp_mean=('temp_mean', 'mean'))
+    .rename(columns={'month': 'name'}).sort_values('name'))
+result_df['name'] = result_df['name'].map(lambda month: f'Tháng {month}')
+chart_data = result_df.to_dict(orient='records')
+chart_type = 'composed'""", "Biểu đồ kép: cột lượng mưa và đường nhiệt độ trung bình của TP.HCM theo tháng.", "composed")
+
+    # 7. Central Highlands temperature range
+    if "tây nguyên" in text and ("max" in text or "min" in text or "chênh lệch" in text or "biên độ" in text):
+        return ("""result_df = (df[df['region'].eq('Tây Nguyên')].groupby('province', as_index=False)
+    .agg(temp_max=('temp_max', 'mean'), temp_min=('temp_min', 'mean')))
+result_df['amplitude'] = result_df['temp_max'] - result_df['temp_min']
+result_df = result_df.rename(columns={'province': 'name'}).sort_values('amplitude', ascending=False)
+chart_data = result_df.to_dict(orient='records')
+chart_type = 'line'""", "So sánh nhiệt độ cực đại, cực tiểu và biên độ nhiệt của các tỉnh Tây Nguyên.", "line")
+
+    # 8. Northern temperature-humidity relationship
+    if ("độ ẩm" in text and "nhiệt độ" in text) and ("miền bắc" in text or "tỷ lệ nghịch" in text or "phân tán" in text):
+        return (f"""result_df = (df[df['region'].isin({north})].groupby(['province', 'month'], as_index=False)
+    .agg(temp_mean=('temp_mean', 'mean'), humidity_mean=('humidity_mean', 'mean')))
+result_df = result_df.rename(columns={{'province': 'name'}})
+chart_data = result_df.to_dict(orient='records')
+chart_type = 'scatter'""", "Kiểm chứng quan hệ nhiệt độ–độ ẩm tại miền Bắc bằng biểu đồ phân tán.", "scatter")
+
+    # 9. Coastal location radar. Use available province aliases transparently.
+    if "radar" in text and ("ven biển" in text or "gió" in text):
+        return ("""selected = ['Đà Nẵng', 'Khánh Hòa']
+summary = (df[df['province'].isin(selected)].groupby('province', as_index=False)
+    .agg(wind_speed_max=('wind_speed_max', 'mean'), et0=('et0', 'mean'),
+         temp_mean=('temp_mean', 'mean'), precipitation_sum=('precipitation_sum', 'mean')))
+metrics = [('Gió', 'wind_speed_max'), ('Bốc hơi', 'et0'), ('Nhiệt độ', 'temp_mean'), ('Lượng mưa', 'precipitation_sum')]
+chart_data = [{'name': label, **{row['province']: round(float(row[key]), 2) for _, row in summary.iterrows()}}
+              for label, key in metrics]
+chart_type = 'radar'""", "So sánh radar Đà Nẵng và Khánh Hòa. Vũng Tàu không có trong bộ dữ liệu 34 tỉnh hiện tại nên không tự thay bằng dữ liệu khác.", "radar")
+
+    # 10. Summer Hanoi versus HCMC
+    if "mùa hè" in text and "hà nội" in text and ("tp.hcm" in text or "tp hcm" in text or "hồ chí minh" in text):
+        return ("""result_df = (df[df['season'].eq('Hè') & df['province'].isin(['Hà Nội', 'Hồ Chí Minh'])]
+    .groupby('province', as_index=False)
+    .agg(temp_mean=('temp_mean', 'mean'), sunshine_hours=('sunshine_hours', 'mean'))
+    .rename(columns={'province': 'name'}))
+chart_data = result_df.to_dict(orient='records')
+chart_type = 'bar'""", "Chỉ lọc mùa Hè, sau đó so sánh đồng thời nhiệt độ trung bình và số giờ nắng của Hà Nội với TP.HCM.", "bar")
+
+    # 11. December trip comfort: Lao Cai vs Lam Dong
+    if ("sapa" in text or "lào cai" in text) and ("đà lạt" in text or "lâm đồng" in text):
+        return ("""summary = (df[df['month'].eq(12) & df['province'].isin(['Lào Cai', 'Lâm Đồng'])]
+    .groupby('province', as_index=False)
+    .agg(temp_mean=('temp_mean', 'mean'), humidity_mean=('humidity_mean', 'mean'),
+         precipitation_sum=('precipitation_sum', 'mean'), sunshine_hours=('sunshine_hours', 'mean'),
+         temp_max=('temp_max', 'mean'), temp_min=('temp_min', 'mean')))
+metrics = [('Nhiệt độ TB', 'temp_mean'), ('Độ ẩm', 'humidity_mean'), ('Lượng mưa', 'precipitation_sum'), ('Giờ nắng', 'sunshine_hours')]
+chart_data = [{'name': label, **{row['province']: round(float(row[key]), 2) for _, row in summary.iterrows()}}
+              for label, key in metrics]
+additional_charts = [{'title': 'Biên độ nhiệt tháng 12', 'type': 'bar', 'data': (summary.assign(amplitude=summary['temp_max']-summary['temp_min'])
+    .rename(columns={'province':'name', 'amplitude':'value'})[['name','value']].to_dict(orient='records'))}]
+chart_type = 'radar'""", "So sánh đa chiều Lào Cai và Lâm Đồng trong tháng 12, kèm biểu đồ biên độ nhiệt.", "radar")
+
+    # 12. Wind and solar potential in South Central Coast
+    if "điện gió" in text or "điện mặt trời" in text or "tiềm năng" in text:
+        return (f"""summary = (df[df['region'].eq({south_central})].groupby('province', as_index=False)
+    .agg(wind_speed_max=('wind_speed_max', 'mean'), sunshine_hours=('sunshine_hours', 'mean')))
+summary['score'] = (summary['wind_speed_max'] / summary['wind_speed_max'].max()) + (summary['sunshine_hours'] / summary['sunshine_hours'].max())
+chart_data = summary.rename(columns={{'province': 'name'}}).to_dict(orient='records')
+additional_charts = [{{'title': 'Top 3 tiềm năng gió – mặt trời', 'type': 'bar', 'data': (summary.nlargest(3, 'score')
+    .rename(columns={{'province':'name', 'score':'value'}})[['name','value']].to_dict(orient='records'))}}]
+chart_type = 'scatter'""", "Xác định tiềm năng tổng hợp từ tốc độ gió và số giờ nắng tại Duyên hải Nam Trung Bộ.", "scatter")
+
+    # 13. Sunshine and evaporation by region
+    if ("bốc hơi" in text or "et0" in text) and ("nắng" in text or "sunshine" in text):
+        return ("""summary = (df.groupby('region', as_index=False)
+    .agg(sunshine_hours=('sunshine_hours', 'mean'), et0=('et0', 'mean')))
+summary['ratio'] = summary['et0'] / summary['sunshine_hours'].replace(0, pd.NA)
+chart_data = summary.rename(columns={'region': 'name'}).to_dict(orient='records')
+additional_charts = [{'title': 'Tỷ lệ bốc hơi trên giờ nắng theo vùng', 'type': 'bar', 'data': (summary.rename(columns={'region':'name', 'ratio':'value'})[['name','value']].to_dict(orient='records'))}]
+chart_type = 'scatter'""", "Phân tích quan hệ giữa giờ nắng và bốc hơi theo từng vùng, kèm tỷ lệ bốc hơi/giờ nắng.", "scatter")
+
+    # 14. Weather variability
+    if "ẩm ương" in text or "thất thường" in text or "biên độ nhiệt" in text:
+        return ("""df_work = df.copy()
+df_work['temp_range'] = df_work['temp_max'] - df_work['temp_min']
+result_df = (df_work.groupby('province', as_index=False)
+    .agg(temp_range=('temp_range', 'mean'), rain_std=('precipitation_sum', 'std'))
+    .dropna().rename(columns={'province':'name'}))
+chart_data = result_df.to_dict(orient='records')
+chart_type = 'scatter'""", "Tìm các tỉnh có đồng thời biên độ nhiệt lớn và lượng mưa biến động mạnh.", "scatter")
+
+    # 15. Autumn cloud-cover effects
+    if "mùa thu" in text and ("mây" in text or "cloud" in text):
+        return ("""summary = (df[df['season'].eq('Thu')].groupby('province', as_index=False)
+    .agg(cloud_cover=('cloud_cover', 'mean'), temp_mean=('temp_mean', 'mean'), sunshine_hours=('sunshine_hours', 'mean'))
+    .rename(columns={'province':'name'}))
+chart_data = summary[['name', 'cloud_cover', 'temp_mean']].to_dict(orient='records')
+additional_charts = [{'title': 'Mây che phủ và giờ nắng trong mùa Thu', 'type': 'scatter', 'data': summary[['name', 'cloud_cover', 'sunshine_hours']].to_dict(orient='records')}]
+chart_type = 'scatter'""", "Đối chiếu tác động của mây che phủ tới nhiệt độ và giờ nắng trong mùa Thu.", "scatter")
+
+    metric = "precipitation_sum" if any(word in text for word in ("mưa", "mua", "rain")) else "temp_mean"
+    group = "region" if any(word in text for word in ("vùng", "vung", "miền", "mien")) else "province"
+    return (f"""result_df = (df.groupby('{group}', as_index=False)['{metric}'].mean()
+    .rename(columns={{'{group}': 'name', '{metric}': 'value'}}).sort_values('value', ascending=False).head(10))
+chart_data = result_df.to_dict(orient='records')
+chart_type = 'bar'""", "Tổng hợp dữ liệu theo yêu cầu và hiển thị các nhóm nổi bật.", "bar")
 
 
 def normalize_generated_python(code: str) -> str:
@@ -100,6 +242,18 @@ def read_root():
 @app.post("/api/ai/generate")
 async def generate_ai_response(request: ChatRequest):
     try:
+        # Use the verified KTTV intent templates first. This prevents an LLM
+        # from silently changing the user's scope (for example, turning a
+        # summer Hanoi-vs-HCMC comparison into a national Top-10 ranking).
+        code, explanation, chart_type = local_analysis_code(request.prompt)
+        return {
+            "status": "success",
+            "log_id": f"local_log_{int(time.time())}",
+            "code": code,
+            "explanation": explanation,
+            "chart_type": chart_type,
+        }
+
         # 1. Save User query to Supabase
         user_res = supabase.table("chat_history").insert({
             "role": "user",
@@ -207,7 +361,7 @@ print(result_df.to_json(orient='records'))
 
         # Use the project-safe template whenever Gemini has no usable answer.
         if not code:
-            code, explanation = local_analysis_code(request.prompt)
+            code, explanation, _ = local_analysis_code(request.prompt)
         code = normalize_generated_python(code)
 
         # 3. Save AI response to Supabase gracefully
@@ -233,13 +387,13 @@ print(result_df.to_json(orient='records'))
     except Exception as e:
         print(f"Error in generate endpoint: {str(e)}")
         # Guaranteed safe return instead of 500 error!
-        code, explanation = local_analysis_code(request.prompt)
+        code, explanation, chart_type = local_analysis_code(request.prompt)
         return {
             "status": "success",
             "log_id": "fallback_log",
             "explanation": explanation,
             "code": code,
-            "chart_type": "bar"
+            "chart_type": chart_type
         }
 
 class AnalyzeChartRequest(BaseModel):
@@ -359,6 +513,7 @@ async def execute_code(request: ExecuteRequest):
         exec(safe_code, execution_env, execution_env)
         chart_data = execution_env.get("chart_data")
         chart_type = execution_env.get("chart_type", request.chart_type or "bar")
+        additional_charts = execution_env.get("additional_charts", [])
         if not chart_data:
             raise ValueError("Mã phân tích chưa tạo chart_data. Hãy sinh lại đề xuất.")
         result_data = json.dumps(chart_data, ensure_ascii=False, default=str)
@@ -383,6 +538,7 @@ async def execute_code(request: ExecuteRequest):
         "status": "success",
         "chart_data": result_data,
         "chart_type": chart_type,
+        "additional_charts": additional_charts,
         "raw_logs": ""
     }
 

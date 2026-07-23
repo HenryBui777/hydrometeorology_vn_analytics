@@ -234,7 +234,11 @@ export default function App() {
         } catch(e) {
           console.error("Failed to parse chart_data", e);
         }
-        handleExecutionFinished('success', { chartData: parsedChartData, chartType: data.chart_type });
+        handleExecutionFinished('success', {
+          chartData: parsedChartData,
+          chartType: data.chart_type,
+          additionalCharts: Array.isArray(data.additional_charts) ? data.additional_charts : []
+        });
       } else {
         console.error("Execute error:", data.error_message || data.detail);
         setActiveQuery(prev => prev ? {
@@ -275,6 +279,7 @@ export default function App() {
         if (resultData) {
           updatedQuery.chartData = resultData.chartData;
           updatedQuery.chartType = resultData.chartType;
+          updatedQuery.additionalCharts = resultData.additionalCharts || [];
         }
         
         // Save to analysis history list
