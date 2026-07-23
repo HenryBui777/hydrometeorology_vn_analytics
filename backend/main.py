@@ -64,6 +64,21 @@ PROVINCE_ALIASES = {
     "Vĩnh Long": ("vinh long",), "Đồng Tháp": ("dong thap",),
 }
 
+REGION_ALIASES = {
+    "Trung du miền núi Bắc Bộ": ("trung du mien nui bac bo",),
+    "Đồng bằng sông Hồng": ("dong bang song hong",),
+    "Bắc Trung Bộ": ("bac trung bo",),
+    "Duyên hải Nam Trung Bộ": ("duyen hai nam trung bo", "nam trung bo"),
+    "Tây Nguyên": ("tay nguyen",),
+    "Đông Nam Bộ": ("dong nam bo",),
+    "Đồng bằng sông Cửu Long": ("dong bang song cuu long", "mien tay"),
+}
+MACRO_REGION_ALIASES = {
+    "miền bắc": ["Trung du miền núi Bắc Bộ", "Đồng bằng sông Hồng"],
+    "miền trung": ["Bắc Trung Bộ", "Duyên hải Nam Trung Bộ", "Tây Nguyên"],
+    "miền nam": ["Đông Nam Bộ", "Đồng bằng sông Cửu Long"],
+}
+
 
 def normalized_text(value: str) -> str:
     return " ".join("".join(
@@ -114,6 +129,10 @@ def infer_general_analysis(prompt: str) -> tuple[str, str, str]:
     """Infer an analysis plan for natural questions outside the predefined set."""
     text = normalized_text(prompt)
     provinces = [name for name, aliases in PROVINCE_ALIASES.items() if any(alias in text for alias in aliases)]
+    regions = [name for name, aliases in REGION_ALIASES.items() if any(alias in text for alias in aliases)]
+    for alias, members in MACRO_REGION_ALIASES.items():
+        if alias in text:
+            regions.extend(member for member in members if member not in regions)
     month_match = re.search(r"thang\s*(1[0-2]|[1-9])", text)
     season = next((label for label, aliases in {
         "Xuân": ("mua xuan",), "Hè": ("mua he",), "Thu": ("mua thu",), "Đông": ("mua dong",)
@@ -133,7 +152,13 @@ def infer_general_analysis(prompt: str) -> tuple[str, str, str]:
         ("pressure", ("ap suat", "pressure")),
     ]
     for metric, aliases in metric_rules:
-        if any(alias in text for alias in aliases) and metric not in metrics:
+        # "giờ nắng" becomes "gio nang" after normalization; it must never
+        # be mistaken for the different metric "gió".
+        if metric == "wind_speed_max":
+            matched = "toc do gio" in text or "gio giat" in text or "wind" in text or ("gio" in text and "gio nang" not in text)
+        else:
+            matched = any(alias in text for alias in aliases)
+        if matched and metric not in metrics:
             metrics.append(metric)
     if not metrics:
         metrics = ["temp_mean"]
@@ -141,6 +166,8 @@ def infer_general_analysis(prompt: str) -> tuple[str, str, str]:
     filters = ["df_work = df.copy()"]
     if provinces:
         filters.append(f"df_work = df_work[df_work['province'].isin({provinces!r})]")
+    if regions:
+        filters.append(f"df_work = df_work[df_work['region'].isin({regions!r})]")
     if month_match:
         filters.append(f"df_work = df_work[df_work['month'].eq({int(month_match.group(1))})]")
     if season:
@@ -217,7 +244,9 @@ chart_data = [{{'name': metric, **{{row['province']: round(float(row[metric]), 2
               for metric in {metrics!r}]
 chart_type = 'radar'""", "Radar được chọn vì câu hỏi so sánh tối đa hai địa điểm trên nhiều tiêu chí định lượng.", "radar")
 
-    group = "province" if provinces or "tinh" in text or "thanh pho" in text else ("season" if "mua" in text else "region")
+    # Asking about a region means the result must list only the provinces
+    # inside that region, never the whole national dataset.
+    group = "province" if provinces or regions or "tinh" in text or "thanh pho" in text else ("season" if "mua" in text else "region")
     aggregations = ", ".join(f"{metric}=({metric!r}, 'mean')" for metric in metrics)
     # Donut is allowed only for 2-5 parts. For larger result sets the runtime
     # safely switches to a horizontal bar chart instead of a cluttered donut.
