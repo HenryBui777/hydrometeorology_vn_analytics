@@ -30,7 +30,7 @@ export default function NewsTicker() {
 
   if (loading) {
     return (
-      <div className="w-full h-10 bg-slate-900 flex items-center px-4 text-slate-300 text-xs overflow-hidden">
+      <div className="print-hidden w-full h-10 bg-slate-900 flex items-center px-4 text-slate-300 text-xs overflow-hidden">
         <div className="flex items-center gap-2 font-bold uppercase shrink-0 text-amber-400">
           <CloudRain className="w-4 h-4" /> BẢN TIN THỜI TIẾT
         </div>
@@ -49,7 +49,7 @@ export default function NewsTicker() {
   const items = [...news, ...news];
 
   return (
-    <div className="w-full h-10 bg-slate-900 border-b border-slate-800 flex items-center px-4 text-xs overflow-hidden shadow-inner shrink-0 relative z-10">
+    <div className="print-hidden w-full h-10 bg-slate-900 border-b border-slate-800 flex items-center px-4 text-xs overflow-hidden shadow-inner shrink-0 relative z-10">
       <div className="flex items-center gap-2 font-black uppercase shrink-0 text-amber-400 border-r border-slate-700 pr-4 mr-2 bg-slate-900 relative z-20 h-full">
         <CloudRain className="w-4 h-4 animate-bounce" /> TIN TỨC
       </div>

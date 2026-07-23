@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import html2pdf from 'html2pdf.js';
 import { supabase } from './lib/supabase';
 import { predefinedQueries } from './mockData';
 import Sidebar from './components/Sidebar';
@@ -43,6 +44,7 @@ export default function App() {
 
   const [user, setUser] = useState(null);
   const [isDark, setIsDark] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const { isColorblind, toggleColorblind } = useData();
 
   useEffect(() => {
@@ -97,8 +99,49 @@ export default function App() {
     setUser(null);
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    const report = document.querySelector('main[data-print-tab]');
+    if (!report || isExportingPdf) return;
+
+    setIsExportingPdf(true);
+    const exportCopy = report.cloneNode(true);
+    const tabLabel = printTabLabels[currentTab] || 'bao-cao-kttv';
+
+    exportCopy.classList.add('pdf-export-copy');
+    exportCopy.style.width = '1120px';
+    exportCopy.style.padding = '24px';
+    exportCopy.style.overflow = 'visible';
+    exportCopy.style.background = '#f8fafc';
+    exportCopy.style.position = 'absolute';
+    exportCopy.style.left = '-100000px';
+    exportCopy.style.top = '0';
+    exportCopy.querySelectorAll('.print-report-header').forEach((element) => {
+      element.style.display = 'flex';
+    });
+
+    document.body.appendChild(exportCopy);
+
+    try {
+      await html2pdf()
+        .set({
+          margin: [8, 8, 8, 8],
+          filename: `${tabLabel.toLowerCase().replace(/\s+/g, '-')}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#f8fafc',
+            logging: false,
+          },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+          pagebreak: { mode: ['css', 'legacy'] },
+        })
+        .from(exportCopy)
+        .save();
+    } finally {
+      exportCopy.remove();
+      setIsExportingPdf(false);
+    }
   };
 
   // Start with some history items to show past activities
@@ -276,8 +319,8 @@ export default function App() {
           {/* Quick Metrics & User tools */}
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <button onClick={handlePrint} title="Xuất PDF / In báo cáo" className="print-hidden cursor-pointer flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 hover:text-brand-primary dark:text-slate-300 dark:hover:text-indigo-400 font-medium text-sm shadow-sm transition-colors">
-                <Download className="w-4 h-4" /> <span className="hidden sm:inline">Xuất PDF</span>
+              <button disabled={isExportingPdf} onClick={handlePrint} title="Xuất PDF báo cáo" className="print-hidden cursor-pointer flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 hover:text-brand-primary dark:text-slate-300 dark:hover:text-indigo-400 font-medium text-sm shadow-sm transition-colors disabled:cursor-wait disabled:opacity-60">
+                <Download className="w-4 h-4" /> <span className="hidden sm:inline">{isExportingPdf ? 'Đang xuất...' : 'Xuất PDF'}</span>
               </button>
               <button onClick={toggleColorblind} title="Chế độ người mù màu (Colorblind Mode)" className={`print-hidden cursor-pointer p-2 rounded-full border transition-colors shadow-sm ${isColorblind ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 hover:text-brand-accent dark:text-slate-400'}`}>
                 {isColorblind ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}

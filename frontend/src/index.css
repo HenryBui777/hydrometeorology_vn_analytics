@@ -176,6 +176,46 @@ svg:focus, g:focus, rect:focus, path:focus, .recharts-wrapper:focus, .recharts-s
   display: none;
 }
 
+/* A hidden clone is captured by html2pdf so charts and images remain visual. */
+.pdf-export-copy {
+  box-sizing: border-box;
+  color: #0f172a !important;
+}
+
+.pdf-export-copy .print-report-header {
+  display: flex !important;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 0 0 18px !important;
+  padding: 0 0 12px !important;
+  border-bottom: 2px solid #2563eb !important;
+}
+
+.pdf-export-copy .print-hidden,
+.pdf-export-copy input,
+.pdf-export-copy select,
+.pdf-export-copy textarea,
+.pdf-export-copy .monaco-editor {
+  display: none !important;
+}
+
+.pdf-export-copy .h-screen,
+.pdf-export-copy .overflow-hidden,
+.pdf-export-copy .overflow-y-auto,
+.pdf-export-copy .overflow-x-auto {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.pdf-export-copy img,
+.pdf-export-copy svg,
+.pdf-export-copy canvas {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
 /* ==========================================================================
    PRINT STYLES (Xuất PDF)
    ========================================================================== */
@@ -196,11 +236,7 @@ svg:focus, g:focus, rect:focus, path:focus, .recharts-wrapper:focus, .recharts-s
     display: none !important;
   }
 
-  /* Keep the PDF focused on the analysis instead of interactive controls. */
-  main button,
-  main input,
-  main select,
-  main textarea,
+  /* Monaco uses a canvas and is unreliable in browser print previews. */
   main [role="dialog"],
   main .monaco-editor,
   main .monaco-editor-background,
@@ -310,20 +346,14 @@ svg:focus, g:focus, rect:focus, path:focus, .recharts-wrapper:focus, .recharts-s
     overflow: visible !important;
   }
 
-  main [class*="grid-cols-"] {
-    gap: 12px !important;
+  /* Keep only the important dashboard grid dense; never override nested grids. */
+  main[data-print-tab="dashboard"] [class~="xl:grid-cols-4"] {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   }
 
-  /* Tab-specific refinements. */
-  main[data-print-tab="dashboard"] [class*="grid-cols-"],
-  main[data-print-tab="comparison"] [class*="grid-cols-"],
-  main[data-print-tab="analysis"] [class*="grid-cols-"] {
+  main[data-print-tab="analysis"] [class~="xl:grid-cols-2"],
+  main[data-print-tab="comparison"] [class~="xl:grid-cols-2"] {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-
-  main[data-print-tab="timeseries"] [class*="grid-cols-"],
-  main[data-print-tab="aianalyst"] [class*="grid-cols-"] {
-    grid-template-columns: 1fr !important;
   }
 
   main[data-print-tab="datasets"] table {
@@ -345,6 +375,11 @@ svg:focus, g:focus, rect:focus, path:focus, .recharts-wrapper:focus, .recharts-s
   main[data-print-tab="aianalyst"] code {
     white-space: pre-wrap !important;
     word-break: break-word !important;
+  }
+
+  img, svg, canvas {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   /* Add some spacing between cards in print */
