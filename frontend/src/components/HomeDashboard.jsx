@@ -569,7 +569,7 @@ Dựa vào dữ liệu mẫu KTTV Việt Nam, tôi đã tạo ra mã nguồn Pyt
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] gap-4 text-slate-500">
         <Loader2 className="h-10 w-10 animate-spin text-brand-primary" />
-        <p className="text-sm font-semibold">Đang tải dữ liệu KTTV (6,156 bản ghi)...</p>
+        <p className="text-sm font-semibold">Đang tải dữ liệu KTTV (12.410 bản ghi)...</p>
         <p className="text-xs text-slate-400">Vui lòng chờ trong giây lát</p>
       </div>
     );
@@ -1379,7 +1379,7 @@ const predefinedQueries = [
     id: 1,
     title: "So sánh lượng mưa các vùng",
     question: "Tỉnh nào mưa nhiều nhất?",
-    explanation: "Tính toán lượng mưa trung bình theo từng vùng (region) từ tháng 12/2025 đến tháng 03/2026...",
+    explanation: "Tính toán lượng mưa trung bình theo từng vùng trong toàn bộ khoảng thời gian dữ liệu...",
     code: `# Lượng mưa\nprint("Script lượng mưa")`,
     logs: ["[2026-06-24 12:49:05] Running..."],
     kpis: [{ label: "Nhiệt độ", value: "25.8", desc: "Avg", trend: "up" }],

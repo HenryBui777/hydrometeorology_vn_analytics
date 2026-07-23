@@ -108,7 +108,7 @@ flowchart TD
 - **Chế độ Human-in-the-Loop:** Giao diện xem xét mã nguồn (Code Review), sửa mã và phê duyệt trước khi thực thi.
 
 ### 6. 📁 Quản Lý Tập Dữ Liệu (`DatasetManagement.jsx`)
-- **Quản lý dữ liệu KTTV 34 tỉnh thành:** Hiển thị và xem trước 6,156 bản ghi dữ liệu.
+- **Quản lý dữ liệu KTTV 34 tỉnh thành:** Hiển thị và xem trước 12.410 bản ghi dữ liệu.
 - **Nạp tập dữ liệu mới:** Cho phép nạp tập dữ liệu CSV tùy chỉnh hoặc khôi phục tập dữ liệu mặc định.
 - **Cấu trúc trường dữ liệu:** Cung cấp thông tin chi tiết các cột chỉ số khí tượng.
 
