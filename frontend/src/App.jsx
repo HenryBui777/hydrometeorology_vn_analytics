@@ -131,9 +131,9 @@ export default function App() {
       }
     });
 
-    // Recharts stores its rendered SVG with the desktop pixel width. The preview
-    // is narrower (A4 portrait), so preserve the SVG coordinate system and scale
-    // both the drawing and its wrapper together instead of clipping the chart.
+    // Recharts SVG uses dimensions calculated for the desktop dashboard. Turn it
+    // into a self-contained SVG image so it keeps every line/bar in the preview
+    // and in the browser print engine.
     exportCopy.querySelectorAll('svg.recharts-surface').forEach((svg) => {
       const sourceWidth = Number(svg.getAttribute('width')) || 760;
       const sourceHeight = Number(svg.getAttribute('height')) || 320;
@@ -143,12 +143,18 @@ export default function App() {
 
       svg.setAttribute('viewBox', `0 0 ${sourceWidth} ${sourceHeight}`);
       svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-      svg.setAttribute('width', '100%');
-      svg.setAttribute('height', String(targetHeight));
-      svg.style.display = 'block';
-      svg.style.width = '100%';
-      svg.style.height = `${targetHeight}px`;
-      svg.style.maxWidth = '100%';
+      svg.setAttribute('width', String(sourceWidth));
+      svg.setAttribute('height', String(sourceHeight));
+
+      const image = document.createElement('img');
+      image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`;
+      image.alt = 'Biểu đồ phân tích';
+      image.style.display = 'block';
+      image.style.width = '100%';
+      image.style.maxWidth = '100%';
+      image.style.height = `${targetHeight}px`;
+      image.style.objectFit = 'contain';
+      svg.replaceWith(image);
 
       if (wrapper) {
         wrapper.style.width = '100%';
@@ -173,7 +179,6 @@ export default function App() {
           height: auto !important; max-height: none !important; overflow: visible !important;
         }
         .report-preview-copy .recharts-responsive-container, .report-preview-copy .recharts-wrapper { width: 100% !important; max-width: 100% !important; min-width: 0 !important; overflow: hidden !important; }
-        .report-preview-copy svg.recharts-surface { display: block !important; max-width: 100% !important; }
         .print-report-header { display: flex !important; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid #2563eb; }
         .print-report-kicker { margin: 0 0 4px; color: #2563eb; font-size: 11px; font-weight: 800; letter-spacing: .12em; }
         .print-report-header h1 { margin: 0; font-size: 26px; }
