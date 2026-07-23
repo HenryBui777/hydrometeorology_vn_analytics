@@ -119,6 +119,15 @@ export default function App() {
   // Derived state: check if activeQuery is pending approval
   const pendingReviewCount = (activeQuery && activeQuery.status === 'pending') ? 1 : 0;
 
+  const printTabLabels = {
+    dashboard: 'Dashboard tổng quan',
+    timeseries: 'Xu hướng thời gian',
+    comparison: 'So sánh đối chiếu',
+    analysis: 'Phân tích tương quan',
+    datasets: 'Tập dữ liệu',
+    aianalyst: 'Trợ lý phân tích AI',
+  };
+
   // Handles adding chat bubbles to history and setting the active pending query
   const submitQuery = (text, sender, queryObj = null) => {
     if (sender === 'user') {
@@ -298,7 +307,18 @@ export default function App() {
         </header>
 
         {/* View Router Render Area */}
-        <main className={`flex-1 bg-transparent transition-colors relative z-10 ${currentTab === 'chat' ? 'p-0 overflow-hidden flex flex-col' : 'p-8 overflow-y-auto'}`}>
+        <main
+          data-print-tab={currentTab}
+          className={`flex-1 bg-transparent transition-colors relative z-10 ${currentTab === 'chat' ? 'p-0 overflow-hidden flex flex-col' : 'p-8 overflow-y-auto'}`}
+        >
+          <div className="print-report-header">
+            <div>
+              <p className="print-report-kicker">KTTV ANALYTICS · BÁO CÁO TRỰC QUAN</p>
+              <h1>{printTabLabels[currentTab] || 'Báo cáo phân tích'}</h1>
+              <p className="print-report-subtitle">Dữ liệu khí tượng thủy văn Việt Nam · 34 tỉnh/thành</p>
+            </div>
+            <p className="print-report-date">Xuất ngày {new Date().toLocaleDateString('vi-VN')}</p>
+          </div>
           {currentTab === 'dashboard' && (
             <HomeDashboard
               datasetUploaded={datasetUploaded}
