@@ -229,6 +229,12 @@ svg:focus, g:focus, rect:focus, path:focus, .recharts-wrapper:focus, .recharts-s
     size: A4 portrait;
   }
 
+  /* Force browsers to print background colors and images */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   /* Hide UI elements that shouldn't be in the PDF */
   .print-hidden, 
   aside, 
@@ -339,11 +345,13 @@ svg:focus, g:focus, rect:focus, path:focus, .recharts-wrapper:focus, .recharts-s
 
   /* Preserve chart proportions and avoid clipped SVGs in the browser print engine. */
   .recharts-responsive-container,
-  .recharts-wrapper {
+  .recharts-wrapper,
+  .recharts-surface {
     width: 100% !important;
     min-width: 0 !important;
     min-height: 240px !important;
     height: 240px !important;
+    display: block !important;
   }
 
   .print-original-chart {
@@ -364,8 +372,22 @@ svg:focus, g:focus, rect:focus, path:focus, .recharts-wrapper:focus, .recharts-s
   }
 
   main[data-print-tab="analysis"] [class~="xl:grid-cols-2"],
-  main[data-print-tab="comparison"] [class~="xl:grid-cols-2"] {
+  main[data-print-tab="analysis"] [class~="lg:grid-cols-2"],
+  main[data-print-tab="comparison"] [class~="lg:grid-cols-2"],
+  main[data-print-tab="timeseries"] [class~="lg:grid-cols-2"] {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  main[data-print-tab="comparison"] [class~="lg:grid-cols-3"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  main[data-print-tab="timeseries"] [class~="lg:grid-cols-10"] {
+    grid-template-columns: repeat(10, minmax(0, 1fr)) !important;
+  }
+
+  main[data-print-tab="timeseries"] [class~="lg:grid-cols-12"] {
+    grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
   }
 
   main[data-print-tab="datasets"] table {

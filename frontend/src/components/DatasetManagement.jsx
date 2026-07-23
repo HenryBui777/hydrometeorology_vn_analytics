@@ -8,16 +8,57 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Loader2
+  Loader2,
+  Download,
+  ChevronDown
 } from 'lucide-react';
 import { mockDatasetInfo } from '../mockData';
 import { useData } from '../context/DataContext';
+import Papa from 'papaparse';
+import JSZip from 'jszip';
 
 export default function DatasetManagement() {
   const { rawRows, loading, fullStats } = useData();
 
   const [activeSubTab, setActiveSubTab] = useState('explorer'); // 'explorer' | 'schema'
   const [searchQuery, setSearchQuery] = useState('');
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
+  const handleExport = (type) => {
+    let dataCsv = '';
+    let schemaCsv = '';
+    
+    if (type === 'data' || type === 'both') {
+      dataCsv = Papa.unparse(rawRows);
+    }
+    if (type === 'schema' || type === 'both') {
+      schemaCsv = Papa.unparse(mockDatasetInfo.columns);
+    }
+
+    if (type === 'both') {
+      const zip = new JSZip();
+      zip.file("du_lieu_khi_tuong.csv", new Blob(["\uFEFF" + dataCsv], { type: 'text/csv;charset=utf-8;' }));
+      zip.file("cau_truc_cot.csv", new Blob(["\uFEFF" + schemaCsv], { type: 'text/csv;charset=utf-8;' }));
+      zip.generateAsync({ type: "blob" }).then(content => {
+        const url = URL.createObjectURL(content);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "tap_du_lieu_khi_tuong.zip";
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    } else {
+      const csvContent = type === 'data' ? dataCsv : schemaCsv;
+      const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = type === 'data' ? "du_lieu_khi_tuong.csv" : "cau_truc_cot.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    setShowExportMenu(false);
+  };
 
   // Data table pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -124,20 +165,47 @@ export default function DatasetManagement() {
               </button>
             </div>
 
-            {activeSubTab === 'explorer' && (
-              <div className="relative w-64 text-xs">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Search className="h-3.5 w-3.5" />
-                </span>
-                <input
-                  type="text"
-                  placeholder="Tìm theo tỉnh, vùng..."
-                  value={searchQuery}
-                  onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                  className="glass-input w-full !pl-9 py-2 text-xs font-semibold placeholder:font-semibold placeholder:text-slate-400"
-                />
+            <div className="flex items-center gap-3">
+              {activeSubTab === 'explorer' && (
+                <div className="relative w-64 text-xs">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <Search className="h-3.5 w-3.5" />
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Tìm theo tỉnh, vùng..."
+                    value={searchQuery}
+                    onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                    className="glass-input w-full !pl-9 py-2 text-xs font-semibold placeholder:font-semibold placeholder:text-slate-400"
+                  />
+                </div>
+              )}
+              
+              <div className="relative">
+                <button
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                  className="px-3 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 border cursor-pointer bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:text-brand-primary dark:hover:text-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm"
+                >
+                  <Download className="h-4 w-4" /> Xuất CSV <ChevronDown className="h-3 w-3" />
+                </button>
+                
+                {showExportMenu && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                    <div className="flex flex-col text-xs font-semibold">
+                      <button onClick={() => handleExport('data')} className="text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-b border-slate-100 dark:border-slate-700 transition-colors cursor-pointer">
+                        Xuất file CSV Trình duyệt dữ liệu
+                      </button>
+                      <button onClick={() => handleExport('schema')} className="text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-b border-slate-100 dark:border-slate-700 transition-colors cursor-pointer">
+                        Xuất file CSV Cấu trúc cột
+                      </button>
+                      <button onClick={() => handleExport('both')} className="text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700 text-brand-primary dark:text-indigo-400 font-bold transition-colors cursor-pointer">
+                        Xuất cả 2 (File ZIP)
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
 
           {/* Sub-tab 1: Data Explorer */}

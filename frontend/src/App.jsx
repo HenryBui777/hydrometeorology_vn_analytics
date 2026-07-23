@@ -331,9 +331,11 @@ export default function App() {
           {/* Quick Metrics & User tools */}
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <button disabled={isExportingPdf} onClick={handlePrint} title="Xem trước báo cáo PDF" className="print-hidden cursor-pointer flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 hover:text-brand-primary dark:text-slate-300 dark:hover:text-indigo-400 font-medium text-sm shadow-sm transition-colors disabled:cursor-wait disabled:opacity-60">
-                <Download className="w-4 h-4" /> <span className="hidden sm:inline">{isExportingPdf ? 'Đang tạo...' : 'Xem trước PDF'}</span>
-              </button>
+              {currentTab === 'dashboard' && (
+                <button disabled={isExportingPdf} onClick={handlePrint} title="Xem trước báo cáo PDF" className="print-hidden cursor-pointer flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 hover:text-brand-primary dark:text-slate-300 dark:hover:text-indigo-400 font-medium text-sm shadow-sm transition-colors disabled:cursor-wait disabled:opacity-60">
+                  <Download className="w-4 h-4" /> <span className="hidden sm:inline">{isExportingPdf ? 'Đang tạo...' : 'Xem trước PDF'}</span>
+                </button>
+              )}
               <button onClick={toggleColorblind} title="Chế độ người mù màu (Colorblind Mode)" className={`print-hidden cursor-pointer p-2 rounded-full border transition-colors shadow-sm ${isColorblind ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 hover:text-brand-accent dark:text-slate-400'}`}>
                 {isColorblind ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
               </button>

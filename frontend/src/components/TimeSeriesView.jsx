@@ -842,7 +842,7 @@ export default function TimeSeriesView() {
                       const areaFillOpacity = isHighlighted ? 0.5 : (isDimmed ? 0.05 : 0.2);
 
                       return (
-                        <Area key={prov} type="monotone" dataKey={prov} name={prov} stroke={color} strokeWidth={lineWidth} strokeOpacity={lineOpacity} fillOpacity={areaFillOpacity} fill={color} hide={isHidden} activeDot={{ r: 5, onClick: () => handleLineClick(prov) }} connectNulls onClick={() => handleLineClick(prov)} style={{ cursor: 'pointer' }} />
+                        <Area isAnimationActive={false} key={prov} type="monotone" dataKey={prov} name={prov} stroke={color} strokeWidth={lineWidth} strokeOpacity={lineOpacity} fillOpacity={areaFillOpacity} fill={color} hide={isHidden} activeDot={{ r: 5, onClick: () => handleLineClick(prov) }} connectNulls onClick={() => handleLineClick(prov)} style={{ cursor: 'pointer' }} />
                       );
                     })}
                     {dynamicInsightData && selectedProvinces.includes(dynamicInsightData.maxProv) && !hiddenLines[dynamicInsightData.maxProv] && (
@@ -866,7 +866,7 @@ export default function TimeSeriesView() {
                       const lineWidth = isHighlighted ? 4 : 2.5;
 
                       return (
-                        <Line key={prov} type="monotone" dataKey={prov} name={prov} stroke={color} strokeWidth={lineWidth} strokeOpacity={lineOpacity} dot={false} hide={isHidden} activeDot={{ r: 5, onClick: () => handleLineClick(prov) }} connectNulls onClick={() => handleLineClick(prov)} style={{ cursor: 'pointer' }} />
+                        <Line isAnimationActive={false} key={prov} type="monotone" dataKey={prov} name={prov} stroke={color} strokeWidth={lineWidth} strokeOpacity={lineOpacity} dot={false} hide={isHidden} activeDot={{ r: 5, onClick: () => handleLineClick(prov) }} connectNulls onClick={() => handleLineClick(prov)} style={{ cursor: 'pointer' }} />
                       );
                     })}
                     {dynamicInsightData && selectedProvinces.includes(dynamicInsightData.maxProv) && !hiddenLines[dynamicInsightData.maxProv] && (
@@ -915,6 +915,7 @@ export default function TimeSeriesView() {
 
                     return (
                       <Area
+                        isAnimationActive={false}
                         key={prov}
                         type="monotone"
                         dataKey={prov}
@@ -959,6 +960,7 @@ export default function TimeSeriesView() {
                   <YAxis stroke="#70859c" tick={{ fontSize: 9, fontWeight: 600 }} label={{ value: metricInfo?.label, angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: '11px', fontWeight: 'bold', fill: '#475569' } }} />
                   <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '11px', fontWeight: 'bold' }} itemStyle={{ fontWeight: 'bold' }} labelStyle={{ fontWeight: '800', color: '#475569', marginBottom: '4px' }} />
                   <Bar
+                    isAnimationActive={false}
                     dataKey="value"
                     name={highlightedProvince || 'Trung bình chung'}
                     fill={highlightedProvince ? (currentPalette[Math.max(0, selectedProvinces.indexOf(highlightedProvince)) % currentPalette.length]) : (isColorblind ? "#E69F00" : (metricInfo?.color || "#F59E0B"))}
