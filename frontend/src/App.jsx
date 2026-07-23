@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import html2canvas from 'html2canvas';
 import { supabase } from './lib/supabase';
 import { predefinedQueries } from './mockData';
 import Sidebar from './components/Sidebar';
@@ -99,98 +100,28 @@ export default function App() {
     setUser(null);
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     const report = document.querySelector('main[data-print-tab]');
     if (!report || isExportingPdf) return;
 
     setIsExportingPdf(true);
-    const exportCopy = report.cloneNode(true);
     const tabLabel = printTabLabels[currentTab] || 'bao-cao-kttv';
-
-    exportCopy.classList.add('report-preview-copy');
-    // A4 portrait printable width at 96dpi, leaving space for margins.
-    exportCopy.style.width = '760px';
-    exportCopy.style.maxWidth = '100%';
-    exportCopy.style.padding = '24px';
-    exportCopy.style.overflow = 'visible';
-    exportCopy.style.background = '#f8fafc';
-    exportCopy.querySelectorAll('.print-report-header').forEach((element) => {
-      element.style.display = 'flex';
-    });
-
-    // Canvas cannot be cloned by HTML alone; replace each copy with a snapshot.
-    exportCopy.querySelectorAll('canvas').forEach((canvas) => {
-      try {
-        const image = document.createElement('img');
-        image.src = canvas.toDataURL('image/png');
-        image.style.maxWidth = '100%';
-        image.style.height = 'auto';
-        canvas.replaceWith(image);
-      } catch {
-        // Keep the original canvas when a browser blocks its data URL.
-      }
-    });
-
-    // Recharts SVG uses dimensions calculated for the desktop dashboard. Turn it
-    // into a self-contained SVG image so it keeps every line/bar in the preview
-    // and in the browser print engine.
-    exportCopy.querySelectorAll('svg.recharts-surface').forEach((svg) => {
-      const sourceWidth = Number(svg.getAttribute('width')) || 760;
-      const sourceHeight = Number(svg.getAttribute('height')) || 320;
-      const targetWidth = 710;
-      const targetHeight = Math.max(220, Math.round(sourceHeight * Math.min(1, targetWidth / sourceWidth)));
-      const wrapper = svg.closest('.recharts-wrapper, .recharts-responsive-container');
-
-      svg.setAttribute('viewBox', `0 0 ${sourceWidth} ${sourceHeight}`);
-      svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-      svg.setAttribute('width', String(sourceWidth));
-      svg.setAttribute('height', String(sourceHeight));
-
-      const image = document.createElement('img');
-      image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`;
-      image.alt = 'Biểu đồ phân tích';
-      image.style.display = 'block';
-      image.style.width = '100%';
-      image.style.maxWidth = '100%';
-      image.style.height = `${targetHeight}px`;
-      image.style.objectFit = 'contain';
-      svg.replaceWith(image);
-
-      if (wrapper) {
-        wrapper.style.width = '100%';
-        wrapper.style.maxWidth = '100%';
-        wrapper.style.minWidth = '0';
-        wrapper.style.height = `${targetHeight}px`;
-        wrapper.style.overflow = 'hidden';
-      }
-    });
-
-    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-      .map((node) => node.outerHTML)
-      .join('');
-    const previewStyles = `
-      <style>
-        * { box-sizing: border-box; }
-        body { margin: 0; background: #e2e8f0; color: #0f172a; font-family: Inter, Arial, sans-serif; }
-        .report-preview-copy { margin: 0 auto; min-height: 100vh; }
-        .report-preview-copy .print-hidden { display: none !important; }
-        .report-preview-copy .h-screen, .report-preview-copy .overflow-hidden,
-        .report-preview-copy .overflow-y-auto, .report-preview-copy .overflow-x-auto {
-          height: auto !important; max-height: none !important; overflow: visible !important;
-        }
-        .report-preview-copy .recharts-responsive-container, .report-preview-copy .recharts-wrapper { width: 100% !important; max-width: 100% !important; min-width: 0 !important; overflow: hidden !important; }
-        .print-report-header { display: flex !important; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid #2563eb; }
-        .print-report-kicker { margin: 0 0 4px; color: #2563eb; font-size: 11px; font-weight: 800; letter-spacing: .12em; }
-        .print-report-header h1 { margin: 0; font-size: 26px; }
-        .print-report-subtitle, .print-report-date { margin: 5px 0 0; color: #475569; font-size: 13px; }
-        @media print { @page { size: A4 portrait; margin: 8mm; } body { background: #fff; } .report-preview-copy { width: auto !important; padding: 0 !important; } }
-      </style>`;
-
-    setPdfPreview({
-      filename: `${tabLabel.toLowerCase().replace(/\s+/g, '-')}.pdf`,
-      srcDoc: `<!doctype html><html lang="vi"><head><base href="${window.location.origin}/">${styles}${previewStyles}</head><body>${exportCopy.outerHTML}</body></html>`,
-    });
-    setIsExportingPdf(false);
+    try {
+      const screenshot = await html2canvas(report, {
+        backgroundColor: '#f8fafc',
+        scale: 1.5,
+        useCORS: true,
+        logging: false,
+        width: report.scrollWidth,
+        height: report.scrollHeight,
+      });
+      setPdfPreview({
+        filename: `${tabLabel.toLowerCase().replace(/\s+/g, '-')}.pdf`,
+        imageUrl: screenshot.toDataURL('image/png'),
+      });
+    } finally {
+      setIsExportingPdf(false);
+    }
   };
 
   const closePdfPreview = () => {
@@ -199,7 +130,10 @@ export default function App() {
 
   const downloadPdfPreview = () => {
     if (!pdfPreview) return;
-    document.getElementById('report-preview-frame')?.contentWindow?.print();
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    printWindow.document.write(`<!doctype html><html><head><title>${pdfPreview.filename}</title><style>@page{size:A4 portrait;margin:8mm}body{margin:0}img{display:block;width:100%;height:auto}</style></head><body><img src="${pdfPreview.imageUrl}" onload="window.print()"></body></html>`);
+    printWindow.document.close();
   };
 
   // Start with some history items to show past activities
@@ -481,7 +415,9 @@ export default function App() {
                 <button onClick={downloadPdfPreview} className="rounded-lg bg-brand-primary px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700">Lưu thành PDF</button>
               </div>
             </header>
-            <iframe id="report-preview-frame" srcDoc={pdfPreview.srcDoc} title="Bản xem trước báo cáo" className="min-h-0 flex-1 bg-slate-100" />
+            <div className="min-h-0 flex-1 overflow-auto bg-slate-200 p-4">
+              <img src={pdfPreview.imageUrl} alt="Bản xem trước báo cáo" className="mx-auto block w-full max-w-[760px] bg-white shadow-lg" />
+            </div>
           </section>
         </div>
       )}
