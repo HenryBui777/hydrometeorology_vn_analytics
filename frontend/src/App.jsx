@@ -109,13 +109,22 @@ export default function App() {
     try {
       const captureScale = 1.5;
       const reportScrollTop = report.scrollTop;
+      const reportRect = report.getBoundingClientRect();
+      // `main` is a scrolling flex child, so scrollHeight can equal only the
+      // viewport. Its direct content child gives us the true bottom instead.
+      const reportContentHeight = Math.ceil(Math.max(
+        report.scrollHeight,
+        ...Array.from(report.children).map((child) => (
+          child.getBoundingClientRect().bottom - reportRect.top + reportScrollTop
+        )),
+      ));
       const screenshot = await html2canvas(report, {
         backgroundColor: '#f8fafc',
         scale: captureScale,
         useCORS: true,
         logging: false,
         width: report.scrollWidth,
-        height: report.scrollHeight,
+        height: reportContentHeight,
       });
 
       // Browser paints some ResponsiveContainer charts only after they become
@@ -161,10 +170,21 @@ export default function App() {
 
   const downloadPdfPreview = () => {
     if (!pdfPreview) return;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    printWindow.document.write(`<!doctype html><html><head><title>${pdfPreview.filename}</title><style>@page{size:A4 portrait;margin:8mm}body{margin:0}img{display:block;width:100%;height:auto}</style></head><body><img src="${pdfPreview.imageUrl}" onload="window.print()"></body></html>`);
-    printWindow.document.close();
+    const printFrame = document.createElement('iframe');
+    printFrame.style.cssText = 'position:fixed;width:0;height:0;border:0;right:0;bottom:0;visibility:hidden';
+    document.body.appendChild(printFrame);
+    const printDocument = printFrame.contentDocument;
+    if (!printDocument) {
+      printFrame.remove();
+      return;
+    }
+    printFrame.onload = () => {
+      printFrame.contentWindow?.print();
+      printFrame.contentWindow?.addEventListener('afterprint', () => printFrame.remove(), { once: true });
+    };
+    printDocument.open();
+    printDocument.write(`<!doctype html><html><head><title>${pdfPreview.filename}</title><style>@page{size:A4 portrait;margin:8mm}body{margin:0}img{display:block;width:100%;height:auto}</style></head><body><img src="${pdfPreview.imageUrl}"></body></html>`);
+    printDocument.close();
   };
 
   // Start with some history items to show past activities
