@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import html2canvas from 'html2canvas';
 import { supabase } from './lib/supabase';
 import { predefinedQueries } from './mockData';
 import Sidebar from './components/Sidebar';
@@ -117,48 +118,36 @@ export default function App() {
     if (!report) return;
 
     const printSnapshots = [];
-    const charts = Array.from(report.querySelectorAll('svg.recharts-surface'));
+    const charts = Array.from(report.querySelectorAll('.recharts-wrapper'));
+    const previousScrollTop = report.scrollTop;
 
-    for (const svg of charts) {
+    for (const chart of charts) {
       try {
-        const rect = svg.getBoundingClientRect();
-        const width = Math.max(1, Math.round(rect.width || svg.clientWidth || 760));
-        const height = Math.max(1, Math.round(rect.height || svg.clientHeight || 320));
-        const svgCopy = svg.cloneNode(true);
-        svgCopy.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-        svgCopy.setAttribute('width', String(width));
-        svgCopy.setAttribute('height', String(height));
-
-        const svgSource = new XMLSerializer().serializeToString(svgCopy);
-        const svgUrl = URL.createObjectURL(new Blob([svgSource], { type: 'image/svg+xml;charset=utf-8' }));
-        const sourceImage = new Image();
-        sourceImage.src = svgUrl;
-        await sourceImage.decode();
-
-        const scale = 2;
-        const canvas = document.createElement('canvas');
-        canvas.width = width * scale;
-        canvas.height = height * scale;
-        const context = canvas.getContext('2d');
-        context?.scale(scale, scale);
-        context?.drawImage(sourceImage, 0, 0, width, height);
-        URL.revokeObjectURL(svgUrl);
+        chart.scrollIntoView({ block: 'center', behavior: 'auto' });
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        const canvas = await html2canvas(chart, {
+          backgroundColor: '#ffffff',
+          scale: 2,
+          useCORS: true,
+          logging: false,
+        });
 
         const snapshot = document.createElement('img');
         snapshot.src = canvas.toDataURL('image/png');
         snapshot.alt = 'Biểu đồ phân tích';
         snapshot.className = 'print-chart-snapshot';
-        svg.classList.add('print-original-chart');
-        svg.insertAdjacentElement('afterend', snapshot);
-        printSnapshots.push({ svg, snapshot });
+        chart.classList.add('print-original-chart');
+        chart.insertAdjacentElement('afterend', snapshot);
+        printSnapshots.push({ chart, snapshot });
       } catch (error) {
         console.warn('Không thể tạo ảnh biểu đồ để in:', error);
       }
     }
+    report.scrollTop = previousScrollTop;
 
     const restoreAfterPrint = () => {
-      printSnapshots.forEach(({ svg, snapshot }) => {
-        svg.classList.remove('print-original-chart');
+      printSnapshots.forEach(({ chart, snapshot }) => {
+        chart.classList.remove('print-original-chart');
         snapshot.remove();
       });
       window.removeEventListener('afterprint', restoreAfterPrint);
