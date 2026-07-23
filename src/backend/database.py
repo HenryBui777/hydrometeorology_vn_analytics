@@ -33,6 +33,9 @@ def init_db():
     conn.close()
 
 def insert_log(prompt: str, context: str, code: str, explanation: str):
+    # Keep the AI endpoints usable when they are imported by a reload worker or
+    # test process before FastAPI's startup hook has run.
+    init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -45,6 +48,7 @@ def insert_log(prompt: str, context: str, code: str, explanation: str):
     return log_id
 
 def update_log_status(log_id: int, status: str, final_code: str, result_image: str = None, error_message: str = None):
+    init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -56,6 +60,7 @@ def update_log_status(log_id: int, status: str, final_code: str, result_image: s
     conn.close()
 
 def get_all_logs():
+    init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM ai_logs ORDER BY created_at DESC')

@@ -237,10 +237,18 @@ export default function App() {
         handleExecutionFinished('success', { chartData: parsedChartData, chartType: data.chart_type });
       } else {
         console.error("Execute error:", data.error_message || data.detail);
+        setActiveQuery(prev => prev ? {
+          ...prev,
+          errorMessage: data.error_message || data.detail || 'Không thể chạy đề xuất này.'
+        } : prev);
         handleExecutionFinished('failed');
       }
     } catch (error) {
       console.error(error);
+      setActiveQuery(prev => prev ? {
+        ...prev,
+        errorMessage: 'Không thể kết nối Backend để chạy đề xuất. Hãy kiểm tra backend đang chạy ở cổng 8000.'
+      } : prev);
       handleExecutionFinished('failed');
     }
   };

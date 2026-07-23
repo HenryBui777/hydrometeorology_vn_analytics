@@ -31,6 +31,71 @@ def parse_json_response(text: str) -> dict[str, Any]:
             raise ValueError("AI không trả về JSON hợp lệ.")
         return json.loads(match.group(0))
 
+
+def local_generate(prompt: str, engine: str) -> tuple[str, str, str]:
+    """Create a safe deterministic proposal when Gemini is unavailable."""
+    normalized = (prompt or "").lower()
+    metrics = [
+        (("mưa", "mua", "rain", "precipitation"), "precipitation_sum", "lượng mưa"),
+        (("độ ẩm", "do am", "humidity"), "humidity_mean", "độ ẩm"),
+        (("gió", "gio", "wind"), "wind_speed_max", "tốc độ gió cực đại"),
+        (("bức xạ", "buc xa", "radiation"), "shortwave_radiation_sum", "bức xạ mặt trời"),
+    ]
+    metric, label = "temp_mean", "nhiệt độ trung bình"
+    for keywords, candidate_metric, candidate_label in metrics:
+        if any(keyword in normalized for keyword in keywords):
+            metric, label = candidate_metric, candidate_label
+            break
+
+    is_time_series = any(keyword in normalized for keyword in (
+        "xu hướng", "xu huong", "theo thời gian", "theo thoi gian", "theo tháng", "theo thang"
+    ))
+    group_column = "region" if any(keyword in normalized for keyword in (
+        "vùng", "vung", "miền", "mien", "region"
+    )) else "province"
+    top_match = re.search(r"top\s*(\d+)", normalized)
+    limit = int(top_match.group(1)) if top_match else 10
+
+    if engine == "sql":
+        if is_time_series:
+            code = (
+                f"SELECT CAST(date AS VARCHAR) AS name, AVG({metric}) AS value\n"
+                "FROM df\nGROUP BY date\nORDER BY date"
+            )
+            chart_type = "line"
+        else:
+            code = (
+                f"SELECT {group_column} AS name, AVG({metric}) AS value\n"
+                f"FROM df\nGROUP BY {group_column}\nORDER BY value DESC\nLIMIT {limit}"
+            )
+            chart_type = "bar"
+    elif is_time_series:
+        code = f'''df_work = df.copy()
+df_work['date'] = pd.to_datetime(df_work['date'])
+result = (df_work.groupby('date', as_index=False)['{metric}']
+          .mean()
+          .rename(columns={{'date': 'name', '{metric}': 'value'}}))
+result['name'] = result['name'].dt.strftime('%Y-%m-%d')
+chart_data = result.to_dict(orient='records')
+chart_type = 'line' '''
+        chart_type = "line"
+    else:
+        code = f'''result = (df.groupby('{group_column}', as_index=False)['{metric}']
+          .mean()
+          .rename(columns={{'{group_column}': 'name', '{metric}': 'value'}})
+          .sort_values('value', ascending=False)
+          .head({limit}))
+chart_data = result.to_dict(orient='records')
+chart_type = 'bar' '''
+        chart_type = "bar"
+
+    explanation = (
+        f"Đề xuất cục bộ: tổng hợp {label} theo "
+        f"{'thời gian' if is_time_series else group_column} để tạo biểu đồ {chart_type}. "
+        "Gemini chưa được cấu hình hoặc đang không phản hồi, nên hệ thống dùng mẫu Pandas/SQL an toàn này."
+    )
+    return code.strip(), explanation, chart_type
+
 router = APIRouter(prefix="/api/ai", tags=["AI"])
 
 class GenerateRequest(BaseModel):
@@ -90,6 +155,25 @@ async def generate_code(request: GenerateRequest):
     Gọi Gemini API để sinh mã nguồn phân tích Python
     """
     try:
+        # The application remains usable for a classroom/demo installation even
+        # before a Gemini key is configured.
+        if not GEMINI_API_KEY:
+            generated_code, generated_explanation, chart_type = local_generate(request.prompt, request.engine)
+            if request.engine == "sql":
+                generated_code = f"-- CHART_TYPE: {chart_type}\n" + generated_code
+            log_id = insert_log(
+                prompt=request.prompt,
+                context=request.context,
+                code=generated_code,
+                explanation=generated_explanation,
+            )
+            return GenerateResponse(
+                log_id=log_id,
+                code=generated_code,
+                explanation=generated_explanation,
+                chart_type=chart_type,
+            )
+
         # Xây dựng lịch sử trò chuyện
         history_text = ""
         if request.chat_history:
@@ -106,19 +190,19 @@ async def generate_code(request: GenerateRequest):
         # Tạo prompt hoàn chỉnh
         full_prompt = f"{base_prompt}\n\n{history_text}Câu hỏi hiện tại của người dùng: {request.prompt}\nNgữ cảnh bổ sung: {request.context}"
         
-        # Gọi Gemini
-        response = get_model().generate_content(full_prompt)
-        response_text = response.text
-        
-        # Tiền xử lý để loại bỏ markdown bọc ngoài nếu có
-        result_dict = parse_json_response(response_text)
-        generated_code = str(result_dict.get('code', '')).strip()
-        generated_explanation = str(result_dict.get('explanation', '')).strip()
-        chart_type = str(result_dict.get('chart_type', 'bar')).lower()
-        if chart_type not in {'bar', 'line', 'scatter', 'pie'}:
-            chart_type = 'bar'
-        if not generated_code:
-            raise ValueError("AI không sinh được mã phân tích.")
+        try:
+            response = get_model().generate_content(full_prompt)
+            result_dict = parse_json_response(response.text)
+            generated_code = str(result_dict.get('code', '')).strip()
+            generated_explanation = str(result_dict.get('explanation', '')).strip()
+            chart_type = str(result_dict.get('chart_type', 'bar')).lower()
+            if chart_type not in {'bar', 'line', 'scatter', 'pie'}:
+                chart_type = 'bar'
+            if not generated_code:
+                raise ValueError("AI không sinh được mã phân tích.")
+        except Exception as ai_error:
+            print("Gemini unavailable; using local proposal:", ai_error)
+            generated_code, generated_explanation, chart_type = local_generate(request.prompt, request.engine)
         
         # Nếu dùng engine SQL, ta cần gài chart_type vào để client/execute router biết
         if request.engine == "sql":
@@ -132,13 +216,13 @@ async def generate_code(request: GenerateRequest):
             context=request.context,
             code=generated_code,
             explanation=generated_explanation,
-            chart_type=chart_type
         )
 
         return GenerateResponse(
             log_id=log_id,
             code=generated_code,
-            explanation=generated_explanation
+            explanation=generated_explanation,
+            chart_type=chart_type,
         )
     except Exception as e:
         print("Gemini API Error:", e)
@@ -181,6 +265,9 @@ Chỉ trả về JSON thuần túy, không markdown, không text thừa:
 @router.post("/analyze-chart", response_model=AnalyzeChartResponse)
 async def analyze_chart(request: AnalyzeChartRequest):
     try:
+        if not GEMINI_API_KEY:
+            return local_chart_insight(request)
+
         # Nếu data quá dài, chỉ lấy 20 record đầu và cuối để AI không bị quá tải token
         data_summary = request.chart_data
         if len(data_summary) > 40:
@@ -202,4 +289,6 @@ async def analyze_chart(request: AnalyzeChartRequest):
         )
     except Exception as e:
         print("Gemini Analysis API Error:", e)
-        raise HTTPException(status_code=500, detail=f"Lỗi khi gọi AI phân tích: {str(e)}")
+        # Results are still useful when the external AI service is temporarily
+        # unavailable, so return a transparent local statistical summary.
+        return local_chart_insight(request)

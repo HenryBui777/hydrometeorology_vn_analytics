@@ -54,12 +54,13 @@ async def execute_code(request: ExecuteRequest):
             final_query = "\n".join(clean_query)
             
             # 2. Thực thi SQL bằng DuckDB trên Pandas DataFrame 'df'
-            result_df = duckdb.query(final_query).df()
+            duckdb.register("df", df)
+            result_df = duckdb.sql(final_query).df()
             chart_data = result_df.to_dict(orient='records')
             
         else:
             # Chế độ Python Pandas Sandbox
-            local_env = { 'df': df }
+            local_env = { 'df': df, 'pd': pd }
             exec(request.code, {}, local_env)
             chart_data = local_env.get('chart_data', None)
             chart_type = local_env.get('chart_type', 'bar')

@@ -76,6 +76,7 @@ export default function AIAnalystPortal({
 
   const handleGenerate = async () => {
     if (!promptInput.trim()) return;
+    setGenerateError('');
     setIsGenerating(true);
     
     try {
@@ -104,7 +105,6 @@ export default function AIAnalystPortal({
     } catch (error) {
       console.error(error);
       setGenerateError(error.message || 'Không thể kết nối Backend AI.');
-      alert('Lỗi kết nối tới Backend AI. Vui lòng thử lại sau.');
     } finally {
       setIsGenerating(false);
     }
@@ -236,7 +236,7 @@ export default function AIAnalystPortal({
   }, [executionStatus, activeQuery]);
 
   return (
-    <div className="w-full h-full flex flex-col font-sans pb-10" id="report-export-area">
+    <div className="w-full min-h-full font-sans pb-10" id="report-export-area">
       
       {/* Header Section */}
       <div className="mb-8 flex justify-between items-start">
@@ -289,7 +289,7 @@ export default function AIAnalystPortal({
       
       {/* 2. Draft Code Review Section */}
       {activeQuery && (activeQuery.status === 'pending' || executionStatus !== 'idle') && (
-        <div className="mt-8 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm overflow-hidden animate-fade-in relative">
+        <div className="mt-8 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm overflow-visible animate-fade-in relative">
           <div className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
              <span className="text-xs font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest flex items-center gap-2">
                 <FileText className="h-4 w-4 text-orange-500" /> Draft: Đề xuất phân tích
@@ -302,7 +302,7 @@ export default function AIAnalystPortal({
                <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 font-serif">"{activeQuery.question}"</h3>
                <div className="bg-blue-50/50 dark:bg-slate-700/50 border border-blue-100 dark:border-slate-600 p-4 rounded-xl text-sm text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
                  <p className="font-semibold text-slate-800 dark:text-slate-200">Giải thích:</p>
-                 <p className="mt-1">{activeQuery.explanation}</p>
+                 <p className="mt-1">{activeQuery.explanation || 'Đề xuất đã sẵn sàng. Hãy xem lại mã bên dưới trước khi chạy.'}</p>
                </div>
             </div>
 
@@ -315,7 +315,7 @@ export default function AIAnalystPortal({
                     height="100%"
                     defaultLanguage="python"
                     theme="vs-dark"
-                    value={activeQuery.code}
+                    value={activeQuery.code || '# Chưa có mã phân tích. Hãy tạo lại đề xuất.'}
                     onChange={(value) => updateActiveCode(value || '')}
                     options={{ minimap: { enabled: false }, fontSize: 13, padding: { top: 16 } }}
                   />
@@ -365,7 +365,7 @@ export default function AIAnalystPortal({
                  <AlertTriangle className="h-8 w-8 text-rose-500 mx-auto" />
                  <div>
                     <h4 className="font-bold text-rose-800">Thực thi đoạn mã thất bại</h4>
-                    <p className="text-sm text-rose-600 mt-1">Đã có lỗi xảy ra trong quá trình chạy mã Python. Vui lòng quay lại tạo đề xuất mới.</p>
+                    <p className="text-sm text-rose-600 mt-1">{activeQuery?.errorMessage || 'Đã có lỗi xảy ra trong quá trình chạy mã. Vui lòng tạo đề xuất mới hoặc chỉnh lại mã.'}</p>
                  </div>
                  <button onClick={rejectQuery} className="bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs px-6 py-2.5 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-2">
                     <X className="h-4 w-4" /> Đóng & thử lại
