@@ -10,6 +10,7 @@ import json
 import time
 import os
 import math
+import glob
 from datetime import date, timedelta
 
 os.makedirs("data/raw/openmeteo_2026", exist_ok=True)
@@ -20,6 +21,14 @@ POINT_COUNT = 5
 REQUEST_DELAY = 5.0
 PROVINCE_DELAY = 5.0
 RATE_LIMIT_WAIT = 5
+
+# Historical API có thể không trả các biến này. Vẫn giữ cột rỗng để schema
+# của mọi file tỉnh/thành nhất quán và không làm validator báo thiếu ngày.
+OPTIONAL_EMPTY_COLUMNS = (
+    "uv_index_max",
+    "uv_index_clear_sky_max",
+    "precipitation_probability_max",
+)
 
 LARGE_PROVINCES = {
     "Quảng Ninh",
@@ -57,8 +66,11 @@ SESSION.headers.update({
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 })
 
-TODAY = date.today()
-START_DATE_RAW = TODAY - timedelta(days=180)
+# Cố định mốc kết thúc để có thể chạy tiếp nhiều ngày mà không làm dịch
+# cửa sổ dữ liệu và mất hiệu lực checkpoint hiện tại.
+TODAY = date(2026, 7, 20)
+# Lấy tròn 365 ngày, bao gồm cả ngày bắt đầu và ngày hôm nay.
+START_DATE_RAW = TODAY - timedelta(days=364)
 EXPECTED_DAYS = (TODAY - START_DATE_RAW).days + 1
 
 START_DATE = START_DATE_RAW.strftime("%Y-%m-%d")
@@ -140,6 +152,12 @@ def load_complete_province_file(fpath):
     except Exception:
         return None
 
+    added_optional_columns = False
+    for column in OPTIONAL_EMPTY_COLUMNS:
+        if column not in df.columns:
+            df[column] = pd.NA
+            added_optional_columns = True
+
     required_columns = {
         "province", "region", "date", "weather_code", "temperature_2m_mean",
         "temperature_2m_max", "temperature_2m_min", "apparent_temperature_mean",
@@ -162,7 +180,68 @@ def load_complete_province_file(fpath):
     if df["date"].nunique() != EXPECTED_DAYS:
         return None
 
+    if added_optional_columns:
+        df.to_csv(fpath, index=False, encoding="utf-8-sig")
+
     return df
+
+
+def load_existing_province_data(safe_name):
+    """Gộp các file cũ của một tỉnh và chỉ giữ dữ liệu trong cửa sổ 365 ngày."""
+    pattern = f"data/raw/openmeteo_2026/{safe_name}_*.csv"
+    frames = []
+
+    for existing_path in glob.glob(pattern):
+        try:
+            frame = pd.read_csv(
+                existing_path,
+                parse_dates=["date", "sunrise", "sunset"],
+            )
+        except Exception:
+            continue
+
+        if "date" in frame.columns:
+            frames.append(frame)
+
+    if not frames:
+        return None
+
+    df = pd.concat(frames, ignore_index=True)
+    df["date"] = pd.to_datetime(df["date"]).dt.normalize()
+    start = pd.Timestamp(START_DATE)
+    end = pd.Timestamp(END_DATE)
+    df = df[df["date"].between(start, end)]
+    df = df.sort_values("date").drop_duplicates("date", keep="last")
+    return df.reset_index(drop=True)
+
+
+def find_missing_date_ranges(existing_df):
+    """Trả về các khoảng ngày liên tục chưa có dữ liệu."""
+    target_dates = pd.date_range(START_DATE, END_DATE, freq="D")
+
+    if existing_df is None or existing_df.empty:
+        missing_dates = target_dates
+    else:
+        existing_dates = pd.DatetimeIndex(
+            pd.to_datetime(existing_df["date"]).dt.normalize().unique()
+        )
+        missing_dates = target_dates.difference(existing_dates)
+
+    if missing_dates.empty:
+        return []
+
+    ranges = []
+    range_start = missing_dates[0]
+    previous = missing_dates[0]
+
+    for current in missing_dates[1:]:
+        if current - previous > pd.Timedelta(days=1):
+            ranges.append((range_start.strftime("%Y-%m-%d"), previous.strftime("%Y-%m-%d")))
+            range_start = current
+        previous = current
+
+    ranges.append((range_start.strftime("%Y-%m-%d"), previous.strftime("%Y-%m-%d")))
+    return ranges
 
 
 def load_completed_provinces():
@@ -206,7 +285,7 @@ REGION_MAP = {
     "Bắc Ninh":    "Đồng bằng sông Hồng",
     "Cao Bằng":    "Trung du miền núi Bắc Bộ",
     "Lạng Sơn":    "Trung du miền núi Bắc Bộ",
-    "Quảng Ninh":  "Đồng bằng sông Hồng",
+    "Quảng Ninh":  "Trung du miền núi Bắc Bộ",
     "Thái Nguyên": "Trung du miền núi Bắc Bộ",
     "Tuyên Quang": "Trung du miền núi Bắc Bộ",
     "Phú Thọ":     "Trung du miền núi Bắc Bộ",
@@ -280,13 +359,13 @@ DAILY_VARS = [
     "et0_fao_evapotranspiration"
 ]
 
-def crawl_point(name, lat, lon):
+def crawl_point(name, lat, lon, start_date=START_DATE, end_date=END_DATE):
     url = "https://archive-api.open-meteo.com/v1/archive"
     params = {
         "latitude":           lat,
         "longitude":          lon,
-        "start_date":         START_DATE,
-        "end_date":           END_DATE,
+        "start_date":         start_date,
+        "end_date":           end_date,
         "daily":              ",".join(DAILY_VARS),
         "timezone":           "Asia/Bangkok",
         "wind_speed_unit":    "kmh",
@@ -441,6 +520,12 @@ def aggregate_province(name, point_dfs):
 
         df = df.reset_index()
 
+    # Các cột toàn NA bị select_dtypes loại khi tổng hợp nhiều điểm.
+    # Thêm lại để file một điểm và nhiều điểm luôn có cùng schema.
+    for column in OPTIONAL_EMPTY_COLUMNS:
+        if column not in df.columns:
+            df[column] = pd.NA
+
     df.insert(0, "province", name)
     df.insert(1, "region", REGION_MAP.get(name, "Khác"))
     df["month"] = df["date"].dt.month
@@ -454,17 +539,20 @@ def aggregate_province(name, point_dfs):
     return df
 
 
-def crawl_province(name, points):
+def crawl_province(name, points, start_date=START_DATE, end_date=END_DATE):
     dfs = []
     for lat, lon in points:
-        point_df = crawl_point(name, lat, lon)
+        point_df = crawl_point(name, lat, lon, start_date, end_date)
         if point_df is not None:
             dfs.append(point_df)
         time.sleep(REQUEST_DELAY)
 
     df = aggregate_province(name, dfs)
     if df is not None:
-        print(f"  ✅ {name}: {len(df)} ngày | mưa TB {df['precipitation_sum'].mean():.1f}mm/ngày")
+        print(
+            f"  ✅ {name}: {start_date} → {end_date} | {len(df)} ngày"
+            f" | mưa TB {df['precipitation_sum'].mean():.1f}mm/ngày"
+        )
     return df
 
 def crawl_all():
@@ -516,30 +604,57 @@ def crawl_all():
             f"{safe}_{START_DATE}_{END_DATE}.csv"
         )
 
-        if name in completed_provinces:
-            df = load_complete_province_file(fpath)
-            if df is not None:
-                print("  ⏭️  Đã hoàn tất từ lần chạy trước, bỏ qua crawl lại")
-                all_dfs.append(df)
-                time.sleep(PROVINCE_DELAY)
-                continue
-
-            completed_provinces.discard(name)
-
         df = load_complete_province_file(fpath)
         if df is not None:
-            print(f"  ⏭️  Đã có file hoàn chỉnh ({len(df)} dòng)")
+            message = (
+                "Đã hoàn tất từ lần chạy trước"
+                if name in completed_provinces
+                else "Đã có file hoàn chỉnh"
+            )
+            print(f"  ⏭️  {message} ({len(df)} ngày), bỏ qua crawl lại")
             completed_provinces.add(name)
             save_completed_provinces(completed_provinces)
         else:
-            if os.path.exists(fpath):
-                print("  ♻️  File cũ chưa đủ hoặc lỗi, sẽ crawl lại tỉnh này")
+            completed_provinces.discard(name)
+            existing_df = load_existing_province_data(safe)
+            missing_ranges = find_missing_date_ranges(existing_df)
+            existing_days = 0 if existing_df is None else existing_df["date"].nunique()
 
-            df = crawl_province(name, points)
+            if existing_days:
+                print(f"  ♻️  Tái sử dụng {existing_days}/{EXPECTED_DAYS} ngày đã crawl")
+
+            collected_frames = [] if existing_df is None else [existing_df]
+            for missing_start, missing_end in missing_ranges:
+                print(f"  📥 Chỉ crawl phần còn thiếu: {missing_start} → {missing_end}")
+                missing_df = crawl_province(
+                    name,
+                    points,
+                    start_date=missing_start,
+                    end_date=missing_end,
+                )
+                if missing_df is not None:
+                    collected_frames.append(missing_df)
+
+            if collected_frames:
+                merged_df = pd.concat(collected_frames, ignore_index=True)
+                merged_df["date"] = pd.to_datetime(merged_df["date"]).dt.normalize()
+                merged_df = merged_df[
+                    merged_df["date"].between(pd.Timestamp(START_DATE), pd.Timestamp(END_DATE))
+                ]
+                merged_df = (
+                    merged_df.sort_values("date")
+                    .drop_duplicates("date", keep="last")
+                    .reset_index(drop=True)
+                )
+                merged_df.to_csv(fpath, index=False, encoding="utf-8-sig")
+
+            df = load_complete_province_file(fpath)
             if df is not None:
-                df.to_csv(fpath, index=False, encoding="utf-8-sig")
                 completed_provinces.add(name)
                 save_completed_provinces(completed_provinces)
+                print(f"  💾 Đã gộp đủ {len(df)}/{EXPECTED_DAYS} ngày")
+            else:
+                print("  ⚠️  Chưa thu thập đủ 365 ngày; lần chạy sau sẽ tiếp tục phần còn thiếu")
 
         if df is not None:
             all_dfs.append(df)

@@ -51,19 +51,20 @@ function parseRow(row) {
     region,
     regionKey: REGION_KEY_MAP[region] || 'NorthMountain',
     date,
+    year: parseInt(date.substring(0, 4), 10) || 0,
     season,
     month: isNaN(month) ? 0 : month,
-    temp:      parseFloat(row.temperature_2m_mean) || 0,
-    tempMax:   parseFloat(row.temperature_2m_max)  || 0,
-    tempMin:   parseFloat(row.temperature_2m_min)  || 0,
+    temp:      parseFloat(row.temp_mean) || 0,
+    tempMax:   parseFloat(row.temp_max)  || 0,
+    tempMin:   parseFloat(row.temp_min)  || 0,
     rain:      parseFloat(row.precipitation_sum)   || 0,
-    humidity:  parseFloat(row.relative_humidity_2m_mean) || 0,
-    wind:      parseFloat(row.wind_speed_10m_max)  || 0,
+    humidity:  parseFloat(row.humidity_mean) || 0,
+    wind:      parseFloat(row.wind_speed_max)  || 0,
     sunshine:  parseFloat(row.sunshine_hours)      || 0,
-    et0:       parseFloat(row.et0_fao_evapotranspiration) || 0,
+    et0:       parseFloat(row.et0) || 0,
     uvMax:     parseFloat(row.uv_index_max)        || null,
-    cloud:     parseFloat(row.cloud_cover_mean)    || 0,
-    pressure:  parseFloat(row.pressure_msl_mean)   || 0,
+    cloud:     parseFloat(row.cloud_cover)    || 0,
+    pressure:  parseFloat(row.pressure)   || 0,
     windDir:   row.wind_direction_10m_dominant || '',
     latitude:  parseFloat(row.latitude)  || 0,
     longitude: parseFloat(row.longitude) || 0,
@@ -77,6 +78,7 @@ function parseRow(row) {
 export function applyFilters(rows, filters) {
   return rows.filter(r => {
     if (filters.regionKey && filters.regionKey !== 'All' && r.regionKey !== filters.regionKey) return false;
+    if (filters.year && filters.year !== 'All' && r.year !== parseInt(filters.year, 10)) return false;
     if (filters.month && filters.month !== 'All' && r.month !== parseInt(filters.month, 10)) return false;
     if (filters.season && filters.season !== 'All' && r.season !== filters.season) return false;
     return true;

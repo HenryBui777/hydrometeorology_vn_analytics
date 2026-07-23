@@ -11,10 +11,15 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
+    "@supabase/supabase-js": "^2.110.7",
+    "framer-motion": "^12.42.2",
+    "html2pdf.js": "^0.14.0",
     "lucide-react": "^1.21.0",
     "papaparse": "^5.5.4",
+    "prismjs": "^1.30.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
+    "react-simple-code-editor": "^0.14.1",
     "recharts": "^3.9.0"
   },
   "devDependencies": {

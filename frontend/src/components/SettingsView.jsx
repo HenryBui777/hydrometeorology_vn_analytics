@@ -84,8 +84,8 @@ export default function SettingsView() {
     <div className="space-y-8 animate-fade-in w-full">
       {/* Page Title */}
       <div>
-        <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight sm:text-3xl">Cấu hình nền tảng</h1>
-        <p className="text-slate-500 text-sm mt-1">Thiết lập môi trường, kết nối LLM (AI Model) và cấu hình Sandbox.</p>
+        <h1 className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight sm:text-3xl">Cấu hình nền tảng</h1>
+        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Thiết lập môi trường, kết nối LLM (AI Model) và cấu hình Sandbox.</p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
@@ -102,15 +102,15 @@ export default function SettingsView() {
         </div>
 
         {/* LLM Connection settings */}
-        <div className="glass-panel bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+        <div className="glass-panel bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-700 pb-3">
             <Cpu className="h-5 w-5 text-brand-primary" />
-            <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Cấu hình kết nối LLM</h2>
+            <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Cấu hình kết nối LLM</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
             <div className="space-y-1.5">
-              <label className="text-slate-650 font-bold cursor-pointer">Primary LLM Model</label>
+              <label className="text-slate-650 dark:text-slate-300 font-bold cursor-pointer">Primary LLM Model</label>
               <CustomSelect
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
@@ -142,15 +142,15 @@ export default function SettingsView() {
         </div>
 
         {/* Local Environment settings */}
-        <div className="glass-panel bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+        <div className="glass-panel bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-700 pb-3">
             <FolderOpen className="h-5 w-5 text-brand-primary" />
-            <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Cài đặt Local Environment</h2>
+            <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Cài đặt Local Environment</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
             <div className="space-y-1.5">
-              <label className="text-slate-650 font-bold">Thư mục dự án</label>
+              <label className="text-slate-650 dark:text-slate-300 font-bold">Thư mục dự án</label>
               <input
                 type="text"
                 value={localDir}
@@ -175,11 +175,11 @@ export default function SettingsView() {
         </div>
 
         {/* Security Sandbox settings */}
-        <div className="glass-panel bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="glass-panel bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
             <div className="flex items-center gap-2">
               <Settings className="h-5 w-5 text-rose-500 animate-spin-slow" />
-              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Cơ chế bảo mật Sandbox</h2>
+              <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Cơ chế bảo mật Sandbox</h2>
             </div>
 
             <button

@@ -14,7 +14,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+/lib/
 lib64/
 parts/
 sdist/
@@ -230,3 +230,8 @@ frontend/.vite/
 # PDF files
 *.pdf
 
+
+# Environment Variables
+.env
+.env.*
+!.env.example

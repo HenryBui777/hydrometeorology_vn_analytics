@@ -5,6 +5,28 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --color-brand-primary: #3B82F6;
+    --color-brand-secondary: #1E3A8A;
+    --color-brand-accent: #60A5FA;
+    --color-brand-bg: #F0F4F8;
+    --color-brand-card: #FFFFFF;
+    --color-brand-text: #1E293B;
+  }
+
+  /* Colorblind mode (Okabe-Ito Palette) */
+  :root.colorblind {
+    --color-brand-primary: #0072B2;
+    --color-brand-secondary: #009E73;
+    --color-brand-accent: #D55E00;
+  }
+
+  .dark.colorblind {
+    --color-brand-primary: #56B4E9;
+    --color-brand-secondary: #F0E442;
+    --color-brand-accent: #E69F00;
+  }
+
   body {
     @apply bg-brand-bg text-brand-text antialiased overflow-x-hidden selection:bg-brand-primary selection:text-white;
     font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
@@ -16,14 +38,14 @@
   }
 }
 
-:root[data-theme='dark'] body { background: #0f172a; color: #e2e8f0; }
-:root[data-theme='dark'] .bg-white, :root[data-theme='dark'] .glass-panel, :root[data-theme='dark'] .tech-panel { background-color: #182235 !important; }
-:root[data-theme='dark'] .bg-slate-50 { background-color: #202c40 !important; }
-:root[data-theme='dark'] .text-slate-800, :root[data-theme='dark'] .text-slate-700, :root[data-theme='dark'] .text-slate-600 { color: #e2e8f0 !important; }
-:root[data-theme='dark'] .text-slate-500, :root[data-theme='dark'] .text-slate-400 { color: #aab8cc !important; }
-:root[data-theme='dark'] .border-slate-200, :root[data-theme='dark'] .border-slate-100 { border-color: #334155 !important; }
-:root[data-palette='colorblind'] { --chart-1: #0072B2; --chart-2: #E69F00; --chart-3: #009E73; --chart-4: #CC79A7; --chart-5: #56B4E9; --chart-6: #D55E00; }
-@media print { aside, header, button, .no-print { display: none !important; } main { padding: 0 !important; overflow: visible !important; } body { background: white !important; } }
+@keyframes siren-pulse {
+  0% { color: #ef4444; transform: scale(1); }
+  50% { color: #3b82f6; transform: scale(1.1); }
+  100% { color: #ef4444; transform: scale(1); }
+}
+.animate-siren {
+  animation: siren-pulse 0.8s infinite ease-in-out;
+}
 
 /* Custom Scrollbars - Light/Azure Style */
 ::-webkit-scrollbar {
@@ -148,3 +170,77 @@ svg:focus, g:focus, rect:focus, path:focus, .recharts-wrapper:focus, .recharts-s
 .delay-3 { animation-delay: 150ms; }
 .delay-4 { animation-delay: 200ms; }
 .delay-5 { animation-delay: 250ms; }
+
+/* ==========================================================================
+   PRINT STYLES (Xuất PDF)
+   ========================================================================== */
+@media print {
+  @page {
+    margin: 1.2cm;
+    size: A4 portrait;
+  }
+
+  /* Hide UI elements that shouldn't be in the PDF */
+  .print-hidden, 
+  aside, 
+  nav, 
+  header, 
+  .news-ticker, 
+  .animate-siren,
+  ::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  /* Force white background and reset colors for clean document look */
+  body, html, main, #root {
+    background: #ffffff !important;
+    color: #000000 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Fix for 1-page cutoff: Ensure all scrollable/height-constrained wrappers expand fully */
+  body, html, #root, main, .h-screen, .w-screen, .overflow-hidden, .overflow-y-auto, .flex-1 {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    position: static !important;
+  }
+
+  /* Force light theme colors inside dark mode elements during print */
+  .dark .glass-card, 
+  .dark .glass-panel, 
+  .dark .tech-card, 
+  .dark .tech-panel {
+    background: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    color: #1e293b !important;
+  }
+
+  .dark p, .dark span, .dark h1, .dark h2, .dark h3, .dark h4 {
+    color: #1e293b !important;
+  }
+
+  /* Prevent elements from being cut in half across pages */
+  .glass-card, 
+  .tech-card, 
+  .glass-panel, 
+  .tech-panel, 
+  .recharts-wrapper, 
+  table, 
+  tr, 
+  img, 
+  svg {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Add some spacing between cards in print */
+  .glass-card, .tech-card, .glass-panel {
+    margin-bottom: 24px !important;
+    box-shadow: none !important;
+    border: 1px solid #cbd5e1 !important;
+  }
+}
