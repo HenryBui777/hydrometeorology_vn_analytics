@@ -35,6 +35,19 @@ const formatAxisTick = (value) => {
   const numericValue = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(numericValue) ? numericValue.toFixed(2) : value;
 };
+const inferCategoryLabel = (data, key, chartType) => {
+  if (chartType === 'radar') return 'Chỉ số khí tượng';
+  const values = (data || []).map((row) => String(row?.[key] ?? ''));
+  if (key === 'date') return 'Ngày quan trắc';
+  if (key === 'month' || values.some((value) => /^Tháng\s+\d+/i.test(value))) return 'Tháng';
+  if (key === 'year') return 'Năm';
+  if (key === 'week') return 'Tuần';
+  if (key === 'season' || values.every((value) => ['Xuân', 'Hè', 'Thu', 'Đông'].includes(value))) return 'Mùa';
+  const regionNames = ['Tây Nguyên', 'Bắc Trung Bộ', 'Đông Nam Bộ', 'Đồng bằng sông Hồng', 'Đồng bằng sông Cửu Long', 'Duyên hải Nam Trung Bộ', 'Trung du miền núi Bắc Bộ', 'Miền Bắc', 'Miền Trung', 'Miền Nam'];
+  if (key === 'region' || (values.length > 0 && values.every((value) => regionNames.includes(value)))) return 'Vùng khí hậu';
+  if (key === 'province' || key === 'name') return 'Tỉnh/thành phố';
+  return fieldLabel(key);
+};
 
 // Scatter points represent places. Recharts normally only exposes the two
 // numerical axes, so render the province/region in the tooltip explicitly.
@@ -166,16 +179,20 @@ export default function AIAnalystPortal({
     const yKeys = keys.filter(k => typeof data[0][k] === 'number');
     const scatterX = yKeys[0];
     const scatterY = yKeys[1] || yKeys[0];
+    const categoryLabel = inferCategoryLabel(data, xKey, chartType);
+    const displayTitle = chart?.title || activeQuery?.question || autoChartLabel;
 
     return (
-      <div className="h-96 w-full mt-4" id="chart-export-area">
+      <div className="mt-4" id="chart-export-area">
+        <h4 className="mb-3 text-center text-sm font-extrabold uppercase tracking-wide text-slate-700">{displayTitle}</h4>
+        <div className="h-96 w-full">
         <ResponsiveContainer width="100%" height="100%">
           {chartType === 'bar' || chartType === 'histogram' ? (
             <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
-              <XAxis dataKey={xKey} tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(xKey), position: 'insideBottom', offset: -2 }} />
+              <XAxis dataKey={xKey} tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: categoryLabel, position: 'insideBottom', offset: -2 }} />
               <YAxis tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
-              <Tooltip cursor={{fill: '#f1f5f9'}} formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <Tooltip cursor={{fill: '#f1f5f9'}} formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => categoryLabel + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               <Legend />
               {yKeys.map((key, i) => <Bar key={key} name={fieldLabel(key)} dataKey={key} fill={COLORS[i % COLORS.length]} radius={[4, 4, 0, 0]} />)}
             </BarChart>
@@ -183,24 +200,24 @@ export default function AIAnalystPortal({
             <BarChart data={data} layout="vertical" margin={{ top: 20, right: 30, left: 80, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
               <XAxis type="number" tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), position: 'insideBottom', offset: -2 }} />
-              <YAxis type="category" dataKey={xKey} stroke="#64748b" fontSize={12} width={110} label={{ value: fieldLabel(xKey), angle: -90, position: 'insideLeft', offset: 35 }} />
-              <Tooltip cursor={{fill: '#f1f5f9'}} formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <YAxis type="category" dataKey={xKey} stroke="#64748b" fontSize={12} width={110} label={{ value: categoryLabel, angle: -90, position: 'insideLeft', offset: 35 }} />
+              <Tooltip cursor={{fill: '#f1f5f9'}} formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => categoryLabel + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               <Legend />
               {yKeys.map((key, i) => <Bar key={key} name={fieldLabel(key)} dataKey={key} fill={COLORS[i % COLORS.length]} radius={[0, 4, 4, 0]} />)}
             </BarChart>
           ) : chartType === 'line' || chartType === 'multi-line' ? (
             <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
-              <XAxis dataKey={xKey} tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(xKey), position: 'insideBottom', offset: -2 }} />
+              <XAxis dataKey={xKey} tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: categoryLabel, position: 'insideBottom', offset: -2 }} />
               <YAxis tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
-              <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => categoryLabel + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               <Legend />
               {yKeys.map((key, i) => <Line key={key} name={fieldLabel(key)} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />)}
             </LineChart>
           ) : chartType === 'area' || chartType === 'stacked-area' ? (
             <AreaChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
-              <XAxis dataKey={xKey} tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(xKey), position: 'insideBottom', offset: -2 }} />
+              <XAxis dataKey={xKey} tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: categoryLabel, position: 'insideBottom', offset: -2 }} />
               <YAxis tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
               <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} />
               <Legend />
@@ -209,7 +226,7 @@ export default function AIAnalystPortal({
           ) : chartType === 'composed' ? (
             <ComposedChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
-              <XAxis dataKey={xKey} tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(xKey), position: 'insideBottom', offset: -2 }} />
+              <XAxis dataKey={xKey} tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: categoryLabel, position: 'insideBottom', offset: -2 }} />
               <YAxis yAxisId="left" tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
               <YAxis yAxisId="right" orientation="right" tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[1]), angle: 90, position: 'insideRight', offset: 8 }} />
               <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} />
@@ -238,7 +255,7 @@ export default function AIAnalystPortal({
             </ScatterChart>
           ) : (
             <PieChart>
-              <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => categoryLabel + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               <Legend />
               <Pie data={data} dataKey={yKeys[0]} name={fieldLabel(yKeys[0])} nameKey={xKey} cx="50%" cy="50%" innerRadius={chartType === 'donut' ? 64 : 0} outerRadius={120} label>
                 {data.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
@@ -246,6 +263,7 @@ export default function AIAnalystPortal({
             </PieChart>
           )}
         </ResponsiveContainer>
+        </div>
       </div>
     );
   };
@@ -479,7 +497,6 @@ export default function AIAnalystPortal({
 
                  {(activeQuery.additionalCharts || []).map((chart, index) => (
                    <div key={`${chart.title || 'supplement'}-${index}`} className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm overflow-hidden">
-                     <h4 className="mb-2 text-center text-sm font-extrabold uppercase tracking-wide text-slate-700">{chart.title || `Biểu đồ bổ sung ${index + 1}`}</h4>
                      {renderInteractiveChart(chart)}
                    </div>
                  ))}
