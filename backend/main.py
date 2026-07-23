@@ -8,12 +8,18 @@ import google.generativeai as genai
 from supabase import create_client, Client
 from typing import Optional, List
 import time
+import json
+import re
+import pandas as pd
 
 # Load env
 load_dotenv()
 
 # Initialize FastAPI
 app = FastAPI(title="KTTV AI Analytics API")
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CSV_PATH = os.path.join(BASE_DIR, "data", "processed", "cleaned_data.csv")
 
 # Setup CORS
 app.add_middleware(
@@ -39,6 +45,47 @@ model = genai.GenerativeModel('gemini-2.0-flash')
 class ChatRequest(BaseModel):
     prompt: str
     context: Optional[str] = "Dữ liệu thời tiết VN"
+    engine: str = "python"
+
+
+def local_analysis_code(prompt: str) -> tuple[str, str]:
+    """A valid offline proposal. The executor always provides DataFrame ``df``."""
+    text = (prompt or "").lower()
+    metric = "precipitation_sum" if any(word in text for word in ("mưa", "mua", "rain")) else "temp_mean"
+    label = "lượng mưa" if metric == "precipitation_sum" else "nhiệt độ trung bình"
+    group = "region" if any(word in text for word in ("vùng", "vung", "miền", "mien")) else "province"
+    return (
+        f"""# Dữ liệu df đã được hệ thống nạp sẵn từ cleaned_data.csv
+result_df = (df.groupby('{group}', as_index=False)['{metric}']
+             .mean()
+             .rename(columns={{'{group}': 'name', '{metric}': 'value'}})
+             .sort_values('value', ascending=False)
+             .head(10))
+chart_data = result_df.to_dict(orient='records')
+chart_type = 'bar'
+""",
+        f"Tổng hợp {label} trung bình theo {group} và hiển thị 10 nhóm có giá trị cao nhất."
+    )
+
+
+def normalize_generated_python(code: str) -> str:
+    """Remove stale CSV reads and convert legacy printed JSON into chart_data."""
+    safe_code = code or ""
+    safe_code = re.sub(
+        r"(?m)^\s*df\s*=\s*pd\.read_csv\([^\n]*\)\s*$",
+        "# df is preloaded by the application.",
+        safe_code,
+    )
+    safe_code = re.sub(
+        r"(?m)^\s*print\(\s*([A-Za-z_]\w*)\.to_json\(orient\s*=\s*['\"]records['\"]\)\s*\)\s*$",
+        r"chart_data = \1.to_dict(orient='records')",
+        safe_code,
+    )
+    if "chart_data" not in safe_code and re.search(r"\bresult_df\b", safe_code):
+        safe_code += "\nchart_data = result_df.to_dict(orient='records')\n"
+    if "chart_type" not in safe_code:
+        safe_code += "\nchart_type = 'bar'\n"
+    return safe_code
 
 class ChatHistoryItem(BaseModel):
     id: str
@@ -60,7 +107,7 @@ async def generate_ai_response(request: ChatRequest):
         }).execute()
 
         # Extract Dynamic Schema from CSV
-        csv_path = "../data/raw/vietnam_kttv_34tinh_2025-07-21_2026-07-20.csv"
+        csv_path = CSV_PATH
         dynamic_context = "Không tìm thấy file dữ liệu."
         if os.path.exists(csv_path):
             try:
@@ -131,7 +178,7 @@ CHỈ trả về JSON nguyên thủy, không có dấu markdown ```json.
                 code = ""
 
         # Fallback if Gemini fails or is rate-limited
-        if not code:
+        if False and not code:  # legacy fallback retained only for reference
             explanation = f"Đã tự động tạo mã nguồn Python phân tích dữ liệu thời tiết dựa trên yêu cầu: '{request.prompt}'."
             code = f"""# 1. Đọc dữ liệu khí tượng thủy văn Việt Nam từ file CSV
 # Sử dụng hàm read_csv của thư viện Pandas
@@ -158,6 +205,11 @@ result_df = result_df.rename(columns=rename_dict)
 print(result_df.to_json(orient='records'))
 """
 
+        # Use the project-safe template whenever Gemini has no usable answer.
+        if not code:
+            code, explanation = local_analysis_code(request.prompt)
+        code = normalize_generated_python(code)
+
         # 3. Save AI response to Supabase gracefully
         log_id = f"local_log_{int(time.time())}"
         try:
@@ -174,17 +226,20 @@ print(result_df.to_json(orient='records'))
             "status": "success",
             "log_id": str(log_id),
             "code": code,
-            "explanation": explanation
+            "explanation": explanation,
+            "chart_type": "bar"
         }
 
     except Exception as e:
         print(f"Error in generate endpoint: {str(e)}")
         # Guaranteed safe return instead of 500 error!
+        code, explanation = local_analysis_code(request.prompt)
         return {
             "status": "success",
             "log_id": "fallback_log",
-            "explanation": f"Đã sinh mã nguồn phân tích cho yêu cầu: '{request.prompt}'.",
-            "code": f"# Mã Python phân tích dữ liệu\nimport pandas as pd\ndf = pd.read_csv('../data/raw/vietnam_kttv_34tinh_2025-07-21_2026-07-20.csv')\nprint(df.head(10).to_json(orient='records'))"
+            "explanation": explanation,
+            "code": code,
+            "chart_type": "bar"
         }
 
 class AnalyzeChartRequest(BaseModel):
@@ -251,64 +306,45 @@ class ExecuteRequest(BaseModel):
     log_id: str
     code: str
     chart_type: Optional[str] = 'bar'
+    engine: str = 'python'
 
 @app.post("/api/execute")
 async def execute_code(request: ExecuteRequest):
-    # 1. Prepare environment to capture stdout
-    old_stdout = sys.stdout
-    redirected_output = sys.stdout = StringIO()
-    
-    status = 'success'
-    result_data = ''
-    error_msg = ''
-    
     try:
-        # Pre-import common data libs
-        global_env = {}
-        exec("import pandas as pd\nimport json\nimport numpy as np\n", global_env)
-        
-        # 2. Execute the user-approved code
-        exec(request.code, global_env)
-        
-        result_data = redirected_output.getvalue().strip()
-    except Exception as e:
-        status = 'error'
-        error_msg = traceback.format_exc()
-        result_data = str(e)
-    finally:
-        sys.stdout = old_stdout
+        if not os.path.exists(CSV_PATH):
+            raise FileNotFoundError(f"Không tìm thấy tệp dữ liệu: {CSV_PATH}")
 
-    # 3. Save to Supabase (API Logs Requirement)
+        df = pd.read_csv(CSV_PATH)
+        safe_code = normalize_generated_python(request.code)
+        execution_env = {"__builtins__": __builtins__, "pd": pd, "df": df}
+        exec(safe_code, execution_env, execution_env)
+        chart_data = execution_env.get("chart_data")
+        chart_type = execution_env.get("chart_type", request.chart_type or "bar")
+        if not chart_data:
+            raise ValueError("Mã phân tích chưa tạo chart_data. Hãy sinh lại đề xuất.")
+        result_data = json.dumps(chart_data, ensure_ascii=False, default=str)
+    except Exception as e:
+        return {
+            "status": "error",
+            "error_message": str(e)
+        }
+
+    # Save logs opportunistically; analysis must not fail if Supabase is offline.
     try:
         supabase.table("execution_logs").insert({
             "chat_id": request.log_id,
-            "code": request.code,
-            "result_data": result_data if status == 'success' else error_msg,
-            "status": status
+            "code": safe_code,
+            "result_data": result_data,
+            "status": "success"
         }).execute()
     except Exception as e:
         print("Failed to save log to Supabase:", e)
 
-    if status == 'error':
-        return {
-            "status": "failed",
-            "error_message": error_msg
-        }
-
-    parsed_chart_data = []
-    if status == 'success' and result_data:
-        try:
-            # Try to parse the output as JSON array
-            parsed_chart_data = json.loads(result_data)
-        except:
-            # If not JSON, return as is (could be string logs)
-            parsed_chart_data = []
-
     return {
         "status": "success",
-        "chart_data": parsed_chart_data,
-        "chart_type": request.chart_type,
-        "raw_logs": result_data if not parsed_chart_data else ""
+        "chart_data": result_data,
+        "chart_type": chart_type,
+        "raw_logs": ""
     }
 
 class LogSaveRequest(BaseModel):
