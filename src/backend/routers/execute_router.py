@@ -3,6 +3,7 @@ from pydantic import BaseModel
 import pandas as pd
 import os
 import duckdb
+import re
 
 from ..database import update_log_status
 
@@ -23,6 +24,33 @@ class ExecuteResponse(BaseModel):
 # Đường dẫn đến file dữ liệu đã làm sạch
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 CSV_PATH = os.path.join(BASE_DIR, "data", "processed", "cleaned_data.csv")
+
+
+def normalize_generated_python(code: str) -> str:
+    """Keep AI-generated scripts compatible with the already-loaded ``df``.
+
+    The frontend asks the AI to use ``df`` directly, but an external model can
+    still occasionally generate an obsolete ``pd.read_csv(...)`` line.  That
+    path must never replace the project's current dataset.
+    """
+    safe_code = code or ""
+    safe_code = re.sub(
+        r"(?m)^\s*df\s*=\s*pd\.read_csv\([^\n]*\)\s*$",
+        "# Dataset `df` is preloaded by the application.",
+        safe_code,
+    )
+    # Some older prompts returned JSON via print instead of exposing
+    # ``chart_data``. Convert that pattern to the contract used by the UI.
+    safe_code = re.sub(
+        r"(?m)^\s*print\(\s*([A-Za-z_]\w*)\.to_json\(orient\s*=\s*['\"]records['\"]\)\s*\)\s*$",
+        r"chart_data = \1.to_dict(orient='records')",
+        safe_code,
+    )
+    if "chart_data" not in safe_code and re.search(r"\bresult_df\b", safe_code):
+        safe_code += "\nchart_data = result_df.to_dict(orient='records')\n"
+    if "chart_type" not in safe_code:
+        safe_code += "\nchart_type = 'bar'\n"
+    return safe_code
 
 @router.post("/", response_model=ExecuteResponse)
 async def execute_code(request: ExecuteRequest):
@@ -60,8 +88,9 @@ async def execute_code(request: ExecuteRequest):
             
         else:
             # Chế độ Python Pandas Sandbox
-            local_env = { 'df': df, 'pd': pd }
-            exec(request.code, {}, local_env)
+            safe_code = normalize_generated_python(request.code)
+            local_env = { '__builtins__': __builtins__, 'df': df, 'pd': pd }
+            exec(safe_code, local_env, local_env)
             chart_data = local_env.get('chart_data', None)
             chart_type = local_env.get('chart_type', 'bar')
             
@@ -79,7 +108,7 @@ async def execute_code(request: ExecuteRequest):
         update_log_status(
             log_id=request.log_id, 
             status="Approved_And_Executed", 
-            final_code=request.code, 
+            final_code=safe_code if request.engine != 'sql' else request.code, 
             result_image=chart_data_str
         )
 
@@ -96,7 +125,7 @@ async def execute_code(request: ExecuteRequest):
         update_log_status(
             log_id=request.log_id, 
             status="Error", 
-            final_code=request.code, 
+            final_code=normalize_generated_python(request.code) if request.engine != 'sql' else request.code, 
             error_message=error_msg
         )
         
