@@ -32,8 +32,6 @@ export default function AIAnalystPortal({
   const [isGenerating, setIsGenerating] = useState(false);
   const [engine, setEngine] = useState('python');
   const [generateError, setGenerateError] = useState('');
-  const [viewMode, setViewMode] = useState('chart'); // 'chart' or 'table'
-  const [chartTypeUI, setChartTypeUI] = useState('bar');
   const [isColorBlind, setIsColorBlind] = useState(false);
   
   // 4-Axis Analysis State
@@ -41,16 +39,25 @@ export default function AIAnalystPortal({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const COLORS = isColorBlind ? COLORS_COLORBLIND : COLORS_DEFAULT;
+  const autoChartType = useMemo(() => {
+    const allowedTypes = new Set(['bar', 'line', 'scatter', 'pie']);
+    const requestedType = activeQuery?.chartType;
+    if (allowedTypes.has(requestedType)) return requestedType;
+
+    const data = activeQuery?.chartData;
+    const question = (activeQuery?.question || '').toLowerCase();
+    const xKeys = data?.[0] ? Object.keys(data[0]) : [];
+    const hasDate = xKeys.some((key) => /date|ngày|tháng|time/i.test(key));
+    if (hasDate || /xu hướng|theo thời gian|diễn biến|trend/.test(question)) return 'line';
+    if (/tương quan|mối quan hệ|correlation/.test(question)) return 'scatter';
+    if (/tỷ trọng|tỉ trọng|cơ cấu|percentage|phần trăm/.test(question) && (data?.length || 0) <= 8) return 'pie';
+    return 'bar';
+  }, [activeQuery]);
+  const autoChartLabel = { bar: 'Biểu đồ cột', line: 'Biểu đồ đường', scatter: 'Biểu đồ phân tán', pie: 'Biểu đồ tròn' }[autoChartType];
   
   // Fake streaming state for execution monitor
   const [streamedLogs, setStreamedLogs] = useState([]);
   const [currentLineIdx, setCurrentLineIdx] = useState(0);
-
-  useEffect(() => {
-    if (activeQuery?.chartType) {
-      setChartTypeUI(activeQuery.chartType);
-    }
-  }, [activeQuery?.chartType]);
 
   useEffect(() => {
     if (executionStatus === 'running' && activeQuery) {
@@ -124,7 +131,7 @@ export default function AIAnalystPortal({
     return (
       <div className="h-96 w-full mt-4" id="chart-export-area">
         <ResponsiveContainer width="100%" height="100%">
-          {chartTypeUI === 'bar' ? (
+          {autoChartType === 'bar' ? (
             <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
               <XAxis dataKey={xKey} stroke="#64748b" fontSize={12} />
@@ -133,7 +140,7 @@ export default function AIAnalystPortal({
               <Legend />
               {yKeys.map((key, i) => <Bar key={key} dataKey={key} fill={COLORS[i % COLORS.length]} radius={[4, 4, 0, 0]} />)}
             </BarChart>
-          ) : chartTypeUI === 'line' ? (
+          ) : autoChartType === 'line' ? (
             <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
               <XAxis dataKey={xKey} stroke="#64748b" fontSize={12} />
@@ -142,7 +149,7 @@ export default function AIAnalystPortal({
               <Legend />
               {yKeys.map((key, i) => <Line key={key} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />)}
             </LineChart>
-          ) : chartTypeUI === 'scatter' ? (
+          ) : autoChartType === 'scatter' ? (
             <ScatterChart margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
               <XAxis dataKey={xKey} name={xKey} stroke="#64748b" fontSize={12} />
@@ -216,7 +223,7 @@ export default function AIAnalystPortal({
         body: JSON.stringify({
           question: activeQuery.question || "",
           chart_data: activeQuery.chartData,
-          chart_type: chartTypeUI
+          chart_type: autoChartType
         })
       });
       const data = await response.json().catch(() => ({}));
@@ -376,49 +383,26 @@ export default function AIAnalystPortal({
             {executionStatus === 'success' && activeQuery?.chartData && (
               <div className="space-y-4">
                  <div className="flex items-center justify-between bg-slate-50 border border-slate-200 p-3 rounded-lg">
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => setViewMode('chart')}
-                        className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${viewMode === 'chart' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-600 bg-transparent hover:bg-slate-200'}`}
-                      >
-                        Biểu đồ
-                      </button>
-                      <button 
-                        onClick={() => setViewMode('table')}
-                        className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${viewMode === 'table' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-600 bg-transparent hover:bg-slate-200'}`}
-                      >
-                        <Table className="h-3 w-3 inline mr-1"/> Bảng dữ liệu
-                      </button>
+                    <div>
+                      <p className="text-xs font-extrabold text-slate-800">{autoChartLabel}</p>
+                      <p className="mt-0.5 text-[11px] text-slate-500">Tự động chọn theo câu hỏi và cấu trúc dữ liệu trả về.</p>
                     </div>
-                    
-                    {viewMode === 'chart' && (
-                      <div className="flex items-center gap-4">
-                        <button 
-                          onClick={() => setIsColorBlind(!isColorBlind)}
-                          className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-[11px] font-bold border transition-colors ${isColorBlind ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-white text-slate-500 border-slate-200'}`}
-                        >
-                          <Eye className="h-3 w-3"/> Mù màu
-                        </button>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[11px] font-bold text-slate-500">LOẠI BIỂU ĐỒ:</span>
-                          <select 
-                            value={chartTypeUI} 
-                            onChange={(e) => setChartTypeUI(e.target.value)}
-                            className="bg-white border border-slate-200 text-slate-800 text-xs rounded-md px-2 py-1 outline-none focus:ring-2 focus:ring-emerald-500/20"
-                          >
-                            <option value="bar">Cột (Bar)</option>
-                            <option value="line">Đường (Line)</option>
-                            <option value="pie">Tròn (Pie)</option>
-                            <option value="scatter">Phân tán (Scatter)</option>
-                          </select>
-                        </div>
-                      </div>
-                    )}
+                    <button 
+                      onClick={() => setIsColorBlind(!isColorBlind)}
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-[11px] font-bold border transition-colors ${isColorBlind ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-white text-slate-500 border-slate-200'}`}
+                    >
+                      <Eye className="h-3 w-3"/> Mù màu
+                    </button>
                  </div>
                  
                  <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm overflow-hidden">
-                    {viewMode === 'chart' ? renderInteractiveChart() : renderRawTable()}
+                    {renderInteractiveChart()}
                  </div>
+
+                 <details className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                    <summary className="cursor-pointer text-xs font-bold text-slate-600"><Table className="mr-1 inline h-3.5 w-3.5"/>Xem bảng dữ liệu dùng để vẽ biểu đồ</summary>
+                    {renderRawTable()}
+                 </details>
 
                  {/* 4-Axis Insight Section */}
                  {(isAnalyzing || insight) && (

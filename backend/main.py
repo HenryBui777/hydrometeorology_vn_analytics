@@ -247,6 +247,51 @@ class AnalyzeChartRequest(BaseModel):
     chart_data: list
     chart_type: str
 
+
+def local_four_axis_insight(request: AnalyzeChartRequest) -> dict:
+    """Create useful 4-axis insight directly from the chart data."""
+    rows = [row for row in (request.chart_data or []) if isinstance(row, dict)]
+    values = []
+    for row in rows:
+        value = row.get("value")
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            values.append((str(row.get("name", "Nhóm dữ liệu")), float(value)))
+
+    if not values:
+        return {
+            "descriptive": f"Truy vấn có {len(rows)} bản ghi, nhưng chưa có cột giá trị số chuẩn để tổng hợp.",
+            "diagnostic": "Cần kiểm tra lại cột dùng làm giá trị biểu đồ hoặc chọn một phép tổng hợp số học.",
+            "predictive": "Chưa đủ dữ liệu định lượng để suy ra xu hướng đáng tin cậy.",
+            "prescriptive": "Hãy tạo lại đề xuất với các trường như nhiệt độ, lượng mưa, độ ẩm hoặc tốc độ gió.",
+        }
+
+    highest_name, highest = max(values, key=lambda item: item[1])
+    lowest_name, lowest = min(values, key=lambda item: item[1])
+    average = sum(value for _, value in values) / len(values)
+    spread = highest - lowest
+    subject = request.question.strip() or "chỉ số được chọn"
+
+    return {
+        "descriptive": (
+            f"Với câu hỏi '{subject}', biểu đồ gồm {len(values)} nhóm. "
+            f"Giá trị trung bình là {average:.2f}; cao nhất thuộc {highest_name} ({highest:.2f}) "
+            f"và thấp nhất thuộc {lowest_name} ({lowest:.2f})."
+        ),
+        "diagnostic": (
+            f"Độ chênh giữa nhóm cao nhất và thấp nhất là {spread:.2f}. "
+            "Khác biệt này thường liên quan đến vị trí địa lý, mùa quan sát và điều kiện khí hậu từng khu vực; "
+            "cần đối chiếu thêm theo thời gian để kết luận nguyên nhân cụ thể."
+        ),
+        "predictive": (
+            f"Nếu điều kiện quan sát giữ tương tự, {highest_name} là nhóm cần được theo dõi ưu tiên. "
+            "Đây là xu hướng tham khảo từ dữ liệu hiện có, không thay thế dự báo khí tượng chính thức."
+        ),
+        "prescriptive": (
+            f"Ưu tiên kiểm tra {highest_name} và các nhóm gần mức cao, cập nhật dữ liệu định kỳ, "
+            "đồng thời kết hợp cảnh báo thời tiết thực tế trước khi ra quyết định vận hành hoặc sản xuất."
+        ),
+    }
+
 @app.post("/api/ai/analyze-chart")
 async def analyze_chart(request: AnalyzeChartRequest):
     try:
@@ -276,13 +321,7 @@ CHỈ trả về JSON nguyên thủy, không có dấu markdown ```json.
         return parsed
     except Exception as e:
         print(f"Error in analyze-chart: {str(e)}")
-        # Return a fallback JSON if parsing fails
-        return {
-            "descriptive": "Đang phân tích mô tả...",
-            "diagnostic": "Đang chẩn đoán nguyên nhân...",
-            "predictive": "Đang dự đoán xu hướng...",
-            "prescriptive": "Đang đưa ra đề xuất..."
-        }
+        return local_four_axis_insight(request)
 
 @app.get("/api/history")
 async def get_history():
