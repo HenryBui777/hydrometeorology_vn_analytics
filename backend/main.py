@@ -11,6 +11,7 @@ import time
 import json
 import re
 import pandas as pd
+import unicodedata
 
 # Load env
 load_dotenv()
@@ -46,6 +47,109 @@ class ChatRequest(BaseModel):
     prompt: str
     context: Optional[str] = "Dữ liệu thời tiết VN"
     engine: str = "python"
+
+
+PROVINCE_ALIASES = {
+    "Hà Nội": ("ha noi", "hanoi"), "Hồ Chí Minh": ("ho chi minh", "hcm", "tp hcm", "tphcm"),
+    "Đà Nẵng": ("da nang",), "Huế": ("hue",), "Lào Cai": ("lao cai", "sapa"),
+    "Lâm Đồng": ("lam dong", "da lat"), "Khánh Hòa": ("khanh hoa", "nha trang"),
+    "Cần Thơ": ("can tho",), "Hải Phòng": ("hai phong",), "Quảng Ninh": ("quang ninh",),
+    "An Giang": ("an giang",), "Cà Mau": ("ca mau",), "Gia Lai": ("gia lai",),
+    "Đắk Lắk": ("dak lak", "daklak"), "Đồng Nai": ("dong nai",), "Tây Ninh": ("tay ninh",),
+    "Nghệ An": ("nghe an",), "Thanh Hóa": ("thanh hoa",), "Hà Tĩnh": ("ha tinh",),
+    "Quảng Trị": ("quang tri",), "Quảng Ngãi": ("quang ngai",), "Bắc Ninh": ("bac ninh",),
+    "Cao Bằng": ("cao bang",), "Điện Biên": ("dien bien",), "Sơn La": ("son la",),
+    "Lạng Sơn": ("lang son",), "Phú Thọ": ("phu tho",), "Thái Nguyên": ("thai nguyen",),
+    "Tuyên Quang": ("tuyen quang",), "Hưng Yên": ("hung yen",), "Ninh Bình": ("ninh binh",),
+    "Vĩnh Long": ("vinh long",), "Đồng Tháp": ("dong thap",),
+}
+
+
+def normalized_text(value: str) -> str:
+    return " ".join("".join(
+        char for char in unicodedata.normalize("NFD", (value or "").lower())
+        if unicodedata.category(char) != "Mn"
+    ).replace("đ", "d").split())
+
+
+def infer_general_analysis(prompt: str) -> tuple[str, str, str]:
+    """Infer an analysis plan for natural questions outside the predefined set."""
+    text = normalized_text(prompt)
+    provinces = [name for name, aliases in PROVINCE_ALIASES.items() if any(alias in text for alias in aliases)]
+    month_match = re.search(r"thang\s*(1[0-2]|[1-9])", text)
+    season = next((label for label, aliases in {
+        "Xuân": ("mua xuan",), "Hè": ("mua he",), "Thu": ("mua thu",), "Đông": ("mua dong",)
+    }.items() if any(alias in text for alias in aliases)), None)
+
+    metrics = []
+    metric_rules = [
+        ("temp_max", ("nhiet do cao nhat", "nhiet do max", "cuc dai")),
+        ("temp_min", ("nhiet do thap nhat", "nhiet do min", "cuc tieu")),
+        ("temp_mean", ("nhiet do", "nong", "lanh")),
+        ("precipitation_sum", ("luong mua", "mua", "rain")),
+        ("humidity_mean", ("do am", "humidity")),
+        ("sunshine_hours", ("gio nang", "nang", "sunshine")),
+        ("wind_speed_max", ("toc do gio", "gio", "wind")),
+        ("et0", ("boc hoi", "et0")),
+        ("cloud_cover", ("may che", "cloud")),
+        ("pressure", ("ap suat", "pressure")),
+    ]
+    for metric, aliases in metric_rules:
+        if any(alias in text for alias in aliases) and metric not in metrics:
+            metrics.append(metric)
+    if not metrics:
+        metrics = ["temp_mean"]
+
+    filters = ["df_work = df.copy()"]
+    if provinces:
+        filters.append(f"df_work = df_work[df_work['province'].isin({provinces!r})]")
+    if month_match:
+        filters.append(f"df_work = df_work[df_work['month'].eq({int(month_match.group(1))})]")
+    if season:
+        filters.append(f"df_work = df_work[df_work['season'].eq({season!r})]")
+    filter_code = "\n".join(filters)
+
+    wants_relationship = any(word in text for word in ("tuong quan", "moi quan he", "ty le nghich", "anh huong", "lien quan", "scatter", "phan tan"))
+    wants_time = any(word in text for word in ("xu huong", "dien bien", "theo thoi gian", "qua 12 thang", "theo thang", "hang thang"))
+    wants_composition = any(word in text for word in ("ty trong", "ti trong", "co cau", "phan tram"))
+
+    if wants_relationship:
+        if len(metrics) < 2:
+            metrics.append("humidity_mean" if metrics[0] != "humidity_mean" else "temp_mean")
+        x_metric, y_metric = metrics[:2]
+        return (f"""{filter_code}
+result_df = df_work[['province', '{x_metric}', '{y_metric}']].dropna().copy()
+if len(result_df) > 800:
+    result_df = result_df.sample(800, random_state=42)
+result_df = result_df.rename(columns={{'province': 'name', '{x_metric}': 'x', '{y_metric}': 'y'}})
+chart_data = result_df.to_dict(orient='records')
+chart_type = 'scatter'""", "Biểu đồ phân tán được chọn để kiểm tra mối quan hệ giữa hai biến được hỏi.", "scatter")
+
+    # A time question uses a line chart; each explicitly named province becomes one series.
+    if wants_time and not month_match:
+        metric = metrics[0]
+        if len(provinces) >= 2:
+            return (f"""{filter_code}
+result_df = (df_work.groupby(['month', 'province'])[{metric!r}].mean().unstack('province').reset_index())
+result_df = result_df.rename(columns={{'month': 'name'}}).sort_values('name')
+result_df['name'] = result_df['name'].map(lambda month: f'Tháng {{month}}')
+chart_data = result_df.to_dict(orient='records')
+chart_type = 'line'""", "Biểu đồ đường được chọn để so sánh diễn biến theo tháng của các địa điểm được nêu.", "line")
+        return (f"""{filter_code}
+result_df = (df_work.groupby('month', as_index=False)[{metric!r}].mean()
+    .rename(columns={{'month': 'name', {metric!r}: 'value'}}).sort_values('name'))
+result_df['name'] = result_df['name'].map(lambda month: f'Tháng {{month}}')
+chart_data = result_df.to_dict(orient='records')
+chart_type = 'line'""", "Biểu đồ đường được chọn để thể hiện diễn biến theo tháng.", "line")
+
+    group = "province" if provinces or "tinh" in text or "thanh pho" in text else ("season" if "mua" in text else "region")
+    aggregations = ", ".join(f"{metric}=({metric!r}, 'mean')" for metric in metrics)
+    chart_type = "pie" if wants_composition and len(metrics) == 1 else "bar"
+    return (f"""{filter_code}
+result_df = (df_work.groupby('{group}', as_index=False).agg({aggregations})
+    .rename(columns={{'{group}': 'name'}}))
+chart_data = result_df.to_dict(orient='records')
+chart_type = '{chart_type}'""", "Biểu đồ được chọn theo loại câu hỏi, biến cần so sánh và các điều kiện lọc được nhận diện từ yêu cầu.", chart_type)
 
 
 def local_analysis_code(prompt: str) -> tuple[str, str, str]:
@@ -96,7 +200,7 @@ chart_data = result_df.to_dict(orient='records')
 chart_type = 'bar'""", "Xếp hạng 5 tỉnh có nhiệt độ trung bình cao nhất trên toàn bộ dữ liệu.", "bar")
 
     # 2. Hanoi monthly temperature trend
-    if "hà nội" in text and ("12 tháng" in text or "diễn biến" in text or "xu hướng" in text):
+    if "hà nội" in text and not has_hcm and ("12 tháng" in text or "diễn biến" in text or "xu hướng" in text):
         return ("""result_df = (df[df['province'].eq('Hà Nội')].groupby('month', as_index=False)['temp_mean'].mean()
     .rename(columns={'month': 'name', 'temp_mean': 'value'}).sort_values('name'))
 result_df['name'] = result_df['name'].map(lambda month: f'Tháng {month}')
@@ -231,12 +335,7 @@ chart_data = summary[['name', 'cloud_cover', 'temp_mean']].to_dict(orient='recor
 additional_charts = [{'title': 'Mây che phủ và giờ nắng trong mùa Thu', 'type': 'scatter', 'data': summary[['name', 'cloud_cover', 'sunshine_hours']].to_dict(orient='records')}]
 chart_type = 'scatter'""", "Đối chiếu tác động của mây che phủ tới nhiệt độ và giờ nắng trong mùa Thu.", "scatter")
 
-    metric = "precipitation_sum" if any(word in text for word in ("mưa", "mua", "rain")) else "temp_mean"
-    group = "region" if any(word in text for word in ("vùng", "vung", "miền", "mien")) else "province"
-    return (f"""result_df = (df.groupby('{group}', as_index=False)['{metric}'].mean()
-    .rename(columns={{'{group}': 'name', '{metric}': 'value'}}).sort_values('value', ascending=False).head(10))
-chart_data = result_df.to_dict(orient='records')
-chart_type = 'bar'""", "Tổng hợp dữ liệu theo yêu cầu và hiển thị các nhóm nổi bật.", "bar")
+    return infer_general_analysis(prompt)
 
 
 def normalize_generated_python(code: str) -> str:
