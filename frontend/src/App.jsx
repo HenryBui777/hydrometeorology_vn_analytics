@@ -110,12 +110,12 @@ export default function App() {
       const captureScale = 1.5;
       const reportScrollTop = report.scrollTop;
       const reportRect = report.getBoundingClientRect();
-      // `main` is a scrolling flex child, so scrollHeight can equal only the
-      // viewport. Its direct content child gives us the true bottom instead.
+      // `main` is a scrolling flex child, and some tabs let children overflow
+      // their wrapper. Use the lowest rendered descendant as the true bottom.
       const reportContentHeight = Math.ceil(Math.max(
         report.scrollHeight,
-        ...Array.from(report.children).map((child) => (
-          child.getBoundingClientRect().bottom - reportRect.top + reportScrollTop
+        ...Array.from(report.querySelectorAll('*')).map((element) => (
+          element.getBoundingClientRect().bottom - reportRect.top + reportScrollTop
         )),
       ));
       const screenshot = await html2canvas(report, {
