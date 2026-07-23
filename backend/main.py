@@ -72,6 +72,35 @@ def normalized_text(value: str) -> str:
     ).replace("đ", "d").split())
 
 
+def select_visualization(text: str, metrics: list[str], provinces: list[str]) -> str:
+    """Choose a chart from the visual-vocabulary matrix.
+
+    This is deliberately deterministic: an AI response may suggest code, but
+    it must not choose a chart that conflicts with the analytical purpose.
+    """
+    is_time = any(term in text for term in ("xu huong", "dien bien", "theo thoi gian", "qua 12 thang", "theo thang", "hang thang"))
+    is_relation = any(term in text for term in ("tuong quan", "moi quan he", "ty le nghich", "anh huong", "lien quan", "scatter", "phan tan"))
+    is_distribution = any(term in text for term in ("phan phoi", "phan bo", "tan suat", "histogram", "ngoai le", "outlier"))
+    is_composition = any(term in text for term in ("ty trong", "ti trong", "co cau", "phan tram", "thanh phan"))
+    is_ranking = any(term in text for term in ("top", "cao nhat", "thap nhat", "nhieu nhat", "it nhat", "xep hang", "noi nao", "tinh nao"))
+
+    if is_distribution:
+        return "histogram"
+    if is_relation:
+        return "bubble" if len(metrics) >= 3 or "3 bien" in text else "scatter"
+    if is_time:
+        return "area" if any(term in text for term in ("tich luy", "quy mo", "tong cong")) else "line"
+    if is_composition:
+        return "pie"
+    # Radar is only meaningful for one or two entities evaluated by several
+    # metrics. It is never used for a long list of provinces.
+    if 1 <= len(provinces) <= 2 and len(metrics) >= 4:
+        return "radar"
+    if is_ranking:
+        return "bar-horizontal"
+    return "bar"
+
+
 def infer_general_analysis(prompt: str) -> tuple[str, str, str]:
     """Infer an analysis plan for natural questions outside the predefined set."""
     text = normalized_text(prompt)
@@ -109,21 +138,39 @@ def infer_general_analysis(prompt: str) -> tuple[str, str, str]:
         filters.append(f"df_work = df_work[df_work['season'].eq({season!r})]")
     filter_code = "\n".join(filters)
 
-    wants_relationship = any(word in text for word in ("tuong quan", "moi quan he", "ty le nghich", "anh huong", "lien quan", "scatter", "phan tan"))
-    wants_time = any(word in text for word in ("xu huong", "dien bien", "theo thoi gian", "qua 12 thang", "theo thang", "hang thang"))
-    wants_composition = any(word in text for word in ("ty trong", "ti trong", "co cau", "phan tram"))
+    chart_type = select_visualization(text, metrics, provinces)
+    wants_relationship = chart_type in ("scatter", "bubble")
+    wants_time = chart_type in ("line", "area")
+    wants_composition = chart_type == "pie"
+
+    if chart_type == "histogram":
+        metric = metrics[0]
+        return (f"""{filter_code}
+series = df_work[{metric!r}].dropna()
+if series.empty:
+    chart_data = []
+else:
+    bins = pd.cut(series, bins=10)
+    result_df = (bins.value_counts().sort_index().rename_axis('name').reset_index(name='value'))
+    result_df['name'] = result_df['name'].astype(str)
+    chart_data = result_df.to_dict(orient='records')
+chart_type = 'histogram'""", "Biểu đồ tần suất được chọn để cho thấy phân bố của chỉ số được hỏi.", "histogram")
 
     if wants_relationship:
         if len(metrics) < 2:
             metrics.append("humidity_mean" if metrics[0] != "humidity_mean" else "temp_mean")
+        if chart_type == "bubble" and len(metrics) < 3:
+            metrics.append("precipitation_sum" if "precipitation_sum" not in metrics else "sunshine_hours")
         x_metric, y_metric = metrics[:2]
+        size_metric = metrics[2] if chart_type == "bubble" else None
+        selected = ["province", x_metric, y_metric] + ([size_metric] if size_metric else [])
         return (f"""{filter_code}
-result_df = df_work[['province', '{x_metric}', '{y_metric}']].dropna().copy()
+result_df = df_work[{selected!r}].dropna().copy()
 if len(result_df) > 800:
     result_df = result_df.sample(800, random_state=42)
 result_df = result_df.rename(columns={{'province': 'name'}})
 chart_data = result_df.to_dict(orient='records')
-chart_type = 'scatter'""", "Biểu đồ phân tán được chọn để kiểm tra mối quan hệ giữa hai biến được hỏi.", "scatter")
+chart_type = '{chart_type}'""", "Biểu đồ phân tán được chọn để kiểm tra mối quan hệ giữa các biến được hỏi.", chart_type)
 
     # A time question uses a line chart; each explicitly named province becomes one series.
     if wants_time and not month_match:
@@ -134,22 +181,29 @@ result_df = (df_work.groupby(['month', 'province'])[{metric!r}].mean().unstack('
 result_df = result_df.rename(columns={{'month': 'name'}}).sort_values('name')
 result_df['name'] = result_df['name'].map(lambda month: f'Tháng {{month}}')
 chart_data = result_df.to_dict(orient='records')
-chart_type = 'line'""", "Biểu đồ đường được chọn để so sánh diễn biến theo tháng của các địa điểm được nêu.", "line")
+chart_type = '{chart_type}'""", "Biểu đồ theo thời gian được chọn để so sánh diễn biến theo tháng của các địa điểm được nêu.", chart_type)
         return (f"""{filter_code}
 result_df = (df_work.groupby('month', as_index=False)[{metric!r}].mean()
     .rename(columns={{'month': 'name', {metric!r}: 'value'}}).sort_values('name'))
 result_df['name'] = result_df['name'].map(lambda month: f'Tháng {{month}}')
 chart_data = result_df.to_dict(orient='records')
-chart_type = 'line'""", "Biểu đồ đường được chọn để thể hiện diễn biến theo tháng.", "line")
+chart_type = '{chart_type}'""", "Biểu đồ theo thời gian được chọn để thể hiện diễn biến theo tháng.", chart_type)
 
     group = "province" if provinces or "tinh" in text or "thanh pho" in text else ("season" if "mua" in text else "region")
     aggregations = ", ".join(f"{metric}=({metric!r}, 'mean')" for metric in metrics)
-    chart_type = "pie" if wants_composition and len(metrics) == 1 else "bar"
+    # Pie is allowed only for 2-5 parts. For larger result sets the runtime
+    # safely switches to a horizontal bar chart instead of a cluttered pie.
+    output_type = chart_type
     return (f"""{filter_code}
 result_df = (df_work.groupby('{group}', as_index=False).agg({aggregations})
     .rename(columns={{'{group}': 'name'}}))
-chart_data = result_df.to_dict(orient='records')
-chart_type = '{chart_type}'""", "Biểu đồ được chọn theo loại câu hỏi, biến cần so sánh và các điều kiện lọc được nhận diện từ yêu cầu.", chart_type)
+if len(result_df) < 2:
+    # A single value cannot form a meaningful comparison chart.
+    chart_data = []
+    chart_type = 'none'
+else:
+    chart_data = result_df.to_dict(orient='records')
+    chart_type = ('pie' if 2 <= len(result_df) <= 5 else 'bar-horizontal') if '{output_type}' == 'pie' else '{output_type}'""", "Biểu đồ được chọn theo mục tiêu phân tích, số biến và các điều kiện lọc được nhận diện từ yêu cầu. Nếu chỉ còn một giá trị sau lọc, hệ thống sẽ không vẽ biểu đồ để tránh trực quan hóa sai lệch.", output_type)
 
 
 def local_analysis_code(prompt: str) -> tuple[str, str, str]:

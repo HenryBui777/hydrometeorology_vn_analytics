@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import { 
-  BarChart, Bar, LineChart, Line, ScatterChart, Scatter, PieChart, Pie, ComposedChart,
+  BarChart, Bar, LineChart, Line, AreaChart, Area, ScatterChart, Scatter, ZAxis, PieChart, Pie, ComposedChart,
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
 } from 'recharts';
@@ -72,7 +72,7 @@ export default function AIAnalystPortal({
 
   const COLORS = isColorBlind ? COLORS_COLORBLIND : COLORS_DEFAULT;
   const autoChartType = useMemo(() => {
-    const allowedTypes = new Set(['bar', 'line', 'scatter', 'pie', 'composed', 'radar']);
+    const allowedTypes = new Set(['bar', 'bar-horizontal', 'line', 'area', 'scatter', 'bubble', 'histogram', 'pie', 'composed', 'radar']);
     const requestedType = activeQuery?.chartType;
     if (allowedTypes.has(requestedType)) return requestedType;
 
@@ -85,7 +85,7 @@ export default function AIAnalystPortal({
     if (/tỷ trọng|tỉ trọng|cơ cấu|percentage|phần trăm/.test(question) && (data?.length || 0) <= 8) return 'pie';
     return 'bar';
   }, [activeQuery]);
-  const autoChartLabel = { bar: 'Biểu đồ cột', line: 'Biểu đồ đường', scatter: 'Biểu đồ phân tán', pie: 'Biểu đồ tròn', composed: 'Biểu đồ kết hợp', radar: 'Biểu đồ radar' }[autoChartType];
+  const autoChartLabel = { bar: 'Biểu đồ cột', 'bar-horizontal': 'Biểu đồ thanh ngang', line: 'Biểu đồ đường', area: 'Biểu đồ miền', scatter: 'Biểu đồ phân tán', bubble: 'Biểu đồ bong bóng', histogram: 'Biểu đồ phân bố tần suất', pie: 'Biểu đồ tròn', composed: 'Biểu đồ kết hợp', radar: 'Biểu đồ radar' }[autoChartType];
   
   // Fake streaming state for execution monitor
   const [streamedLogs, setStreamedLogs] = useState([]);
@@ -166,7 +166,7 @@ export default function AIAnalystPortal({
     return (
       <div className="h-96 w-full mt-4" id="chart-export-area">
         <ResponsiveContainer width="100%" height="100%">
-          {chartType === 'bar' ? (
+          {chartType === 'bar' || chartType === 'histogram' ? (
             <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
               <XAxis dataKey={xKey} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(xKey), position: 'insideBottom', offset: -2 }} />
@@ -174,6 +174,15 @@ export default function AIAnalystPortal({
               <Tooltip cursor={{fill: '#f1f5f9'}} formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               <Legend />
               {yKeys.map((key, i) => <Bar key={key} name={fieldLabel(key)} dataKey={key} fill={COLORS[i % COLORS.length]} radius={[4, 4, 0, 0]} />)}
+            </BarChart>
+          ) : chartType === 'bar-horizontal' ? (
+            <BarChart data={data} layout="vertical" margin={{ top: 20, right: 30, left: 80, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
+              <XAxis type="number" stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), position: 'insideBottom', offset: -2 }} />
+              <YAxis type="category" dataKey={xKey} stroke="#64748b" fontSize={12} width={110} label={{ value: fieldLabel(xKey), angle: -90, position: 'insideLeft', offset: 35 }} />
+              <Tooltip cursor={{fill: '#f1f5f9'}} formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <Legend />
+              {yKeys.map((key, i) => <Bar key={key} name={fieldLabel(key)} dataKey={key} fill={COLORS[i % COLORS.length]} radius={[0, 4, 4, 0]} />)}
             </BarChart>
           ) : chartType === 'line' ? (
             <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -184,6 +193,15 @@ export default function AIAnalystPortal({
               <Legend />
               {yKeys.map((key, i) => <Line key={key} name={fieldLabel(key)} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />)}
             </LineChart>
+          ) : chartType === 'area' ? (
+            <AreaChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
+              <XAxis dataKey={xKey} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(xKey), position: 'insideBottom', offset: -2 }} />
+              <YAxis stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
+              <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} />
+              <Legend />
+              {yKeys.map((key, i) => <Area key={key} name={fieldLabel(key)} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} fill={COLORS[i % COLORS.length]} fillOpacity={0.25} />)}
+            </AreaChart>
           ) : chartType === 'composed' ? (
             <ComposedChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
@@ -204,14 +222,15 @@ export default function AIAnalystPortal({
               <Legend />
               <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} />
             </RadarChart>
-          ) : chartType === 'scatter' ? (
+          ) : chartType === 'scatter' || chartType === 'bubble' ? (
             <ScatterChart margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
               <XAxis dataKey={scatterX} name={fieldLabel(scatterX)} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(scatterX), position: 'insideBottom', offset: -2 }} />
               <YAxis dataKey={scatterY} name={fieldLabel(scatterY)} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(scatterY), angle: -90, position: 'insideLeft', offset: 8 }} />
               <Tooltip cursor={{strokeDasharray: '3 3'}} content={<ScatterTooltip />} />
               <Legend />
-              <Scatter name="Các địa điểm" data={data} fill={COLORS[0]} />
+              {chartType === 'bubble' && yKeys[2] && <ZAxis dataKey={yKeys[2]} range={[80, 600]} name={fieldLabel(yKeys[2])} />}
+              <Scatter name={chartType === 'bubble' ? 'Các địa điểm (kích thước = chỉ số thứ ba)' : 'Các địa điểm'} data={data} fill={COLORS[0]} />
             </ScatterChart>
           ) : (
             <PieChart>
