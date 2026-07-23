@@ -31,6 +31,10 @@ const FIELD_LABELS = {
 };
 const fieldLabel = (key) => FIELD_LABELS[key] || String(key || '').replaceAll('_', ' ');
 const formatChartValue = (value) => typeof value === 'number' ? Number(value).toFixed(2) : value;
+const formatAxisTick = (value) => {
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(numericValue) ? numericValue.toFixed(2) : value;
+};
 
 // Scatter points represent places. Recharts normally only exposes the two
 // numerical axes, so render the province/region in the tooltip explicitly.
@@ -169,8 +173,8 @@ export default function AIAnalystPortal({
           {chartType === 'bar' || chartType === 'histogram' ? (
             <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
-              <XAxis dataKey={xKey} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(xKey), position: 'insideBottom', offset: -2 }} />
-              <YAxis stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
+              <XAxis dataKey={xKey} tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(xKey), position: 'insideBottom', offset: -2 }} />
+              <YAxis tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
               <Tooltip cursor={{fill: '#f1f5f9'}} formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               <Legend />
               {yKeys.map((key, i) => <Bar key={key} name={fieldLabel(key)} dataKey={key} fill={COLORS[i % COLORS.length]} radius={[4, 4, 0, 0]} />)}
@@ -178,7 +182,7 @@ export default function AIAnalystPortal({
           ) : chartType === 'bar-horizontal' ? (
             <BarChart data={data} layout="vertical" margin={{ top: 20, right: 30, left: 80, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
-              <XAxis type="number" stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), position: 'insideBottom', offset: -2 }} />
+              <XAxis type="number" tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), position: 'insideBottom', offset: -2 }} />
               <YAxis type="category" dataKey={xKey} stroke="#64748b" fontSize={12} width={110} label={{ value: fieldLabel(xKey), angle: -90, position: 'insideLeft', offset: 35 }} />
               <Tooltip cursor={{fill: '#f1f5f9'}} formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               <Legend />
@@ -187,8 +191,8 @@ export default function AIAnalystPortal({
           ) : chartType === 'line' || chartType === 'multi-line' ? (
             <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
-              <XAxis dataKey={xKey} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(xKey), position: 'insideBottom', offset: -2 }} />
-              <YAxis stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
+              <XAxis dataKey={xKey} tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(xKey), position: 'insideBottom', offset: -2 }} />
+              <YAxis tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
               <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               <Legend />
               {yKeys.map((key, i) => <Line key={key} name={fieldLabel(key)} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />)}
@@ -196,8 +200,8 @@ export default function AIAnalystPortal({
           ) : chartType === 'area' || chartType === 'stacked-area' ? (
             <AreaChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
-              <XAxis dataKey={xKey} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(xKey), position: 'insideBottom', offset: -2 }} />
-              <YAxis stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
+              <XAxis dataKey={xKey} tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(xKey), position: 'insideBottom', offset: -2 }} />
+              <YAxis tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
               <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} />
               <Legend />
               {yKeys.map((key, i) => <Area key={key} stackId={chartType === 'stacked-area' ? 'total' : undefined} name={fieldLabel(key)} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} fill={COLORS[i % COLORS.length]} fillOpacity={0.25} />)}
@@ -205,9 +209,9 @@ export default function AIAnalystPortal({
           ) : chartType === 'composed' ? (
             <ComposedChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
-              <XAxis dataKey={xKey} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(xKey), position: 'insideBottom', offset: -2 }} />
-              <YAxis yAxisId="left" stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
-              <YAxis yAxisId="right" orientation="right" stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[1]), angle: 90, position: 'insideRight', offset: 8 }} />
+              <XAxis dataKey={xKey} tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(xKey), position: 'insideBottom', offset: -2 }} />
+              <YAxis yAxisId="left" tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
+              <YAxis yAxisId="right" orientation="right" tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[1]), angle: 90, position: 'insideRight', offset: 8 }} />
               <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} />
               <Legend />
               <Bar yAxisId="left" name={fieldLabel(yKeys[0])} dataKey={yKeys[0]} fill={COLORS[0]} radius={[4, 4, 0, 0]} />
@@ -217,7 +221,7 @@ export default function AIAnalystPortal({
             <RadarChart data={data} outerRadius="72%">
               <PolarGrid />
               <PolarAngleAxis dataKey={xKey} fontSize={12} />
-              <PolarRadiusAxis fontSize={10} />
+              <PolarRadiusAxis tickFormatter={formatAxisTick} fontSize={10} />
               {yKeys.map((key, index) => <Radar key={key} name={fieldLabel(key)} dataKey={key} stroke={COLORS[index % COLORS.length]} fill={COLORS[index % COLORS.length]} fillOpacity={0.22} />)}
               <Legend />
               <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} />
@@ -225,8 +229,8 @@ export default function AIAnalystPortal({
           ) : chartType === 'scatter' || chartType === 'bubble' ? (
             <ScatterChart margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
-              <XAxis dataKey={scatterX} name={fieldLabel(scatterX)} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(scatterX), position: 'insideBottom', offset: -2 }} />
-              <YAxis dataKey={scatterY} name={fieldLabel(scatterY)} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(scatterY), angle: -90, position: 'insideLeft', offset: 8 }} />
+              <XAxis dataKey={scatterX} name={fieldLabel(scatterX)} tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(scatterX), position: 'insideBottom', offset: -2 }} />
+              <YAxis dataKey={scatterY} name={fieldLabel(scatterY)} tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(scatterY), angle: -90, position: 'insideLeft', offset: 8 }} />
               <Tooltip cursor={{strokeDasharray: '3 3'}} content={<ScatterTooltip />} />
               <Legend />
               {chartType === 'bubble' && yKeys[2] && <ZAxis dataKey={yKeys[2]} range={[80, 600]} name={fieldLabel(yKeys[2])} />}
