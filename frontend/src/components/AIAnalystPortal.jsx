@@ -26,10 +26,26 @@ const FIELD_LABELS = {
   wind_direction_10m_dominant: 'Hướng gió chủ đạo', weather_code: 'Mã thời tiết',
   cloud_cover: 'Độ che phủ mây (%)', et0: 'Lượng bốc hơi tham chiếu (mm)', pressure: 'Áp suất khí quyển (hPa)',
   shortwave_radiation_sum: 'Tổng bức xạ mặt trời', dew_point: 'Điểm sương (°C)', amplitude: 'Biên độ nhiệt (°C)',
-  temp_range: 'Biên độ nhiệt (°C)', rain_std: 'Độ lệch chuẩn lượng mưa (mm)', score: 'Điểm tiềm năng', ratio: 'Tỷ lệ bốc hơi/giờ nắng'
+  temp_range: 'Biên độ nhiệt (°C)', rain_std: 'Độ lệch chuẩn lượng mưa (mm)', score: 'Điểm tiềm năng',
+  variability_score: 'Điểm thất thường tổng hợp', ratio: 'Tỷ lệ bốc hơi/giờ nắng'
 };
 const fieldLabel = (key) => FIELD_LABELS[key] || String(key || '').replaceAll('_', ' ');
 const formatChartValue = (value) => typeof value === 'number' ? Number(value).toFixed(2) : value;
+
+// Scatter points represent places. Recharts normally only exposes the two
+// numerical axes, so render the province/region in the tooltip explicitly.
+const ScatterTooltip = ({ active, payload }) => {
+  if (!active || !payload?.length) return null;
+  const row = payload[0]?.payload || {};
+  const entries = Object.entries(row).filter(([, value]) => typeof value === 'number');
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg">
+      {row.name && <p className="mb-1 font-extrabold text-slate-800">Tỉnh/thành: {row.name}</p>}
+      {row.region && <p className="mb-1 font-semibold text-slate-700">Vùng: {row.region}</p>}
+      {entries.map(([key, value]) => <p key={key} className="text-slate-600">{fieldLabel(key)}: <b>{formatChartValue(value)}</b></p>)}
+    </div>
+  );
+};
 
 export default function AIAnalystPortal({
   datasetUploaded,
@@ -193,9 +209,9 @@ export default function AIAnalystPortal({
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
               <XAxis dataKey={scatterX} name={fieldLabel(scatterX)} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(scatterX), position: 'insideBottom', offset: -2 }} />
               <YAxis dataKey={scatterY} name={fieldLabel(scatterY)} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(scatterY), angle: -90, position: 'insideLeft', offset: 8 }} />
-              <Tooltip cursor={{strokeDasharray: '3 3'}} formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <Tooltip cursor={{strokeDasharray: '3 3'}} content={<ScatterTooltip />} />
               <Legend />
-              <Scatter name="Data" data={data} fill={COLORS[0]} />
+              <Scatter name="Các địa điểm" data={data} fill={COLORS[0]} />
             </ScatterChart>
           ) : (
             <PieChart>

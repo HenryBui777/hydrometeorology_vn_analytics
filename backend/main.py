@@ -323,7 +323,19 @@ df_work['temp_range'] = df_work['temp_max'] - df_work['temp_min']
 result_df = (df_work.groupby('province', as_index=False)
     .agg(temp_range=('temp_range', 'mean'), rain_std=('precipitation_sum', 'std'))
     .dropna().rename(columns={'province':'name'}))
+result_df['variability_score'] = (
+    result_df['temp_range'] / result_df['temp_range'].max()
+    + result_df['rain_std'] / result_df['rain_std'].max()
+)
+ranking = (result_df.nlargest(10, 'variability_score')
+    [['name', 'variability_score']]
+    .rename(columns={'variability_score': 'value'}))
 chart_data = result_df.to_dict(orient='records')
+additional_charts = [{
+    'title': 'Top 10 tỉnh có thời tiết thất thường nhất',
+    'type': 'bar',
+    'data': ranking.to_dict(orient='records')
+}]
 chart_type = 'scatter'""", "Tìm các tỉnh có đồng thời biên độ nhiệt lớn và lượng mưa biến động mạnh.", "scatter")
 
     # 15. Autumn cloud-cover effects
