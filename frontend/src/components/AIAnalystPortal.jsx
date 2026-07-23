@@ -15,6 +15,19 @@ import {
 // Colors for charts
 const COLORS_DEFAULT = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
 const COLORS_COLORBLIND = ['#0072B2', '#E69F00', '#56B4E9', '#009E73', '#F0E442', '#D55E00', '#CC79A7'];
+const FIELD_LABELS = {
+  name: 'Đối tượng so sánh', province: 'Tỉnh/thành', region: 'Vùng', season: 'Mùa', month: 'Tháng',
+  date: 'Thời gian', value: 'Giá trị', x: 'Trục X', y: 'Trục Y',
+  temp_mean: 'Nhiệt độ trung bình (°C)', temp_max: 'Nhiệt độ cao nhất (°C)', temp_min: 'Nhiệt độ thấp nhất (°C)',
+  app_temp_mean: 'Nhiệt độ cảm nhận TB (°C)', precipitation_sum: 'Lượng mưa (mm)', rain_sum: 'Lượng mưa (mm)',
+  humidity_mean: 'Độ ẩm trung bình (%)', sunshine_hours: 'Số giờ nắng (giờ)', daylight_hours: 'Số giờ ban ngày (giờ)',
+  wind_speed_max: 'Tốc độ gió lớn nhất (km/h)', wind_gusts_max: 'Gió giật lớn nhất (km/h)',
+  cloud_cover: 'Độ che phủ mây (%)', et0: 'Lượng bốc hơi tham chiếu (mm)', pressure: 'Áp suất khí quyển (hPa)',
+  shortwave_radiation_sum: 'Bức xạ mặt trời', dew_point: 'Điểm sương (°C)', amplitude: 'Biên độ nhiệt (°C)',
+  temp_range: 'Biên độ nhiệt (°C)', rain_std: 'Độ lệch chuẩn lượng mưa (mm)', score: 'Điểm tiềm năng', ratio: 'Tỷ lệ bốc hơi/giờ nắng'
+};
+const fieldLabel = (key) => FIELD_LABELS[key] || String(key || '').replaceAll('_', ' ');
+const formatChartValue = (value) => typeof value === 'number' ? Number(value).toFixed(2) : value;
 
 export default function AIAnalystPortal({
   datasetUploaded,
@@ -138,55 +151,55 @@ export default function AIAnalystPortal({
           {chartType === 'bar' ? (
             <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
-              <XAxis dataKey={xKey} stroke="#64748b" fontSize={12} />
-              <YAxis stroke="#64748b" fontSize={12} />
-              <Tooltip cursor={{fill: '#f1f5f9'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <XAxis dataKey={xKey} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(xKey), position: 'insideBottom', offset: -2 }} />
+              <YAxis stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
+              <Tooltip cursor={{fill: '#f1f5f9'}} formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               <Legend />
-              {yKeys.map((key, i) => <Bar key={key} dataKey={key} fill={COLORS[i % COLORS.length]} radius={[4, 4, 0, 0]} />)}
+              {yKeys.map((key, i) => <Bar key={key} name={fieldLabel(key)} dataKey={key} fill={COLORS[i % COLORS.length]} radius={[4, 4, 0, 0]} />)}
             </BarChart>
           ) : chartType === 'line' ? (
             <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
-              <XAxis dataKey={xKey} stroke="#64748b" fontSize={12} />
-              <YAxis stroke="#64748b" fontSize={12} />
-              <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <XAxis dataKey={xKey} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(xKey), position: 'insideBottom', offset: -2 }} />
+              <YAxis stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
+              <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               <Legend />
-              {yKeys.map((key, i) => <Line key={key} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />)}
+              {yKeys.map((key, i) => <Line key={key} name={fieldLabel(key)} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />)}
             </LineChart>
           ) : chartType === 'composed' ? (
             <ComposedChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
-              <XAxis dataKey={xKey} stroke="#64748b" fontSize={12} />
-              <YAxis yAxisId="left" stroke="#64748b" fontSize={12} />
-              <YAxis yAxisId="right" orientation="right" stroke="#64748b" fontSize={12} />
-              <Tooltip />
+              <XAxis dataKey={xKey} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(xKey), position: 'insideBottom', offset: -2 }} />
+              <YAxis yAxisId="left" stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
+              <YAxis yAxisId="right" orientation="right" stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[1]), angle: 90, position: 'insideRight', offset: 8 }} />
+              <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} />
               <Legend />
-              <Bar yAxisId="left" dataKey={yKeys[0]} fill={COLORS[0]} radius={[4, 4, 0, 0]} />
-              <Line yAxisId="right" type="monotone" dataKey={yKeys[1]} stroke={COLORS[2]} strokeWidth={3} />
+              <Bar yAxisId="left" name={fieldLabel(yKeys[0])} dataKey={yKeys[0]} fill={COLORS[0]} radius={[4, 4, 0, 0]} />
+              <Line yAxisId="right" name={fieldLabel(yKeys[1])} type="monotone" dataKey={yKeys[1]} stroke={COLORS[2]} strokeWidth={3} />
             </ComposedChart>
           ) : chartType === 'radar' ? (
             <RadarChart data={data} outerRadius="72%">
               <PolarGrid />
               <PolarAngleAxis dataKey={xKey} fontSize={12} />
               <PolarRadiusAxis fontSize={10} />
-              {yKeys.map((key, index) => <Radar key={key} name={key} dataKey={key} stroke={COLORS[index % COLORS.length]} fill={COLORS[index % COLORS.length]} fillOpacity={0.22} />)}
+              {yKeys.map((key, index) => <Radar key={key} name={fieldLabel(key)} dataKey={key} stroke={COLORS[index % COLORS.length]} fill={COLORS[index % COLORS.length]} fillOpacity={0.22} />)}
               <Legend />
-              <Tooltip />
+              <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} />
             </RadarChart>
           ) : chartType === 'scatter' ? (
             <ScatterChart margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
-              <XAxis dataKey={scatterX} name={scatterX} stroke="#64748b" fontSize={12} />
-              <YAxis dataKey={scatterY} name={scatterY} stroke="#64748b" fontSize={12} />
-              <Tooltip cursor={{strokeDasharray: '3 3'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <XAxis dataKey={scatterX} name={fieldLabel(scatterX)} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(scatterX), position: 'insideBottom', offset: -2 }} />
+              <YAxis dataKey={scatterY} name={fieldLabel(scatterY)} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(scatterY), angle: -90, position: 'insideLeft', offset: 8 }} />
+              <Tooltip cursor={{strokeDasharray: '3 3'}} formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               <Legend />
               <Scatter name="Data" data={data} fill={COLORS[0]} />
             </ScatterChart>
           ) : (
             <PieChart>
-              <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               <Legend />
-              <Pie data={data} dataKey={yKeys[0]} nameKey={xKey} cx="50%" cy="50%" outerRadius={120} label>
+              <Pie data={data} dataKey={yKeys[0]} name={fieldLabel(yKeys[0])} nameKey={xKey} cx="50%" cy="50%" outerRadius={120} label>
                 {data.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
               </Pie>
             </PieChart>

@@ -121,7 +121,7 @@ def infer_general_analysis(prompt: str) -> tuple[str, str, str]:
 result_df = df_work[['province', '{x_metric}', '{y_metric}']].dropna().copy()
 if len(result_df) > 800:
     result_df = result_df.sample(800, random_state=42)
-result_df = result_df.rename(columns={{'province': 'name', '{x_metric}': 'x', '{y_metric}': 'y'}})
+result_df = result_df.rename(columns={{'province': 'name'}})
 chart_data = result_df.to_dict(orient='records')
 chart_type = 'scatter'""", "Biểu đồ phân tán được chọn để kiểm tra mối quan hệ giữa hai biến được hỏi.", "scatter")
 
