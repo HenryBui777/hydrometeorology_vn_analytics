@@ -58,6 +58,35 @@ def local_analysis_code(prompt: str) -> tuple[str, str, str]:
     north = "['Trung du miền núi Bắc Bộ', 'Đồng bằng sông Hồng']"
     south_central = "'Duyên hải Nam Trung Bộ'"
 
+    # Strict entity rule: when the user names Hanoi and HCMC, never include
+    # any other province. A single requested month is a direct two-group
+    # comparison, so a grouped bar chart is the most readable form.
+    has_hanoi = "hà nội" in text or "ha noi" in text
+    has_hcm = any(alias in text for alias in ("hồ chí minh", "ho chi minh", "tp.hcm", "tp hcm", "hcm"))
+    month_match = re.search(r"tháng\s*(1[0-2]|[1-9])", text)
+    if has_hanoi and has_hcm and month_match:
+        month = int(month_match.group(1))
+        selected_metrics = []
+        if "nhiệt" in text or "nóng" in text or "lạnh" in text:
+            selected_metrics.append("temp_mean")
+        if "nắng" in text or "sunshine" in text:
+            selected_metrics.append("sunshine_hours")
+        if "mưa" in text or "rain" in text:
+            selected_metrics.append("precipitation_sum")
+        if "độ ẩm" in text or "humidity" in text:
+            selected_metrics.append("humidity_mean")
+        if not selected_metrics:
+            selected_metrics = ["temp_mean"]
+        aggregation = ", ".join(f"{metric}=('{metric}', 'mean')" for metric in selected_metrics)
+        return (f"""# Chỉ sử dụng đúng hai địa điểm được nêu trong câu hỏi.
+selected_provinces = ['Hà Nội', 'Hồ Chí Minh']
+result_df = (df[df['province'].isin(selected_provinces) & df['month'].eq({month})]
+    .groupby('province', as_index=False)
+    .agg({aggregation})
+    .rename(columns={{'province': 'name'}}))
+chart_data = result_df.to_dict(orient='records')
+chart_type = 'bar'""", f"So sánh đúng Hà Nội và Hồ Chí Minh trong tháng {month}; không đưa bất kỳ tỉnh nào khác vào biểu đồ.", "bar")
+
     # 1. Top hottest provinces
     if "top 5" in text and ("nhiệt" in text or "nóng" in text):
         return ("""result_df = (df.groupby('province', as_index=False)['temp_mean'].mean()
