@@ -163,7 +163,60 @@ duckdb>=0.9.0
 
 ---
 
-## 🚀 Hướng Dẫn Khởi Chạy Source Code
+## 🚀 Hướng Dẫn Chạy Đồ Án (Windows PowerShell)
+
+> Mở **2 cửa sổ PowerShell**: một cửa sổ chạy Backend và một cửa sổ chạy Frontend.
+> Không chạy lệnh `uvicorn src.backend.main:app ...` trong thư mục `src/backend`, vì phiên bản đồ án đang sử dụng entrypoint `backend/main.py`.
+
+### 0. Điều kiện cần
+
+- Python 3.10 trở lên và Node.js 18 trở lên.
+- Có sẵn dữ liệu tại `data/processed/cleaned_data.csv`.
+- Tạo file `.env` ở thư mục gốc dự án. Để chạy Dashboard cơ bản, có thể dùng cấu hình Supabase/Gemini của nhóm. Nếu muốn dùng chức năng Gemini, điền khóa của riêng bạn và **không đưa khóa lên GitHub**.
+
+Ví dụ `.env` tối thiểu:
+
+```ini
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your_supabase_key
+GEMINI_API_KEY=your_gemini_api_key
+```
+
+### Cách chạy nhanh mỗi lần làm bài
+
+**Terminal 1 – Backend:**
+
+```powershell
+cd D:\download\hydrometeorology_vn_analytics
+python -m pip install -r requirements.txt
+cd backend
+python main.py
+```
+
+Khi terminal hiện `Uvicorn running on http://127.0.0.1:8000`, backend đã hoạt động. Có thể kiểm tra tại `http://127.0.0.1:8000/docs`.
+
+**Terminal 2 – Frontend:**
+
+```powershell
+cd D:\download\hydrometeorology_vn_analytics\frontend
+npm install
+npm run dev
+```
+
+Mở địa chỉ Vite in ra trong terminal (thường là `http://localhost:5173`).
+
+Sau lần đầu, chỉ cần chạy `python main.py` ở terminal Backend và `npm run dev` ở terminal Frontend. Nhấn `Ctrl + C` để dừng từng server.
+
+### Khắc phục nhanh
+
+- **Trang trắng hoặc chưa nhận thay đổi:** nhấn `Ctrl + F5` trên trình duyệt.
+- **AI báo `Failed to fetch`:** kiểm tra Backend đang chạy ở cổng `8000` và Frontend ở `5173`.
+- **Cổng 5173 đang bận:** dừng terminal Vite cũ bằng `Ctrl + C`, rồi chạy lại `npm run dev`.
+- **AI trả về kết quả cũ:** tạo một câu hỏi mới sau khi khởi động lại Backend.
+
+---
+
+## Hướng Dẫn Khởi Chạy Source Code (tham khảo chi tiết)
 
 ### Bước 1: Khởi chạy Backend FastAPI (Port 8000)
 
@@ -174,7 +227,8 @@ duckdb>=0.9.0
    ```
 3. Khởi chạy máy chủ FastAPI Backend:
    ```powershell
-   uvicorn src.backend.main:app --reload --port 8000
+   cd backend
+   python main.py
    ```
    *(Backend sẽ chạy tại: `http://localhost:8000` - Tài liệu Swagger API tại: `http://localhost:8000/docs`)*
 
