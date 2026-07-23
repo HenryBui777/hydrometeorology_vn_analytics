@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import html2pdf from 'html2pdf.js';
 import { supabase } from './lib/supabase';
 import { predefinedQueries } from './mockData';
 import Sidebar from './components/Sidebar';
@@ -100,7 +99,7 @@ export default function App() {
     setUser(null);
   };
 
-  const handlePrint = async () => {
+  const handlePrint = () => {
     const report = document.querySelector('main[data-print-tab]');
     if (!report || isExportingPdf) return;
 
@@ -108,64 +107,63 @@ export default function App() {
     const exportCopy = report.cloneNode(true);
     const tabLabel = printTabLabels[currentTab] || 'bao-cao-kttv';
 
-    exportCopy.classList.add('pdf-export-copy');
+    exportCopy.classList.add('report-preview-copy');
     exportCopy.style.width = '1120px';
+    exportCopy.style.maxWidth = '100%';
     exportCopy.style.padding = '24px';
     exportCopy.style.overflow = 'visible';
     exportCopy.style.background = '#f8fafc';
-    // html2canvas can render a blank page when the source is placed far outside
-    // the viewport. Keep it at the viewport origin, underneath the application.
-    exportCopy.style.position = 'fixed';
-    exportCopy.style.left = '0';
-    exportCopy.style.top = '0';
-    exportCopy.style.zIndex = '-1';
-    exportCopy.style.pointerEvents = 'none';
     exportCopy.querySelectorAll('.print-report-header').forEach((element) => {
       element.style.display = 'flex';
     });
 
-    document.body.appendChild(exportCopy);
+    // Canvas cannot be cloned by HTML alone; replace each copy with a snapshot.
+    exportCopy.querySelectorAll('canvas').forEach((canvas) => {
+      try {
+        const image = document.createElement('img');
+        image.src = canvas.toDataURL('image/png');
+        image.style.maxWidth = '100%';
+        image.style.height = 'auto';
+        canvas.replaceWith(image);
+      } catch {
+        // Keep the original canvas when a browser blocks its data URL.
+      }
+    });
 
-    try {
-      const pdfBlob = await html2pdf()
-        .set({
-          margin: [8, 8, 8, 8],
-          filename: `${tabLabel.toLowerCase().replace(/\s+/g, '-')}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: {
-            scale: 2,
-            useCORS: true,
-            backgroundColor: '#f8fafc',
-            logging: false,
-          },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-          pagebreak: { mode: ['css', 'legacy'] },
-        })
-        .from(exportCopy)
-        .outputPdf('blob');
+    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+      .map((node) => node.outerHTML)
+      .join('');
+    const previewStyles = `
+      <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #e2e8f0; color: #0f172a; font-family: Inter, Arial, sans-serif; }
+        .report-preview-copy { margin: 0 auto; min-height: 100vh; }
+        .report-preview-copy .print-hidden { display: none !important; }
+        .report-preview-copy .h-screen, .report-preview-copy .overflow-hidden,
+        .report-preview-copy .overflow-y-auto, .report-preview-copy .overflow-x-auto {
+          height: auto !important; max-height: none !important; overflow: visible !important;
+        }
+        .print-report-header { display: flex !important; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid #2563eb; }
+        .print-report-kicker { margin: 0 0 4px; color: #2563eb; font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+        .print-report-header h1 { margin: 0; font-size: 26px; }
+        .print-report-subtitle, .print-report-date { margin: 5px 0 0; color: #475569; font-size: 13px; }
+        @media print { @page { size: A4 landscape; margin: 8mm; } body { background: #fff; } .report-preview-copy { width: auto !important; padding: 0 !important; } }
+      </style>`;
 
-      if (pdfPreview?.url) URL.revokeObjectURL(pdfPreview.url);
-      setPdfPreview({
-        filename: `${tabLabel.toLowerCase().replace(/\s+/g, '-')}.pdf`,
-        url: URL.createObjectURL(pdfBlob),
-      });
-    } finally {
-      exportCopy.remove();
-      setIsExportingPdf(false);
-    }
+    setPdfPreview({
+      filename: `${tabLabel.toLowerCase().replace(/\s+/g, '-')}.pdf`,
+      srcDoc: `<!doctype html><html lang="vi"><head><base href="${window.location.origin}/">${styles}${previewStyles}</head><body>${exportCopy.outerHTML}</body></html>`,
+    });
+    setIsExportingPdf(false);
   };
 
   const closePdfPreview = () => {
-    if (pdfPreview?.url) URL.revokeObjectURL(pdfPreview.url);
     setPdfPreview(null);
   };
 
   const downloadPdfPreview = () => {
     if (!pdfPreview) return;
-    const link = document.createElement('a');
-    link.href = pdfPreview.url;
-    link.download = pdfPreview.filename;
-    link.click();
+    document.getElementById('report-preview-frame')?.contentWindow?.print();
   };
 
   // Start with some history items to show past activities
@@ -436,18 +434,18 @@ export default function App() {
 
       {pdfPreview && (
         <div className="print-hidden fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-          <section role="dialog" aria-modal="true" aria-label="Xem trước báo cáo PDF" className="flex h-[min(860px,92vh)] w-[min(1200px,96vw)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
+          <section role="dialog" aria-modal="true" aria-label="Xem trước báo cáo" className="flex h-[min(860px,92vh)] w-[min(1200px,96vw)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
             <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
               <div>
-                <h2 className="font-bold text-slate-900 dark:text-white">Xem trước báo cáo PDF</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Kiểm tra bản mẫu; đóng cửa sổ này để chỉnh dữ liệu hoặc giao diện.</p>
+                <h2 className="font-bold text-slate-900 dark:text-white">Xem trước báo cáo</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Bản mẫu hiển thị trực tiếp. Đóng cửa sổ này để chỉnh rồi tạo lại.</p>
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={closePdfPreview} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">Quay lại chỉnh</button>
-                <button onClick={downloadPdfPreview} className="rounded-lg bg-brand-primary px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700">Tải PDF</button>
+                <button onClick={downloadPdfPreview} className="rounded-lg bg-brand-primary px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700">Lưu thành PDF</button>
               </div>
             </header>
-            <iframe src={pdfPreview.url} title="Bản xem trước PDF" className="min-h-0 flex-1 bg-slate-100" />
+            <iframe id="report-preview-frame" srcDoc={pdfPreview.srcDoc} title="Bản xem trước báo cáo" className="min-h-0 flex-1 bg-slate-100" />
           </section>
         </div>
       )}
