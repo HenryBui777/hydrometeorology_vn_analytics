@@ -108,7 +108,8 @@ export default function App() {
     const tabLabel = printTabLabels[currentTab] || 'bao-cao-kttv';
 
     exportCopy.classList.add('report-preview-copy');
-    exportCopy.style.width = '1120px';
+    // A4 portrait printable width at 96dpi, leaving space for margins.
+    exportCopy.style.width = '760px';
     exportCopy.style.maxWidth = '100%';
     exportCopy.style.padding = '24px';
     exportCopy.style.overflow = 'visible';
@@ -147,7 +148,7 @@ export default function App() {
         .print-report-kicker { margin: 0 0 4px; color: #2563eb; font-size: 11px; font-weight: 800; letter-spacing: .12em; }
         .print-report-header h1 { margin: 0; font-size: 26px; }
         .print-report-subtitle, .print-report-date { margin: 5px 0 0; color: #475569; font-size: 13px; }
-        @media print { @page { size: A4 landscape; margin: 8mm; } body { background: #fff; } .report-preview-copy { width: auto !important; padding: 0 !important; } }
+        @media print { @page { size: A4 portrait; margin: 8mm; } body { background: #fff; } .report-preview-copy { width: auto !important; padding: 0 !important; } }
       </style>`;
 
     setPdfPreview({

@@ -222,7 +222,7 @@ svg:focus, g:focus, rect:focus, path:focus, .recharts-wrapper:focus, .recharts-s
 @media print {
   @page {
     margin: 0.9cm;
-    size: A4 landscape;
+    size: A4 portrait;
   }
 
   /* Hide UI elements that shouldn't be in the PDF */
