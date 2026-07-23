@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import html2canvas from 'html2canvas';
 import { supabase } from './lib/supabase';
 import { predefinedQueries } from './mockData';
 import Sidebar from './components/Sidebar';
@@ -100,68 +99,12 @@ export default function App() {
     setUser(null);
   };
 
-  const handlePrint = async () => {
-    const report = document.querySelector('main[data-print-tab]');
-    if (!report || isExportingPdf) return;
-
+  const handlePrint = () => {
+    if (isExportingPdf) return;
     setIsExportingPdf(true);
     const tabLabel = printTabLabels[currentTab] || 'bao-cao-kttv';
-    try {
-      const captureScale = 1.5;
-      const reportScrollTop = report.scrollTop;
-      const reportRect = report.getBoundingClientRect();
-      // `main` is a scrolling flex child, and some tabs let children overflow
-      // their wrapper. Use the lowest rendered descendant as the true bottom.
-      const reportContentHeight = Math.ceil(Math.max(
-        report.scrollHeight,
-        ...Array.from(report.querySelectorAll('*')).map((element) => (
-          element.getBoundingClientRect().bottom - reportRect.top + reportScrollTop
-        )),
-      ));
-      const screenshot = await html2canvas(report, {
-        backgroundColor: '#f8fafc',
-        scale: captureScale,
-        useCORS: true,
-        logging: false,
-        width: report.scrollWidth,
-        height: reportContentHeight,
-      });
-
-      // Browser paints some ResponsiveContainer charts only after they become
-      // visible. Capture each chart while it is on-screen and overlay it at its
-      // exact report position, so lower charts survive the exported image too.
-      const drawingContext = screenshot.getContext('2d');
-      const charts = Array.from(report.querySelectorAll('.recharts-wrapper'));
-      try {
-        for (const chart of charts) {
-          chart.scrollIntoView({ block: 'center', behavior: 'auto' });
-          await new Promise((resolve) => setTimeout(resolve, 120));
-
-          const reportRect = report.getBoundingClientRect();
-          const chartRect = chart.getBoundingClientRect();
-          const chartImage = await html2canvas(chart, {
-            backgroundColor: '#ffffff',
-            scale: captureScale,
-            useCORS: true,
-            logging: false,
-            width: chart.clientWidth,
-            height: chart.clientHeight,
-          });
-          const x = (chartRect.left - reportRect.left + report.scrollLeft) * captureScale;
-          const y = (chartRect.top - reportRect.top + report.scrollTop) * captureScale;
-          drawingContext?.drawImage(chartImage, x, y, chartImage.width, chartImage.height);
-        }
-      } finally {
-        report.scrollTop = reportScrollTop;
-      }
-
-      setPdfPreview({
-        filename: `${tabLabel.toLowerCase().replace(/\s+/g, '-')}.pdf`,
-        imageUrl: screenshot.toDataURL('image/png'),
-      });
-    } finally {
-      setIsExportingPdf(false);
-    }
+    setPdfPreview({ filename: `${tabLabel.toLowerCase().replace(/\s+/g, '-')}.pdf` });
+    setIsExportingPdf(false);
   };
 
   const closePdfPreview = () => {
@@ -170,21 +113,7 @@ export default function App() {
 
   const downloadPdfPreview = () => {
     if (!pdfPreview) return;
-    const printFrame = document.createElement('iframe');
-    printFrame.style.cssText = 'position:fixed;width:0;height:0;border:0;right:0;bottom:0;visibility:hidden';
-    document.body.appendChild(printFrame);
-    const printDocument = printFrame.contentDocument;
-    if (!printDocument) {
-      printFrame.remove();
-      return;
-    }
-    printFrame.onload = () => {
-      printFrame.contentWindow?.print();
-      printFrame.contentWindow?.addEventListener('afterprint', () => printFrame.remove(), { once: true });
-    };
-    printDocument.open();
-    printDocument.write(`<!doctype html><html><head><title>${pdfPreview.filename}</title><style>@page{size:A4 portrait;margin:8mm}body{margin:0}img{display:block;width:100%;height:auto}</style></head><body><img src="${pdfPreview.imageUrl}"></body></html>`);
-    printDocument.close();
+    window.print();
   };
 
   // Start with some history items to show past activities
@@ -324,22 +253,22 @@ export default function App() {
     <div className="flex h-screen w-screen overflow-hidden bg-brand-bg dark:bg-slate-900 text-brand-text dark:text-slate-200 transition-colors">
 
       {/* Sidebar Navigation */}
-      <Sidebar
+      {!pdfPreview && <Sidebar
         currentTab={currentTab}
         setCurrentTab={setCurrentTab}
         isCollapsed={isSidebarCollapsed}
         setIsCollapsed={setIsSidebarCollapsed}
         pendingCount={pendingReviewCount}
-      />
+      />}
 
       {/* Main Panel Content Area */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
+      <div className={`flex-1 flex flex-col h-screen overflow-hidden relative ${pdfPreview ? 'contents' : ''}`}>
 
         {/* Global News Ticker */}
-        <NewsTicker />
+        {!pdfPreview && <NewsTicker />}
 
         {/* Top Header Bar */}
-        <header className="h-16 border-b border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-8 flex justify-between items-center z-20 flex-shrink-0 transition-colors">
+        <header className={`${pdfPreview ? 'hidden' : 'h-16 border-b border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-8 flex justify-between items-center z-20 flex-shrink-0 transition-colors'}`}>
 
           {/* Page Title */}
           <div 
@@ -395,7 +324,7 @@ export default function App() {
         {/* View Router Render Area */}
         <main
           data-print-tab={currentTab}
-          className={`flex-1 bg-transparent transition-colors relative z-10 ${currentTab === 'chat' ? 'p-0 overflow-hidden flex flex-col' : 'p-8 overflow-y-auto'}`}
+          className={`${pdfPreview ? 'fixed inset-x-0 bottom-0 top-[78px] z-[101] bg-brand-bg p-8 overflow-y-auto dark:bg-slate-900' : `flex-1 bg-transparent transition-colors relative z-10 ${currentTab === 'chat' ? 'p-0 overflow-hidden flex flex-col' : 'p-8 overflow-y-auto'}`}`}
         >
           <div className="print-report-header">
             <div>
@@ -454,22 +383,15 @@ export default function App() {
       </div>
 
       {pdfPreview && (
-        <div className="print-hidden fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-          <section role="dialog" aria-modal="true" aria-label="Xem trước báo cáo" className="flex h-[min(860px,92vh)] w-[min(1200px,96vw)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
-            <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
-              <div>
-                <h2 className="font-bold text-slate-900 dark:text-white">Xem trước báo cáo</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Bản mẫu hiển thị trực tiếp. Đóng cửa sổ này để chỉnh rồi tạo lại.</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={closePdfPreview} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">Quay lại chỉnh</button>
-                <button onClick={downloadPdfPreview} className="rounded-lg bg-brand-primary px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700">Lưu thành PDF</button>
-              </div>
-            </header>
-            <div className="min-h-0 flex-1 overflow-auto bg-slate-200 p-4">
-              <img src={pdfPreview.imageUrl} alt="Bản xem trước báo cáo" className="mx-auto block w-full max-w-[760px] bg-white shadow-lg" />
-            </div>
-          </section>
+        <div className="print-hidden fixed inset-x-0 top-0 z-[102] flex h-[78px] items-center justify-between border-b border-slate-200 bg-white px-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <div>
+            <h2 className="font-bold text-slate-900 dark:text-white">Xem trước báo cáo</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Đây là giao diện thật của tab, giữ nguyên biểu đồ và bố cục.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={closePdfPreview} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">Quay lại chỉnh</button>
+            <button onClick={downloadPdfPreview} className="rounded-lg bg-brand-primary px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700">Lưu thành PDF</button>
+          </div>
         </div>
       )}
 
