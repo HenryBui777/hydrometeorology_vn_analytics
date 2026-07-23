@@ -1,15 +1,35 @@
 import os
+import json
+import re
+from typing import Any
+import google.generativeai as genai
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
+from ..database import insert_log
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # Cấu hình API Key Gemini từ môi trường (.env)
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AQ.Ab8RN6IeBa1n7oyTK4Lh7bngSYrFMYydDOHmiOVc4_fJL_1Wkw")
-AI_MODEL_NAME = os.getenv("AI_ENGINE_MODEL", "gemini-3.5-flash")
-genai.configure(api_key=GEMINI_API_KEY)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+AI_MODEL_NAME = os.getenv("AI_ENGINE_MODEL", "gemini-2.5-flash")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
-# Khởi tạo mô hình AI
-model = genai.GenerativeModel(AI_MODEL_NAME)
+def get_model():
+    if not GEMINI_API_KEY:
+        raise HTTPException(status_code=503, detail="Chưa cấu hình GEMINI_API_KEY cho backend.")
+    return genai.GenerativeModel(AI_MODEL_NAME)
+
+def parse_json_response(text: str) -> dict[str, Any]:
+    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", (text or "").strip(), flags=re.IGNORECASE).strip()
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        match = re.search(r"\{[\s\S]*\}", cleaned)
+        if not match:
+            raise ValueError("AI không trả về JSON hợp lệ.")
+        return json.loads(match.group(0))
 
 router = APIRouter(prefix="/api/ai", tags=["AI"])
 
@@ -17,12 +37,13 @@ class GenerateRequest(BaseModel):
     prompt: str
     context: str = ""
     engine: str = "python"
-    chat_history: list = []
+    chat_history: list[dict[str, Any]] = Field(default_factory=list)
 
 class GenerateResponse(BaseModel):
     log_id: int
     code: str
     explanation: str
+    chart_type: str = "bar"
 
 SYSTEM_PROMPT = """
 Bạn là một AI Data Analyst chuyên nghiệp (Chuyên gia Python Pandas).
@@ -86,31 +107,32 @@ async def generate_code(request: GenerateRequest):
         full_prompt = f"{base_prompt}\n\n{history_text}Câu hỏi hiện tại của người dùng: {request.prompt}\nNgữ cảnh bổ sung: {request.context}"
         
         # Gọi Gemini
-        response = model.generate_content(full_prompt)
+        response = get_model().generate_content(full_prompt)
         response_text = response.text
         
         # Tiền xử lý để loại bỏ markdown bọc ngoài nếu có
-        clean_json_str = response_text
-        if "```json" in clean_json_str:
-            clean_json_str = clean_json_str.split("```json")[1].split("```")[0].strip()
-        elif "```" in clean_json_str:
-            clean_json_str = clean_json_str.split("```")[1].split("```")[0].strip()
-            
-        # Parse JSON
-        result_dict = json.loads(clean_json_str)
-        generated_code = result_dict.get('code', '')
-        generated_explanation = result_dict.get('explanation', '')
+        result_dict = parse_json_response(response_text)
+        generated_code = str(result_dict.get('code', '')).strip()
+        generated_explanation = str(result_dict.get('explanation', '')).strip()
+        chart_type = str(result_dict.get('chart_type', 'bar')).lower()
+        if chart_type not in {'bar', 'line', 'scatter', 'pie'}:
+            chart_type = 'bar'
+        if not generated_code:
+            raise ValueError("AI không sinh được mã phân tích.")
         
         # Nếu dùng engine SQL, ta cần gài chart_type vào để client/execute router biết
-        if request.engine == "sql" and "chart_type" in result_dict:
-            generated_code = f"-- CHART_TYPE: {result_dict['chart_type']}\n" + generated_code
+        if request.engine == "sql":
+            generated_code = f"-- CHART_TYPE: {chart_type}\n" + generated_code
+        elif "chart_type" not in generated_code:
+            generated_code += f"\n\nchart_type = {chart_type!r}\n"
         
         # Lưu log vào DB
         log_id = insert_log(
             prompt=request.prompt,
             context=request.context,
             code=generated_code,
-            explanation=generated_explanation
+            explanation=generated_explanation,
+            chart_type=chart_type
         )
 
         return GenerateResponse(
@@ -170,14 +192,8 @@ async def analyze_chart(request: AnalyzeChartRequest):
             chart_data_summary=json.dumps(data_summary, ensure_ascii=False)
         )
         
-        response = model.generate_content(full_prompt)
-        clean_json_str = response.text
-        if "```json" in clean_json_str:
-            clean_json_str = clean_json_str.split("```json")[1].split("```")[0].strip()
-        elif "```" in clean_json_str:
-            clean_json_str = clean_json_str.split("```")[1].split("```")[0].strip()
-            
-        result_dict = json.loads(clean_json_str)
+        response = get_model().generate_content(full_prompt)
+        result_dict = parse_json_response(response.text)
         return AnalyzeChartResponse(
             descriptive=result_dict.get("descriptive", ""),
             diagnostic=result_dict.get("diagnostic", ""),

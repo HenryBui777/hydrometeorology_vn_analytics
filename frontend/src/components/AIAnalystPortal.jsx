@@ -25,10 +25,13 @@ export default function AIAnalystPortal({
   approveQuery,
   rejectQuery,
   updateActiveCode,
-  historyList
+  historyList,
+  chatHistory = []
 }) {
   const [promptInput, setPromptInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [engine, setEngine] = useState('python');
+  const [generateError, setGenerateError] = useState('');
   const [viewMode, setViewMode] = useState('chart'); // 'chart' or 'table'
   const [chartTypeUI, setChartTypeUI] = useState('bar');
   const [isColorBlind, setIsColorBlind] = useState(false);
@@ -76,12 +79,14 @@ export default function AIAnalystPortal({
     setIsGenerating(true);
     
     try {
-      const response = await fetch('http://localhost:8000/api/ai/generate', {
+      const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+      const response = await fetch(`${apiBase}/api/ai/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: promptInput, context: 'Dữ liệu thời tiết Việt Nam' })
+        body: JSON.stringify({ prompt: promptInput, context: 'Dữ liệu thời tiết Việt Nam', engine, chat_history: chatHistory.slice(-8) })
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `Backend trả về lỗi HTTP ${response.status}.`);
       
       submitQuery(
         `Đã tạo xong mã nguồn phân tích bằng Python. Vui lòng kiểm tra và phê duyệt.`,
@@ -90,12 +95,15 @@ export default function AIAnalystPortal({
           id: data.log_id,
           question: promptInput,
           code: data.code,
-          explanation: data.explanation
+          explanation: data.explanation,
+          chartType: data.chart_type || 'bar',
+          engine,
         }
       );
       setPromptInput('');
     } catch (error) {
       console.error(error);
+      setGenerateError(error.message || 'Không thể kết nối Backend AI.');
       alert('Lỗi kết nối tới Backend AI. Vui lòng thử lại sau.');
     } finally {
       setIsGenerating(false);
@@ -201,7 +209,8 @@ export default function AIAnalystPortal({
     if (!activeQuery || !activeQuery.chartData) return;
     setIsAnalyzing(true);
     try {
-      const response = await fetch('http://localhost:8000/api/ai/analyze-chart', {
+      const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+      const response = await fetch(`${apiBase}/api/ai/analyze-chart`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -210,7 +219,8 @@ export default function AIAnalystPortal({
           chart_type: chartTypeUI
         })
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `Backend trả về lỗi HTTP ${response.status}.`);
       setInsight(data);
     } catch (e) {
       console.error(e);
@@ -243,8 +253,8 @@ export default function AIAnalystPortal({
             <Sparkles className="h-4 w-4 text-emerald-600" /> Khung yêu cầu phân tích
           </span>
           <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200">
-             <button className="px-3 py-1 text-[11px] font-bold rounded-md bg-slate-800 text-white">Python</button>
-             <button className="px-3 py-1 text-[11px] font-bold rounded-md text-slate-500 hover:bg-slate-100 transition-colors">SQL</button>
+             <button onClick={() => setEngine('python')} className={`px-3 py-1 text-[11px] font-bold rounded-md ${engine === 'python' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>Python</button>
+             <button onClick={() => setEngine('sql')} className={`px-3 py-1 text-[11px] font-bold rounded-md ${engine === 'sql' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>SQL</button>
           </div>
         </div>
 
@@ -255,6 +265,7 @@ export default function AIAnalystPortal({
             placeholder="Kiểm tra quan hệ lượng mưa và bức xạ mặt trời ở ba miền..."
             className="w-full bg-white dark:bg-slate-800 border border-[#e5e5dd] dark:border-slate-700 rounded-xl p-4 min-h-[120px] text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all resize-y"
           />
+          {generateError && <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{generateError}</div>}
           <div className="flex flex-wrap items-center justify-between gap-4">
              <div className="flex gap-2">
                {["So sánh mưa Đà Nẵng & HCMC", "Nhiệt độ bất thường Hà Nội", "Top 5 tỉnh nóng nhất tháng 5"].map((tag) => (

@@ -215,17 +215,19 @@ export default function App() {
     setExecutionStatus('running');
 
     try {
-      const response = await fetch('http://localhost:8000/api/execute', {
+      const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+      const response = await fetch(`${apiBase}/api/execute/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           log_id: activeQuery.id,
-          code: activeQuery.code
+          code: activeQuery.code,
+          engine: activeQuery.engine || 'python'
         })
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
-      if (data.status === 'success') {
+      if (response.ok && data.status === 'success') {
         let parsedChartData = null;
         try {
           parsedChartData = JSON.parse(data.chart_data);
@@ -234,7 +236,7 @@ export default function App() {
         }
         handleExecutionFinished('success', { chartData: parsedChartData, chartType: data.chart_type });
       } else {
-        console.error("Execute error:", data.error_message);
+        console.error("Execute error:", data.error_message || data.detail);
         handleExecutionFinished('failed');
       }
     } catch (error) {
