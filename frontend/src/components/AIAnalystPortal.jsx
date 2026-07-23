@@ -17,13 +17,15 @@ const COLORS_DEFAULT = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '
 const COLORS_COLORBLIND = ['#0072B2', '#E69F00', '#56B4E9', '#009E73', '#F0E442', '#D55E00', '#CC79A7'];
 const FIELD_LABELS = {
   name: 'Đối tượng so sánh', province: 'Tỉnh/thành', region: 'Vùng', season: 'Mùa', month: 'Tháng',
-  date: 'Thời gian', value: 'Giá trị', x: 'Trục X', y: 'Trục Y',
+  date: 'Thời gian', week: 'Tuần', latitude: 'Vĩ độ', longitude: 'Kinh độ', value: 'Giá trị', x: 'Trục X', y: 'Trục Y', secondary: 'Chỉ số phụ',
   temp_mean: 'Nhiệt độ trung bình (°C)', temp_max: 'Nhiệt độ cao nhất (°C)', temp_min: 'Nhiệt độ thấp nhất (°C)',
-  app_temp_mean: 'Nhiệt độ cảm nhận TB (°C)', precipitation_sum: 'Lượng mưa (mm)', rain_sum: 'Lượng mưa (mm)',
+  app_temp_mean: 'Nhiệt độ cảm nhận TB (°C)', app_temp_max: 'Nhiệt độ cảm nhận cao nhất (°C)', app_temp_min: 'Nhiệt độ cảm nhận thấp nhất (°C)',
+  precipitation_sum: 'Tổng lượng mưa (mm)', rain_sum: 'Lượng mưa (mm)', showers_sum: 'Lượng mưa rào (mm)', precipitation_hours: 'Số giờ mưa (giờ)',
   humidity_mean: 'Độ ẩm trung bình (%)', sunshine_hours: 'Số giờ nắng (giờ)', daylight_hours: 'Số giờ ban ngày (giờ)',
   wind_speed_max: 'Tốc độ gió lớn nhất (km/h)', wind_gusts_max: 'Gió giật lớn nhất (km/h)',
+  wind_direction_10m_dominant: 'Hướng gió chủ đạo', weather_code: 'Mã thời tiết',
   cloud_cover: 'Độ che phủ mây (%)', et0: 'Lượng bốc hơi tham chiếu (mm)', pressure: 'Áp suất khí quyển (hPa)',
-  shortwave_radiation_sum: 'Bức xạ mặt trời', dew_point: 'Điểm sương (°C)', amplitude: 'Biên độ nhiệt (°C)',
+  shortwave_radiation_sum: 'Tổng bức xạ mặt trời', dew_point: 'Điểm sương (°C)', amplitude: 'Biên độ nhiệt (°C)',
   temp_range: 'Biên độ nhiệt (°C)', rain_std: 'Độ lệch chuẩn lượng mưa (mm)', score: 'Điểm tiềm năng', ratio: 'Tỷ lệ bốc hơi/giờ nắng'
 };
 const fieldLabel = (key) => FIELD_LABELS[key] || String(key || '').replaceAll('_', ' ');
@@ -78,7 +80,7 @@ export default function AIAnalystPortal({
       setInsight(null); // Reset insight when a new query runs
       setStreamedLogs([]);
       setCurrentLineIdx(0);
-      const logsToStream = activeQuery.logs || ['[System] Khởi tạo môi trường Python (venv_kttv)...', '[System] Đang nạp dữ liệu cleaned_data.csv...', '[System] Đang thực thi mã nguồn Pandas...'];
+      const logsToStream = activeQuery.logs || ['[Hệ thống] Khởi tạo môi trường Python...', '[Hệ thống] Đang nạp dữ liệu đã làm sạch...', '[Hệ thống] Đang thực thi mã phân tích...'];
       const interval = setInterval(() => {
         setStreamedLogs(prev => {
           if (currentLineIdx < logsToStream.length) {
@@ -336,9 +338,9 @@ export default function AIAnalystPortal({
         <div className="mt-8 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm overflow-visible animate-fade-in relative">
           <div className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
              <span className="text-xs font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest flex items-center gap-2">
-                <FileText className="h-4 w-4 text-orange-500" /> Draft: Đề xuất phân tích
+                <FileText className="h-4 w-4 text-orange-500" /> Bản nháp: Đề xuất phân tích
              </span>
-             {activeQuery.status === 'pending' && <span className="bg-orange-100 text-orange-700 border border-orange-200 text-[10px] font-extrabold px-2 py-1 rounded-md uppercase">Chờ duyệt (Pending)</span>}
+             {activeQuery.status === 'pending' && <span className="bg-orange-100 text-orange-700 border border-orange-200 text-[10px] font-extrabold px-2 py-1 rounded-md uppercase">Chờ phê duyệt</span>}
           </div>
           
           <div className="p-6 space-y-6">
@@ -390,8 +392,8 @@ export default function AIAnalystPortal({
                 {executionStatus === 'success' ? 'Kết quả truy vấn cục bộ' : 'Giám sát thực thi'}
              </span>
              {executionStatus === 'running' && <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-1 rounded-md uppercase animate-pulse">Đang chạy...</span>}
-             {executionStatus === 'success' && <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md uppercase">Đã thực thi (Executed)</span>}
-             {executionStatus === 'failed' && <span className="text-[10px] font-extrabold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-1 rounded-md uppercase">Lỗi (Failed)</span>}
+             {executionStatus === 'success' && <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md uppercase">Đã thực thi</span>}
+             {executionStatus === 'failed' && <span className="text-[10px] font-extrabold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-1 rounded-md uppercase">Thực thi thất bại</span>}
           </div>
 
           <div className="p-6">
@@ -452,7 +454,7 @@ export default function AIAnalystPortal({
                  {(isAnalyzing || (insight && insight.available !== false)) && (
                    <div className="mt-8 border-t border-slate-200 pt-8">
                      <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest flex items-center gap-2 mb-6">
-                        <Sparkles className="h-4 w-4 text-emerald-500" /> Báo cáo phân tích chuyên sâu (4-Axis Insight)
+                        <Sparkles className="h-4 w-4 text-emerald-500" /> Báo cáo phân tích chuyên sâu (4 trục)
                      </h3>
                      {isAnalyzing ? (
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -505,10 +507,10 @@ export default function AIAnalystPortal({
                 {historyList.map((item, idx) => (
                   <tr key={idx} className="hover:bg-slate-50 transition-colors">
                      <td className="px-5 py-4">
-                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 font-extrabold text-[10px] px-2 py-1 rounded-md uppercase">Executed</span>
+                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 font-extrabold text-[10px] px-2 py-1 rounded-md uppercase">Đã thực thi</span>
                      </td>
                      <td className="px-5 py-4 font-bold text-slate-800 truncate max-w-[300px]">{item.question || item.title}</td>
-                     <td className="px-5 py-4 text-slate-500 font-mono">Python</td>
+                     <td className="px-5 py-4 text-slate-500 font-mono">Mã Python</td>
                      <td className="px-5 py-4 text-right">
                         <button 
                           onClick={() => {
