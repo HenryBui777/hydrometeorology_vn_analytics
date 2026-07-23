@@ -45,6 +45,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [isDark, setIsDark] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [pdfPreview, setPdfPreview] = useState(null);
   const { isColorblind, toggleColorblind } = useData();
 
   useEffect(() => {
@@ -122,7 +123,7 @@ export default function App() {
     document.body.appendChild(exportCopy);
 
     try {
-      await html2pdf()
+      const pdfBlob = await html2pdf()
         .set({
           margin: [8, 8, 8, 8],
           filename: `${tabLabel.toLowerCase().replace(/\s+/g, '-')}.pdf`,
@@ -137,11 +138,30 @@ export default function App() {
           pagebreak: { mode: ['css', 'legacy'] },
         })
         .from(exportCopy)
-        .save();
+        .outputPdf('blob');
+
+      if (pdfPreview?.url) URL.revokeObjectURL(pdfPreview.url);
+      setPdfPreview({
+        filename: `${tabLabel.toLowerCase().replace(/\s+/g, '-')}.pdf`,
+        url: URL.createObjectURL(pdfBlob),
+      });
     } finally {
       exportCopy.remove();
       setIsExportingPdf(false);
     }
+  };
+
+  const closePdfPreview = () => {
+    if (pdfPreview?.url) URL.revokeObjectURL(pdfPreview.url);
+    setPdfPreview(null);
+  };
+
+  const downloadPdfPreview = () => {
+    if (!pdfPreview) return;
+    const link = document.createElement('a');
+    link.href = pdfPreview.url;
+    link.download = pdfPreview.filename;
+    link.click();
   };
 
   // Start with some history items to show past activities
@@ -319,8 +339,8 @@ export default function App() {
           {/* Quick Metrics & User tools */}
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <button disabled={isExportingPdf} onClick={handlePrint} title="Xuất PDF báo cáo" className="print-hidden cursor-pointer flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 hover:text-brand-primary dark:text-slate-300 dark:hover:text-indigo-400 font-medium text-sm shadow-sm transition-colors disabled:cursor-wait disabled:opacity-60">
-                <Download className="w-4 h-4" /> <span className="hidden sm:inline">{isExportingPdf ? 'Đang xuất...' : 'Xuất PDF'}</span>
+              <button disabled={isExportingPdf} onClick={handlePrint} title="Xem trước báo cáo PDF" className="print-hidden cursor-pointer flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 hover:text-brand-primary dark:text-slate-300 dark:hover:text-indigo-400 font-medium text-sm shadow-sm transition-colors disabled:cursor-wait disabled:opacity-60">
+                <Download className="w-4 h-4" /> <span className="hidden sm:inline">{isExportingPdf ? 'Đang tạo...' : 'Xem trước PDF'}</span>
               </button>
               <button onClick={toggleColorblind} title="Chế độ người mù màu (Colorblind Mode)" className={`print-hidden cursor-pointer p-2 rounded-full border transition-colors shadow-sm ${isColorblind ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 hover:text-brand-accent dark:text-slate-400'}`}>
                 {isColorblind ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
@@ -409,6 +429,24 @@ export default function App() {
 
         </main>
       </div>
+
+      {pdfPreview && (
+        <div className="print-hidden fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+          <section role="dialog" aria-modal="true" aria-label="Xem trước báo cáo PDF" className="flex h-[min(860px,92vh)] w-[min(1200px,96vw)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
+            <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
+              <div>
+                <h2 className="font-bold text-slate-900 dark:text-white">Xem trước báo cáo PDF</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Kiểm tra bản mẫu; đóng cửa sổ này để chỉnh dữ liệu hoặc giao diện.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={closePdfPreview} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">Quay lại chỉnh</button>
+                <button onClick={downloadPdfPreview} className="rounded-lg bg-brand-primary px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700">Tải PDF</button>
+              </div>
+            </header>
+            <iframe src={pdfPreview.url} title="Bản xem trước PDF" className="min-h-0 flex-1 bg-slate-100" />
+          </section>
+        </div>
+      )}
 
     </div>
   );
