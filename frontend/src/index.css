@@ -216,6 +216,10 @@ svg:focus, g:focus, rect:focus, path:focus, .recharts-wrapper:focus, .recharts-s
   print-color-adjust: exact;
 }
 
+.print-chart-snapshot {
+  display: none;
+}
+
 /* ==========================================================================
    PRINT STYLES (Xuất PDF)
    ========================================================================== */
@@ -342,12 +346,16 @@ svg:focus, g:focus, rect:focus, path:focus, .recharts-wrapper:focus, .recharts-s
     height: 240px !important;
   }
 
-  .recharts-surface {
+  .print-original-chart {
+    display: none !important;
+  }
+
+  .print-chart-snapshot {
     display: block !important;
     width: 100% !important;
-    height: 260px !important;
+    height: 240px !important;
     max-width: 100% !important;
-    overflow: visible !important;
+    object-fit: contain !important;
   }
 
   /* Keep only the important dashboard grid dense; never override nested grids. */

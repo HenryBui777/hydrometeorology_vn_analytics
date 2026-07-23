@@ -111,49 +111,60 @@ export default function App() {
     setPdfPreview(null);
   };
 
-  const downloadPdfPreview = () => {
+  const downloadPdfPreview = async () => {
     if (!pdfPreview) return;
     const report = document.querySelector('main[data-print-tab]');
     if (!report) return;
 
-    const restoreCharts = [];
-    report.querySelectorAll('svg.recharts-surface').forEach((svg) => {
-      const width = Number(svg.getAttribute('width')) || svg.clientWidth || 760;
-      const height = Number(svg.getAttribute('height')) || svg.clientHeight || 320;
-      const previous = {
-        width: svg.getAttribute('width'),
-        height: svg.getAttribute('height'),
-        viewBox: svg.getAttribute('viewBox'),
-        preserveAspectRatio: svg.getAttribute('preserveAspectRatio'),
-        style: svg.getAttribute('style'),
-      };
+    const printSnapshots = [];
+    const charts = Array.from(report.querySelectorAll('svg.recharts-surface'));
 
-      svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-      svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-      svg.setAttribute('width', '100%');
-      svg.setAttribute('height', '260');
-      svg.style.display = 'block';
-      svg.style.width = '100%';
-      svg.style.height = '260px';
-      svg.style.maxWidth = '100%';
+    for (const svg of charts) {
+      try {
+        const rect = svg.getBoundingClientRect();
+        const width = Math.max(1, Math.round(rect.width || svg.clientWidth || 760));
+        const height = Math.max(1, Math.round(rect.height || svg.clientHeight || 320));
+        const svgCopy = svg.cloneNode(true);
+        svgCopy.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        svgCopy.setAttribute('width', String(width));
+        svgCopy.setAttribute('height', String(height));
 
-      restoreCharts.push(() => {
-        for (const [name, value] of Object.entries(previous)) {
-          if (name === 'style') {
-            if (value === null) svg.removeAttribute('style');
-            else svg.setAttribute('style', value);
-          } else if (value === null) svg.removeAttribute(name);
-          else svg.setAttribute(name, value);
-        }
-      });
-    });
+        const svgSource = new XMLSerializer().serializeToString(svgCopy);
+        const svgUrl = URL.createObjectURL(new Blob([svgSource], { type: 'image/svg+xml;charset=utf-8' }));
+        const sourceImage = new Image();
+        sourceImage.src = svgUrl;
+        await sourceImage.decode();
+
+        const scale = 2;
+        const canvas = document.createElement('canvas');
+        canvas.width = width * scale;
+        canvas.height = height * scale;
+        const context = canvas.getContext('2d');
+        context?.scale(scale, scale);
+        context?.drawImage(sourceImage, 0, 0, width, height);
+        URL.revokeObjectURL(svgUrl);
+
+        const snapshot = document.createElement('img');
+        snapshot.src = canvas.toDataURL('image/png');
+        snapshot.alt = 'Biểu đồ phân tích';
+        snapshot.className = 'print-chart-snapshot';
+        svg.classList.add('print-original-chart');
+        svg.insertAdjacentElement('afterend', snapshot);
+        printSnapshots.push({ svg, snapshot });
+      } catch (error) {
+        console.warn('Không thể tạo ảnh biểu đồ để in:', error);
+      }
+    }
 
     const restoreAfterPrint = () => {
-      restoreCharts.forEach((restore) => restore());
+      printSnapshots.forEach(({ svg, snapshot }) => {
+        svg.classList.remove('print-original-chart');
+        snapshot.remove();
+      });
       window.removeEventListener('afterprint', restoreAfterPrint);
     };
     window.addEventListener('afterprint', restoreAfterPrint);
-    setTimeout(() => window.print(), 250);
+    setTimeout(() => window.print(), 150);
   };
 
   // Start with some history items to show past activities
