@@ -107,14 +107,45 @@ export default function App() {
     setIsExportingPdf(true);
     const tabLabel = printTabLabels[currentTab] || 'bao-cao-kttv';
     try {
+      const captureScale = 1.5;
+      const reportScrollTop = report.scrollTop;
       const screenshot = await html2canvas(report, {
         backgroundColor: '#f8fafc',
-        scale: 1.5,
+        scale: captureScale,
         useCORS: true,
         logging: false,
         width: report.scrollWidth,
         height: report.scrollHeight,
       });
+
+      // Browser paints some ResponsiveContainer charts only after they become
+      // visible. Capture each chart while it is on-screen and overlay it at its
+      // exact report position, so lower charts survive the exported image too.
+      const drawingContext = screenshot.getContext('2d');
+      const charts = Array.from(report.querySelectorAll('.recharts-wrapper'));
+      try {
+        for (const chart of charts) {
+          chart.scrollIntoView({ block: 'center', behavior: 'auto' });
+          await new Promise((resolve) => setTimeout(resolve, 120));
+
+          const reportRect = report.getBoundingClientRect();
+          const chartRect = chart.getBoundingClientRect();
+          const chartImage = await html2canvas(chart, {
+            backgroundColor: '#ffffff',
+            scale: captureScale,
+            useCORS: true,
+            logging: false,
+            width: chart.clientWidth,
+            height: chart.clientHeight,
+          });
+          const x = (chartRect.left - reportRect.left + report.scrollLeft) * captureScale;
+          const y = (chartRect.top - reportRect.top + report.scrollTop) * captureScale;
+          drawingContext?.drawImage(chartImage, x, y, chartImage.width, chartImage.height);
+        }
+      } finally {
+        report.scrollTop = reportScrollTop;
+      }
+
       setPdfPreview({
         filename: `${tabLabel.toLowerCase().replace(/\s+/g, '-')}.pdf`,
         imageUrl: screenshot.toDataURL('image/png'),
