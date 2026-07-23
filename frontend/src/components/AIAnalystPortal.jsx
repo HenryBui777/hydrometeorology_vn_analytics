@@ -89,7 +89,7 @@ export default function AIAnalystPortal({
 
   const COLORS = isColorBlind ? COLORS_COLORBLIND : COLORS_DEFAULT;
   const autoChartType = useMemo(() => {
-    const allowedTypes = new Set(['bar', 'bar-horizontal', 'line', 'multi-line', 'area', 'stacked-area', 'scatter', 'bubble', 'histogram', 'pie', 'donut', 'composed', 'radar']);
+    const allowedTypes = new Set(['bar', 'bar-horizontal', 'line', 'multi-line', 'area', 'stacked-area', 'scatter', 'bubble', 'histogram', 'pie', 'donut', 'composed', 'radar', 'wind-rose']);
     const requestedType = activeQuery?.chartType;
     if (allowedTypes.has(requestedType)) return requestedType;
 
@@ -102,7 +102,7 @@ export default function AIAnalystPortal({
     if (/tỷ trọng|tỉ trọng|cơ cấu|percentage|phần trăm/.test(question) && (data?.length || 0) <= 8) return 'pie';
     return 'bar';
   }, [activeQuery]);
-  const autoChartLabel = { bar: 'Biểu đồ cột', 'bar-horizontal': 'Biểu đồ thanh ngang', line: 'Biểu đồ đường', 'multi-line': 'Biểu đồ nhiều đường', area: 'Biểu đồ miền', 'stacked-area': 'Biểu đồ miền chồng', scatter: 'Biểu đồ phân tán', bubble: 'Biểu đồ bong bóng', histogram: 'Biểu đồ phân bố tần suất', pie: 'Biểu đồ tròn', donut: 'Biểu đồ vành khuyên', composed: 'Biểu đồ kết hợp', radar: 'Biểu đồ radar' }[autoChartType];
+  const autoChartLabel = { bar: 'Biểu đồ cột', 'bar-horizontal': 'Biểu đồ thanh ngang', line: 'Biểu đồ đường', 'multi-line': 'Biểu đồ nhiều đường', area: 'Biểu đồ miền', 'stacked-area': 'Biểu đồ miền chồng', scatter: 'Biểu đồ phân tán', bubble: 'Biểu đồ bong bóng', histogram: 'Biểu đồ phân bố tần suất', pie: 'Biểu đồ tròn', donut: 'Biểu đồ vành khuyên', composed: 'Biểu đồ kết hợp', radar: 'Biểu đồ radar', 'wind-rose': 'Biểu đồ hoa gió' }[autoChartType];
   
   // Fake streaming state for execution monitor
   const [streamedLogs, setStreamedLogs] = useState([]);
@@ -234,7 +234,7 @@ export default function AIAnalystPortal({
               <Bar yAxisId="left" name={fieldLabel(yKeys[0])} dataKey={yKeys[0]} fill={COLORS[0]} radius={[4, 4, 0, 0]} />
               <Line yAxisId="right" name={fieldLabel(yKeys[1])} type="monotone" dataKey={yKeys[1]} stroke={COLORS[2]} strokeWidth={3} />
             </ComposedChart>
-          ) : chartType === 'radar' ? (
+          ) : chartType === 'radar' || chartType === 'wind-rose' ? (
             <RadarChart data={data} outerRadius="72%">
               <PolarGrid />
               <PolarAngleAxis dataKey={xKey} fontSize={12} />

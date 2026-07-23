@@ -78,6 +78,13 @@ MACRO_REGION_ALIASES = {
     "miền trung": ["Bắc Trung Bộ", "Duyên hải Nam Trung Bộ", "Tây Nguyên"],
     "miền nam": ["Đông Nam Bộ", "Đồng bằng sông Cửu Long"],
 }
+# Climate-area aliases that do not match the CSV's seven broad regions.  The
+# province lists are intentionally intersected with the actual CSV at query
+# time, so the assistant never invents a value for a province that is absent.
+CLIMATE_AREA_ALIASES = {
+    "tây bắc bộ": ["Điện Biên", "Lai Châu", "Sơn La", "Hòa Bình", "Lào Cai", "Yên Bái"],
+    "đông bắc bộ": ["Hà Giang", "Tuyên Quang", "Cao Bằng", "Bắc Kạn", "Thái Nguyên", "Lạng Sơn", "Bắc Giang", "Quảng Ninh", "Phú Thọ"],
+}
 
 
 def normalized_text(value: str) -> str:
@@ -97,6 +104,7 @@ def select_visualization(text: str, metrics: list[str], provinces: list[str]) ->
     is_relation = any(term in text for term in ("tuong quan", "moi quan he", "ty le nghich", "anh huong", "lien quan", "scatter", "phan tan"))
     is_distribution = any(term in text for term in ("phan phoi", "phan bo", "tan suat", "histogram", "ngoai le", "outlier"))
     is_composition = any(term in text for term in ("ty trong", "ti trong", "co cau", "phan tram", "thanh phan", "dong gop"))
+    is_true_part_to_whole = "phan tram" in text or any(term in text for term in ("so ngay nang", "so ngay mua", "am u", "nang mua am"))
     is_ranking = any(term in text for term in ("top", "cao nhat", "thap nhat", "nhieu nhat", "it nhat", "xep hang", "noi nao", "tinh nao"))
     is_flow_or_finance = any(term in text for term in ("nen", "candlestick", "waterfall", "phieu", "funnel", "sankey", "luong chuyen", "chuyen doi"))
 
@@ -104,6 +112,8 @@ def select_visualization(text: str, metrics: list[str], provinces: list[str]) ->
     # Returning no chart is more honest than fabricating one of these forms.
     if is_flow_or_finance:
         return "none"
+    if "wind_speed_max" in metrics and any(term in text for term in ("huong gio", "toc do gio", "hoa gio", "gio")):
+        return "wind-rose"
     if is_distribution:
         return "histogram"
     if is_relation:
@@ -114,7 +124,7 @@ def select_visualization(text: str, metrics: list[str], provinces: list[str]) ->
         if 2 <= len(provinces) <= 5:
             return "multi-line"
         return "area" if any(term in text for term in ("tich luy", "quy mo", "tong cong")) else "line"
-    if is_composition:
+    if is_composition and is_true_part_to_whole:
         return "donut" if len(metrics) == 1 else "bar"
     # Radar is only meaningful for one or two entities evaluated by several
     # metrics. It is never used for a long list of provinces.
@@ -133,6 +143,11 @@ def infer_general_analysis(prompt: str) -> tuple[str, str, str]:
     for alias, members in MACRO_REGION_ALIASES.items():
         if alias in text:
             regions.extend(member for member in members if member not in regions)
+    climate_area_provinces = []
+    for alias, members in CLIMATE_AREA_ALIASES.items():
+        if alias in text:
+            climate_area_provinces.extend(member for member in members if member not in climate_area_provinces)
+    provinces.extend(member for member in climate_area_provinces if member not in provinces)
     month_match = re.search(r"thang\s*(1[0-2]|[1-9])", text)
     season = next((label for label, aliases in {
         "Xuân": ("mua xuan",), "Hè": ("mua he",), "Thu": ("mua thu",), "Đông": ("mua dong",)
@@ -184,6 +199,17 @@ def infer_general_analysis(prompt: str) -> tuple[str, str, str]:
 chart_data = []
 chart_type = 'none'""", "Không tạo biểu đồ vì dữ liệu hiện tại không có cấu trúc tài chính (OHLC), các bước quy trình, hoặc luồng nguồn–đích. Hãy cung cấp dữ liệu tương ứng nếu cần biểu đồ nến, phễu, thác nước hoặc Sankey.", "none")
 
+    if chart_type == "wind-rose":
+        return (f"""{filter_code}
+df_work = df_work.dropna(subset=['wind_direction_10m_dominant', 'wind_speed_max']).copy()
+bins = [-22.5, 22.5, 67.5, 112.5, 157.5, 202.5, 247.5, 292.5, 337.5, 382.5]
+labels = ['Bắc', 'Đông Bắc', 'Đông', 'Đông Nam', 'Nam', 'Tây Nam', 'Tây', 'Tây Bắc', 'Bắc']
+df_work['wind_direction'] = pd.cut((df_work['wind_direction_10m_dominant'] + 22.5) % 360, bins=bins, labels=labels, include_lowest=True)
+result_df = (df_work.groupby('wind_direction', observed=True, as_index=False)['wind_speed_max'].mean()
+    .rename(columns={{'wind_direction': 'name'}}))
+chart_data = result_df.to_dict(orient='records')
+chart_type = 'wind-rose'""", "Biểu đồ hoa gió được chọn vì câu hỏi có hướng gió hoặc tốc độ gió; mỗi cánh thể hiện tốc độ gió trung bình theo hướng.", "wind-rose")
+
     if chart_type == "histogram":
         metric = metrics[0]
         return (f"""{filter_code}
@@ -223,9 +249,10 @@ result_df = result_df.rename(columns={{'month': 'name'}}).sort_values('name')
 result_df['name'] = result_df['name'].map(lambda month: f'Tháng {{month}}')
 chart_data = result_df.to_dict(orient='records')
 chart_type = 'stacked-area'""", "Biểu đồ miền chồng được chọn để theo dõi phần đóng góp của từng vùng theo thời gian.", "stacked-area")
-        if len(provinces) >= 2:
+        if len(provinces) >= 2 or len(regions) >= 2:
+            series_key = 'province' if len(provinces) >= 2 else 'region'
             return (f"""{filter_code}
-result_df = (df_work.groupby(['month', 'province'])[{metric!r}].mean().unstack('province').reset_index())
+result_df = (df_work.groupby(['month', {series_key!r}])[{metric!r}].mean().unstack({series_key!r}).reset_index())
 result_df = result_df.rename(columns={{'month': 'name'}}).sort_values('name')
 result_df['name'] = result_df['name'].map(lambda month: f'Tháng {{month}}')
 chart_data = result_df.to_dict(orient='records')
