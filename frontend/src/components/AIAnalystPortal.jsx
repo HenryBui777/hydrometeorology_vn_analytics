@@ -436,7 +436,7 @@ export default function AIAnalystPortal({
                  </details>
 
                  {/* 4-Axis Insight Section */}
-                 {(isAnalyzing || insight) && (
+                 {(isAnalyzing || (insight && insight.available !== false)) && (
                    <div className="mt-8 border-t border-slate-200 pt-8">
                      <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest flex items-center gap-2 mb-6">
                         <Sparkles className="h-4 w-4 text-emerald-500" /> Báo cáo phân tích chuyên sâu (4-Axis Insight)

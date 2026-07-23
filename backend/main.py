@@ -413,6 +413,7 @@ def local_four_axis_insight(request: AnalyzeChartRequest) -> dict:
 
     if not values:
         return {
+            "available": False,
             "descriptive": f"Truy vấn có {len(rows)} bản ghi, nhưng chưa có cột giá trị số chuẩn để tổng hợp.",
             "diagnostic": "Cần kiểm tra lại cột dùng làm giá trị biểu đồ hoặc chọn một phép tổng hợp số học.",
             "predictive": "Chưa đủ dữ liệu định lượng để suy ra xu hướng đáng tin cậy.",
@@ -426,6 +427,7 @@ def local_four_axis_insight(request: AnalyzeChartRequest) -> dict:
     subject = request.question.strip() or "chỉ số được chọn"
 
     return {
+        "available": True,
         "descriptive": (
             f"Với câu hỏi '{subject}', biểu đồ gồm {len(values)} nhóm. "
             f"Giá trị trung bình là {average:.2f}; cao nhất thuộc {highest_name} ({highest:.2f}) "
