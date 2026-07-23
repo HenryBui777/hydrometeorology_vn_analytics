@@ -113,9 +113,13 @@ export default function App() {
     exportCopy.style.padding = '24px';
     exportCopy.style.overflow = 'visible';
     exportCopy.style.background = '#f8fafc';
-    exportCopy.style.position = 'absolute';
-    exportCopy.style.left = '-100000px';
+    // html2canvas can render a blank page when the source is placed far outside
+    // the viewport. Keep it at the viewport origin, underneath the application.
+    exportCopy.style.position = 'fixed';
+    exportCopy.style.left = '0';
     exportCopy.style.top = '0';
+    exportCopy.style.zIndex = '-1';
+    exportCopy.style.pointerEvents = 'none';
     exportCopy.querySelectorAll('.print-report-header').forEach((element) => {
       element.style.display = 'flex';
     });
