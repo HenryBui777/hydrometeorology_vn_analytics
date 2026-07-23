@@ -343,6 +343,10 @@ svg:focus, g:focus, rect:focus, path:focus, .recharts-wrapper:focus, .recharts-s
   }
 
   .recharts-surface {
+    display: block !important;
+    width: 100% !important;
+    height: 260px !important;
+    max-width: 100% !important;
     overflow: visible !important;
   }
 

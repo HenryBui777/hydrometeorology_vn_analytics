@@ -113,7 +113,47 @@ export default function App() {
 
   const downloadPdfPreview = () => {
     if (!pdfPreview) return;
-    window.print();
+    const report = document.querySelector('main[data-print-tab]');
+    if (!report) return;
+
+    const restoreCharts = [];
+    report.querySelectorAll('svg.recharts-surface').forEach((svg) => {
+      const width = Number(svg.getAttribute('width')) || svg.clientWidth || 760;
+      const height = Number(svg.getAttribute('height')) || svg.clientHeight || 320;
+      const previous = {
+        width: svg.getAttribute('width'),
+        height: svg.getAttribute('height'),
+        viewBox: svg.getAttribute('viewBox'),
+        preserveAspectRatio: svg.getAttribute('preserveAspectRatio'),
+        style: svg.getAttribute('style'),
+      };
+
+      svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+      svg.setAttribute('width', '100%');
+      svg.setAttribute('height', '260');
+      svg.style.display = 'block';
+      svg.style.width = '100%';
+      svg.style.height = '260px';
+      svg.style.maxWidth = '100%';
+
+      restoreCharts.push(() => {
+        for (const [name, value] of Object.entries(previous)) {
+          if (name === 'style') {
+            if (value === null) svg.removeAttribute('style');
+            else svg.setAttribute('style', value);
+          } else if (value === null) svg.removeAttribute(name);
+          else svg.setAttribute(name, value);
+        }
+      });
+    });
+
+    const restoreAfterPrint = () => {
+      restoreCharts.forEach((restore) => restore());
+      window.removeEventListener('afterprint', restoreAfterPrint);
+    };
+    window.addEventListener('afterprint', restoreAfterPrint);
+    setTimeout(() => window.print(), 250);
   };
 
   // Start with some history items to show past activities
