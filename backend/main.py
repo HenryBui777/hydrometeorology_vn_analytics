@@ -78,20 +78,29 @@ def select_visualization(text: str, metrics: list[str], provinces: list[str]) ->
     This is deliberately deterministic: an AI response may suggest code, but
     it must not choose a chart that conflicts with the analytical purpose.
     """
-    is_time = any(term in text for term in ("xu huong", "dien bien", "theo thoi gian", "qua 12 thang", "theo thang", "hang thang"))
+    is_time = any(term in text for term in ("xu huong", "dien bien", "theo thoi gian", "qua 12 thang", "theo thang", "hang thang", "theo nam", "theo tuan"))
     is_relation = any(term in text for term in ("tuong quan", "moi quan he", "ty le nghich", "anh huong", "lien quan", "scatter", "phan tan"))
     is_distribution = any(term in text for term in ("phan phoi", "phan bo", "tan suat", "histogram", "ngoai le", "outlier"))
-    is_composition = any(term in text for term in ("ty trong", "ti trong", "co cau", "phan tram", "thanh phan"))
+    is_composition = any(term in text for term in ("ty trong", "ti trong", "co cau", "phan tram", "thanh phan", "dong gop"))
     is_ranking = any(term in text for term in ("top", "cao nhat", "thap nhat", "nhieu nhat", "it nhat", "xep hang", "noi nao", "tinh nao"))
+    is_flow_or_finance = any(term in text for term in ("nen", "candlestick", "waterfall", "phieu", "funnel", "sankey", "luong chuyen", "chuyen doi"))
 
+    # The weather dataset has no OHLC, workflow stages, or source→target flow.
+    # Returning no chart is more honest than fabricating one of these forms.
+    if is_flow_or_finance:
+        return "none"
     if is_distribution:
         return "histogram"
     if is_relation:
         return "bubble" if len(metrics) >= 3 or "3 bien" in text else "scatter"
     if is_time:
+        if is_composition:
+            return "stacked-area"
+        if 2 <= len(provinces) <= 5:
+            return "multi-line"
         return "area" if any(term in text for term in ("tich luy", "quy mo", "tong cong")) else "line"
     if is_composition:
-        return "pie"
+        return "donut" if len(metrics) == 1 else "bar"
     # Radar is only meaningful for one or two entities evaluated by several
     # metrics. It is never used for a long list of provinces.
     if 1 <= len(provinces) <= 2 and len(metrics) >= 4:
@@ -140,8 +149,13 @@ def infer_general_analysis(prompt: str) -> tuple[str, str, str]:
 
     chart_type = select_visualization(text, metrics, provinces)
     wants_relationship = chart_type in ("scatter", "bubble")
-    wants_time = chart_type in ("line", "area")
-    wants_composition = chart_type == "pie"
+    wants_time = chart_type in ("line", "multi-line", "area", "stacked-area")
+    wants_composition = chart_type == "donut"
+
+    if chart_type == "none":
+        return ("""# Câu hỏi này yêu cầu dạng dữ liệu không có trong bộ CSV khí tượng hiện tại.
+chart_data = []
+chart_type = 'none'""", "Không tạo biểu đồ vì dữ liệu hiện tại không có cấu trúc tài chính (OHLC), các bước quy trình, hoặc luồng nguồn–đích. Hãy cung cấp dữ liệu tương ứng nếu cần biểu đồ nến, phễu, thác nước hoặc Sankey.", "none")
 
     if chart_type == "histogram":
         metric = metrics[0]
@@ -175,6 +189,13 @@ chart_type = '{chart_type}'""", "Biểu đồ phân tán được chọn để k
     # A time question uses a line chart; each explicitly named province becomes one series.
     if wants_time and not month_match:
         metric = metrics[0]
+        if chart_type == "stacked-area":
+            return (f"""{filter_code}
+result_df = (df_work.groupby(['month', 'region'])[{metric!r}].mean().unstack('region').reset_index())
+result_df = result_df.rename(columns={{'month': 'name'}}).sort_values('name')
+result_df['name'] = result_df['name'].map(lambda month: f'Tháng {{month}}')
+chart_data = result_df.to_dict(orient='records')
+chart_type = 'stacked-area'""", "Biểu đồ miền chồng được chọn để theo dõi phần đóng góp của từng vùng theo thời gian.", "stacked-area")
         if len(provinces) >= 2:
             return (f"""{filter_code}
 result_df = (df_work.groupby(['month', 'province'])[{metric!r}].mean().unstack('province').reset_index())
@@ -189,10 +210,17 @@ result_df['name'] = result_df['name'].map(lambda month: f'Tháng {{month}}')
 chart_data = result_df.to_dict(orient='records')
 chart_type = '{chart_type}'""", "Biểu đồ theo thời gian được chọn để thể hiện diễn biến theo tháng.", chart_type)
 
+    if chart_type == "radar":
+        return (f"""{filter_code}
+summary = (df_work.groupby('province', as_index=False).agg({', '.join(f"{metric}=({metric!r}, 'mean')" for metric in metrics)}))
+chart_data = [{{'name': metric, **{{row['province']: round(float(row[metric]), 2) for _, row in summary.iterrows()}}}}
+              for metric in {metrics!r}]
+chart_type = 'radar'""", "Radar được chọn vì câu hỏi so sánh tối đa hai địa điểm trên nhiều tiêu chí định lượng.", "radar")
+
     group = "province" if provinces or "tinh" in text or "thanh pho" in text else ("season" if "mua" in text else "region")
     aggregations = ", ".join(f"{metric}=({metric!r}, 'mean')" for metric in metrics)
-    # Pie is allowed only for 2-5 parts. For larger result sets the runtime
-    # safely switches to a horizontal bar chart instead of a cluttered pie.
+    # Donut is allowed only for 2-5 parts. For larger result sets the runtime
+    # safely switches to a horizontal bar chart instead of a cluttered donut.
     output_type = chart_type
     return (f"""{filter_code}
 result_df = (df_work.groupby('{group}', as_index=False).agg({aggregations})
@@ -202,8 +230,21 @@ if len(result_df) < 2:
     chart_data = []
     chart_type = 'none'
 else:
-    chart_data = result_df.to_dict(orient='records')
-    chart_type = ('pie' if 2 <= len(result_df) <= 5 else 'bar-horizontal') if '{output_type}' == 'pie' else '{output_type}'""", "Biểu đồ được chọn theo mục tiêu phân tích, số biến và các điều kiện lọc được nhận diện từ yêu cầu. Nếu chỉ còn một giá trị sau lọc, hệ thống sẽ không vẽ biểu đồ để tránh trực quan hóa sai lệch.", output_type)
+    if '{output_type}' == 'donut' and 2 <= len(result_df) <= 5:
+        total = result_df[{metrics[0]!r}].sum()
+        if total > 0:
+            result_df['share'] = result_df[{metrics[0]!r}] / total
+            small = result_df['share'] < 0.03
+            if small.any():
+                others = result_df.loc[small, {metrics[0]!r}].sum()
+                result_df = result_df.loc[~small, ['name', {metrics[0]!r}]]
+                if others > 0:
+                    result_df.loc[len(result_df)] = ['Khác', others]
+        chart_data = result_df[['name', {metrics[0]!r}]].rename(columns={{{metrics[0]!r}: 'value'}}).to_dict(orient='records')
+        chart_type = 'donut'
+    else:
+        chart_data = result_df.to_dict(orient='records')
+        chart_type = 'bar-horizontal' if '{output_type}' == 'donut' else '{output_type}'""", "Biểu đồ được chọn theo mục tiêu phân tích, số biến và các điều kiện lọc được nhận diện từ yêu cầu. Nếu chỉ còn một giá trị sau lọc, hệ thống sẽ không vẽ biểu đồ để tránh trực quan hóa sai lệch.", output_type)
 
 
 def local_analysis_code(prompt: str) -> tuple[str, str, str]:
