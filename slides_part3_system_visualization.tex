@@ -1,0 +1,193 @@
+% Biên dịch bằng XeLaTeX (Overleaf: Menu -> Compiler -> XeLaTeX)
+% Tạo thư mục figures/ và chèn các ảnh giao diện theo tên được ghi trong mã.
+\documentclass[aspectratio=169,10pt]{beamer}
+
+\usepackage{fontspec}
+\setmainfont{Times New Roman}
+\usepackage{polyglossia}
+\setdefaultlanguage{vietnamese}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shadows.blur}
+\usepackage{ragged2e}
+
+% ===== Màu sắc đồng bộ với dashboard =====
+\definecolor{Primary}{HTML}{5B5CEB}
+\definecolor{Navy}{HTML}{12142E}
+\definecolor{Sky}{HTML}{EAF2FF}
+\definecolor{Mint}{HTML}{DCFCE7}
+\definecolor{Warning}{HTML}{F59E0B}
+\definecolor{Text}{HTML}{29324A}
+
+\setbeamercolor{normal text}{fg=Text,bg=white}
+\setbeamercolor{frametitle}{fg=Navy,bg=white}
+\setbeamercolor{structure}{fg=Primary}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}{%
+  \hfill\color{gray}\scriptsize Nền tảng phân tích KTTV Việt Nam \;|\; Tháng 7, 2026\hspace{0.6cm}\vspace{0.25cm}}
+\setbeamertemplate{frametitle}{%
+  \vspace{0.25cm}\insertframetitle\par
+  \color{Primary}\rule{\textwidth}{1.2pt}}
+
+% Hiển thị khung thay thế nếu chưa chèn ảnh.
+\newcommand{\slideimage}[2]{%
+  \IfFileExists{#1}{\includegraphics[width=\linewidth,height=#2,keepaspectratio]{#1}}%
+  {\fcolorbox{Primary}{Sky}{\parbox[c][#2][c]{0.92\linewidth}{\centering\color{Primary}\textbf{CHÈN ẢNH:}\\[-1mm]\texttt{#1}}}}%
+}
+\newcommand{\tagbox}[1]{\colorbox{Sky}{\color{Primary}\scriptsize\textbf{\;#1\;}}}
+\newcommand{\keypoint}[1]{\vspace{0.12cm}\noindent\textcolor{Primary}{\textbullet}\;#1}
+
+\begin{document}
+
+% ================================================================
+% SLIDE 8 -- Không cần ảnh, dùng sơ đồ kiến trúc TikZ
+% ================================================================
+\begin{frame}{3. Hệ thống \& trực quan: Kiến trúc tổng thể}
+\begin{center}\tagbox{MÔ HÌNH 3 LỚP}\end{center}\vspace{0.2cm}
+\centering
+\begin{tikzpicture}[
+  node distance=0.55cm and 0.6cm,
+  box/.style={rounded corners=7pt, draw=Primary!55, fill=Sky, minimum width=3.15cm, minimum height=3.3cm, align=center, blur shadow},
+  arrow/.style={-{Latex[length=2.2mm]}, very thick, draw=Primary}
+]
+\node[box] (data) {
+  {\Large\textbf{DATA}}\\[2mm]
+  \small CSV khí tượng đã làm sạch\\
+  SQLite / xử lý in-memory\\
+  Supabase lưu nhật ký AI
+};
+\node[box, right=of data, fill=Primary!10] (backend) {
+  {\Large\textbf{BACKEND}}\\[2mm]
+  \small FastAPI REST API\\
+  Bảo mật Gemini API Key\\
+  Sinh và thực thi mã Pandas\\
+  Môi trường kiểm soát
+};
+\node[box, right=of backend, fill=Mint!45] (frontend) {
+  {\Large\textbf{FRONTEND}}\\[2mm]
+  \small React + Vite\\
+  Dashboard và bộ lọc\\
+  Recharts trực quan hóa\\
+  Phê duyệt mã AI
+};
+\draw[arrow] (data) -- node[above, font=\scriptsize]{dữ liệu JSON/CSV} (backend);
+\draw[arrow] (backend) -- node[above, font=\scriptsize]{REST API / JSON} (frontend);
+\node[below=0.5cm of backend, align=center, text=Text] {\small\textbf{Gemini 2.0 Flash} hỗ trợ sinh giải thích và mã Pandas;\\ người dùng kiểm tra trước khi thực thi (Human-in-the-Loop).};
+\end{tikzpicture}
+\end{frame}
+
+% ================================================================
+% SLIDE 9 -- Chụp Dashboard có sidebar + bộ lọc + bản đồ
+% figures/slide09-linked-interaction.png
+% ================================================================
+\begin{frame}{3. Hệ thống \& trực quan: Tương tác liên kết}
+\begin{center}\tagbox{OVERVIEW FIRST, DETAILS ON DEMAND}\end{center}\vspace{0.15cm}
+\begin{columns}[T,onlytextwidth]
+\column{0.43\textwidth}
+\begin{tikzpicture}[
+  every node/.style={rounded corners=5pt, align=center, font=\small, minimum width=3.8cm, minimum height=0.72cm},
+  flow/.style={-{Latex[length=2mm]}, thick, draw=Primary}
+]
+\node[fill=Sky,draw=Primary!45] (map) {Bản đồ khí hậu};
+\node[below=0.30cm of map,fill=white,draw=Primary!45] (click) {Chọn tỉnh/thành hoặc vùng};
+\node[below=0.30cm of click,fill=Mint!45,draw=green!45!black] (kpi) {KPI cập nhật tức thời};
+\node[below=0.30cm of kpi,fill=white,draw=Primary!45] (rank) {Xếp hạng và biểu đồ đổi theo bộ lọc};
+\draw[flow] (map)--(click); \draw[flow] (click)--(kpi); \draw[flow] (kpi)--(rank);
+\end{tikzpicture}
+\vspace{0.3cm}
+\footnotesize\justifying
+\keypoint{Sidebar cố định chuyển giữa 6 không gian phân tích.}
+\keypoint{Giữ bộ lọc tỉnh, vùng, thời gian, mùa và chỉ số hiện hành.}
+\keypoint{Người dùng đi từ tổng quan đến chi tiết theo nhu cầu.}
+
+\column{0.55\textwidth}
+\centering
+\slideimage{figures/slide09-linked-interaction.png}{5.0cm}
+\vspace{0.05cm}\scriptsize\color{gray}Ảnh cần chụp: Dashboard có sidebar, bộ lọc và bản đồ.
+\end{columns}
+\end{frame}
+
+% ================================================================
+% SLIDE 10 -- Chụp toàn bộ Dashboard: KPI + map + cảnh báo + ranking
+% figures/slide10-dashboard-overview.png
+% ================================================================
+\begin{frame}{3. Hệ thống \& trực quan: Dashboard tổng quan}
+\begin{center}\tagbox{TỔNG QUAN KHÔNG GIAN VÀ CỰC TRỊ}\end{center}\vspace{0.12cm}
+\begin{columns}[T,onlytextwidth]
+\column{0.70\textwidth}
+\centering
+\slideimage{figures/slide10-dashboard-overview.png}{5.35cm}
+\vspace{0.05cm}\scriptsize\color{gray}Ảnh cần chụp: toàn bộ tab Dashboard tổng quan.
+
+\column{0.28\textwidth}
+\small
+\textbf{Bốn thành phần chính}
+\vspace{0.15cm}
+\keypoint{\textbf{KPI:} nhiệt độ, mưa, độ ẩm và chỉ số cảnh báo.}
+\keypoint{\textbf{Bản đồ:} phân bố chỉ số theo tỉnh/thành.}
+\keypoint{\textbf{Cảnh báo:} nắng nóng, mưa lớn, khô hạn và bất thường.}
+\keypoint{\textbf{Xếp hạng:} phát hiện các tỉnh có cực trị khí hậu.}
+\vspace{0.2cm}
+\colorbox{Mint}{\parbox{0.95\linewidth}{\centering\scriptsize Xem nhanh toàn cảnh, sau đó lọc sâu theo không gian và thời gian.}}
+\end{columns}
+\end{frame}
+
+% ================================================================
+% SLIDE 11 -- Chụp 3 ảnh: time-series, comparison/radar, ranking
+% figures/slide11-timeseries.png
+% figures/slide11-radar.png
+% figures/slide11-ranking.png
+% ================================================================
+\begin{frame}{3. Hệ thống \& trực quan: Phân tích đa chiều}
+\begin{center}\tagbox{TIME-SERIES \;\textbullet\; RADAR \;\textbullet\; RANKING}\end{center}\vspace{0.15cm}
+\begin{columns}[T,onlytextwidth]
+\column{0.33\textwidth}
+\centering\textbf{Xu hướng thời gian}\\[1mm]
+\slideimage{figures/slide11-timeseries.png}{2.65cm}\\[-1mm]
+\scriptsize Hover hiển thị tooltip và làm nổi bật chuỗi đang xem.
+
+\column{0.33\textwidth}
+\centering\textbf{So sánh đối chiếu}\\[1mm]
+\slideimage{figures/slide11-radar.png}{2.65cm}\\[-1mm]
+\scriptsize Radar mô tả hồ sơ mưa -- nắng -- nhiệt độ -- độ ẩm.
+
+\column{0.33\textwidth}
+\centering\textbf{Xếp hạng cực trị}\\[1mm]
+\slideimage{figures/slide11-ranking.png}{2.65cm}\\[-1mm]
+\scriptsize Bar Chart xếp hạng tỉnh, hỗ trợ đối chiếu mức trung bình.
+\end{columns}
+\vspace{0.30cm}
+\begin{beamercolorbox}[rounded=true,shadow=true,wd=\textwidth,center,sep=0.18cm]{block body}
+\small\textbf{Thông điệp:} Mỗi dạng trực quan được chọn theo mục tiêu phân tích để giảm nhiễu thị giác và giúp nhận diện khác biệt nhanh hơn.
+\end{beamercolorbox}
+\end{frame}
+
+% ================================================================
+% SLIDE 12 -- Chụp Dark mode và Colorblind mode
+% figures/slide12-darkmode.png, figures/slide12-colorblind.png
+% ================================================================
+\begin{frame}{3. Hệ thống \& trực quan: Tối ưu tiếp cận}
+\begin{center}\tagbox{A11Y \;\textbullet\; LIGHT/DARK \;\textbullet\; COLORBLIND}\end{center}\vspace{0.12cm}
+\begin{columns}[T,onlytextwidth]
+\column{0.47\textwidth}
+\small
+\keypoint{Không sử dụng màu sắc là tín hiệu duy nhất.}
+\keypoint{Light/Dark Mode phù hợp với các điều kiện ánh sáng khác nhau.}
+\keypoint{Colorblind Mode sử dụng bảng màu Okabe--Ito có độ phân biệt cao.}
+\keypoint{Kết hợp màu với nhãn, tooltip, hình khối, nét liền và nét đứt.}
+\keypoint{Duy trì tương phản tốt và trạng thái focus rõ ràng.}
+\vspace{0.3cm}
+\colorbox{Sky}{\parbox{0.95\linewidth}{\centering\small\textbf{Mục tiêu:} trực quan hóa dễ đọc, dễ thao tác và phù hợp với nhiều nhóm người dùng.}}
+
+\column{0.25\textwidth}
+\centering\textbf{Chế độ tối}\\[1mm]
+\slideimage{figures/slide12-darkmode.png}{3.55cm}
+
+\column{0.25\textwidth}
+\centering\textbf{Chế độ mù màu}\\[1mm]
+\slideimage{figures/slide12-colorblind.png}{3.55cm}
+\end{columns}
+\end{frame}
+
+\end{document}
