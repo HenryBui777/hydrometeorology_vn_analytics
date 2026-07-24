@@ -33,6 +33,7 @@ import {
   ArrowRight,
   ChevronUp
 } from 'lucide-react';
+import ExportPDFButton from './ExportPDFButton';
 
 const METRICS = [
   { key: 'temp', label: 'Nhiệt độ TB (°C)', color: '#3B82F6' },
@@ -500,11 +501,15 @@ export default function TimeSeriesView() {
   if (error) return null;
 
   return (
-    <div className="space-y-6 animate-fade-in pb-12">
+    <div id="timeseries-export-area" className="space-y-6 animate-fade-in pb-12">
 
 
       {/* Control Filter Bar */}
       <div className="glass-panel rounded-2xl p-5 bg-white border border-slate-200 shadow-sm grid grid-cols-1 lg:grid-cols-12 gap-5 items-end">
+        {/* PDF Export button — top-right of filter bar */}
+        <div className="lg:col-span-12 flex justify-end -mb-2">
+          <ExportPDFButton targetId="timeseries-export-area" fileName="xu-huong-thoi-gian" label="Xuất PDF" />
+        </div>
 
         {/* Province Multi-select Dropdown (Col Span 4) */}
         <div className="lg:col-span-4 space-y-1.5" ref={dropdownRef}>

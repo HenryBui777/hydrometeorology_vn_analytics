@@ -156,20 +156,34 @@ export default function App() {
     setTimeout(() => window.print(), 150);
   };
 
-  // Start with some history items to show past activities
-  const [historyList, setHistoryList] = useState([
-    {
-      id: 10,
-      title: "Xu hướng bão nhiệt đới",
-      question: "Vẽ bản đồ nhiệt độ bề mặt đại dương và xu hướng áp suất khí quyển năm 2025.",
-      explanation: "Lọc các trường dữ liệu khí áp và bức xạ mặt trời, tính toán mối tương quan để dự đoán độ ẩm và xu hướng bão tại khu vực Nam Trung Bộ.",
-      code: "# Mock historical script\nprint('Thực thi script #10...')",
-      logs: ["[2026-06-23 14:12:00] Run success"],
-      kpis: [{ label: "Nhiệt độ TB", value: "28.5 °C", desc: "Biển Đông", trend: "up" }],
-      chartType: "bar",
-      chartData: [{ name: "Nam Trung Bộ", value: 1.25 }]
-    }
-  ]);
+  // History loaded from local SQLite API
+  const [historyList, setHistoryList] = useState([]);
+
+  // Load history from SQLite on mount
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+        const email = user?.email || '';
+        const res = await fetch(`${apiBase}/api/logs/local?user_email=${encodeURIComponent(email)}`);
+        const json = await res.json();
+        if (json.status === 'success' && Array.isArray(json.data)) {
+          setHistoryList(json.data.map(item => ({
+            id: item.id,
+            question: item.question,
+            explanation: item.explanation,
+            code: item.original_code || item.human_edited_code,
+            chartType: item.chart_type,
+            chartData: item.chart_data,
+            status: item.status,
+            source: item.source,
+            created_at: item.created_at,
+          })));
+        }
+      } catch (e) { console.warn('Could not load AI history:', e); }
+    };
+    loadHistory();
+  }, [user]);
 
   // Derived state: check if activeQuery is pending approval
   const pendingReviewCount = (activeQuery && activeQuery.status === 'pending') ? 1 : 0;
@@ -282,12 +296,32 @@ export default function App() {
           updatedQuery.additionalCharts = resultData.additionalCharts || [];
         }
         
-        // Save to analysis history list
+        // Save to local state
         setHistoryList(historyPrev => {
           const exists = historyPrev.some(item => item.id === updatedQuery.id);
           if (exists) return historyPrev;
-          return [...historyPrev, updatedQuery];
+          return [updatedQuery, ...historyPrev];
         });
+
+        // Persist to SQLite via API
+        try {
+          const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+          fetch(`${apiBase}/api/logs/save-full`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_email: user?.email || '',
+              question: updatedQuery.question || '',
+              explanation: updatedQuery.explanation || '',
+              original_code: updatedQuery.code || '',
+              human_edited_code: updatedQuery.code || '',
+              status: 'approved',
+              chart_type: updatedQuery.chartType || 'bar',
+              chart_data: JSON.stringify(updatedQuery.chartData || []),
+              source: updatedQuery.source || 'template',
+            })
+          }).catch(e => console.warn('Log save failed:', e));
+        } catch(e) { /* non-critical */ }
         
         return updatedQuery;
       });
@@ -419,6 +453,8 @@ export default function App() {
 
           {currentTab === 'aianalyst' && (
             <AIAnalystPortal
+              user={user}
+              loginWithGoogle={loginWithGoogle}
               datasetUploaded={datasetUploaded}
               chatHistory={chatHistory}
               submitQuery={submitQuery}

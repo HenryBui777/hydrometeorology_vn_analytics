@@ -24,6 +24,7 @@ import {
   ChevronUp,
   Info
 } from 'lucide-react';
+import ExportPDFButton from './ExportPDFButton';
 
 const VARIABLES = [
   { key: 'temp', label: 'Nhiệt độ TB (°C)', shortLabel: 'N.độ TB' },
@@ -778,8 +779,12 @@ export default function AnalysisView() {
   if (loading || error) return null;
 
   return (
-    <div className="space-y-6 animate-fade-in pb-12">
+    <div id="analysis-export-area" className="space-y-6 animate-fade-in pb-12">
 
+      {/* PDF Export button */}
+      <div className="flex justify-end">
+        <ExportPDFButton targetId="analysis-export-area" fileName="phan-tich-tuong-quan" label="Xuất PDF" />
+      </div>
 
       {/* Row 1: Heatmap & Scatter Plot */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-stretch">

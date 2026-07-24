@@ -12,6 +12,8 @@ import json
 import re
 import pandas as pd
 import unicodedata
+import sqlite3
+import datetime
 
 # Load env
 load_dotenv()
@@ -21,6 +23,69 @@ app = FastAPI(title="KTTV AI Analytics API")
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CSV_PATH = os.path.join(BASE_DIR, "data", "processed", "cleaned_data.csv")
+SQLITE_PATH = os.path.join(BASE_DIR, "data", "ai_logs.db")
+
+# ---------- SQLite Local Logging ----------
+def _init_sqlite():
+    conn = sqlite3.connect(SQLITE_PATH)
+    conn.execute("""CREATE TABLE IF NOT EXISTS ai_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_email TEXT,
+        question TEXT NOT NULL,
+        explanation TEXT,
+        original_code TEXT,
+        human_edited_code TEXT,
+        status TEXT DEFAULT 'pending',
+        chart_type TEXT,
+        chart_data TEXT,
+        insight_json TEXT,
+        source TEXT DEFAULT 'template',
+        engine TEXT DEFAULT 'python',
+        execution_time_ms INTEGER DEFAULT 0,
+        row_count INTEGER DEFAULT 0,
+        table_data TEXT DEFAULT '',
+        error_log TEXT DEFAULT '',
+        ai_model TEXT DEFAULT '',
+        human_modified INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now','localtime'))
+    )""")
+    # Migrate existing DBs — add missing columns safely
+    new_cols = [
+        ("engine",           "TEXT DEFAULT 'python'"),
+        ("execution_time_ms","INTEGER DEFAULT 0"),
+        ("row_count",        "INTEGER DEFAULT 0"),
+        ("table_data",       "TEXT DEFAULT ''"),
+        ("error_log",        "TEXT DEFAULT ''"),
+        ("ai_model",         "TEXT DEFAULT ''"),
+        ("human_modified",   "INTEGER DEFAULT 0"),
+    ]
+    for col, typedef in new_cols:
+        try:
+            conn.execute(f"ALTER TABLE ai_sessions ADD COLUMN {col} {typedef}")
+        except Exception:
+            pass
+    conn.commit()
+    conn.close()
+
+_init_sqlite()
+
+def _save_local_log(question, code, explanation, chart_type, source="template",
+                    user_email="", human_code="", status="pending", chart_data="", insight_json="",
+                    engine="python", execution_time_ms=0, row_count=0, table_data="",
+                    error_log="", ai_model="", human_modified=0):
+    conn = sqlite3.connect(SQLITE_PATH)
+    conn.execute(
+        """INSERT INTO ai_sessions
+           (user_email, question, explanation, original_code, human_edited_code,
+            status, chart_type, chart_data, insight_json, source, engine,
+            execution_time_ms, row_count, table_data, error_log, ai_model, human_modified)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (user_email, question, explanation, code, human_code or code,
+         status, chart_type, chart_data, insight_json, source, engine,
+         execution_time_ms, row_count, table_data, error_log, ai_model, human_modified)
+    )
+    conn.commit()
+    conn.close()
 
 # Setup CORS
 app.add_middleware(
@@ -47,6 +112,7 @@ class ChatRequest(BaseModel):
     prompt: str
     context: Optional[str] = "Dữ liệu thời tiết VN"
     engine: str = "python"
+    user_email: str = ""
 
 
 PROVINCE_ALIASES = {
@@ -533,19 +599,24 @@ def read_root():
 @app.post("/api/ai/generate")
 async def generate_ai_response(request: ChatRequest):
     try:
-        # Use the verified KTTV intent templates first. This prevents an LLM
-        # from silently changing the user's scope (for example, turning a
-        # summer Hanoi-vs-HCMC comparison into a national Top-10 ranking).
+        # --- Layer 1: Local verified templates (fast, deterministic) ---
         code, explanation, chart_type = local_analysis_code(request.prompt)
-        return {
-            "status": "success",
-            "log_id": f"local_log_{int(time.time())}",
-            "code": code,
-            "explanation": explanation,
-            "chart_type": chart_type,
-        }
+        is_generic_fallback = (not code) or (code.strip().startswith("# Câu hỏi này"))
 
-        # 1. Save User query to Supabase
+        if not is_generic_fallback:
+            # Template matched — use it directly
+            code = normalize_generated_python(code)
+            _save_local_log(request.prompt, code, explanation, chart_type, source="template",
+                            user_email=request.user_email, engine=request.engine)
+            return {
+                "status": "success",
+                "log_id": f"local_log_{int(time.time())}",
+                "code": code,
+                "explanation": explanation,
+                "chart_type": chart_type,
+            }
+
+        # --- Layer 2: Gemini LLM for novel questions ---
         user_res = supabase.table("chat_history").insert({
             "role": "user",
             "content": request.prompt
@@ -564,24 +635,37 @@ async def generate_ai_response(request: ChatRequest):
                 dynamic_context = str(e)
 
         # 2. Call Gemini with multi-model fallback and bulletproof error handling
-        system_prompt = f"""Bạn là chuyên gia phân tích dữ liệu đóng vai trò trợ giúp.
-Ngữ cảnh: {request.context}
-Cấu trúc DataFrame hiện tại (Dynamic Schema):
+        system_prompt = f"""Ban la chuyen gia phan tich du lieu khi tuong thuy van Viet Nam, dong vai tro TRO GIUP (khong duoc tu quyet dinh).
+
+Ngu canh nguoi dung: {request.context}
+
+Cau truc DataFrame hien tai (DAY LA DU LIEU DUY NHAT BAN DUOC PHEP SU DUNG):
 {dynamic_context}
 
-Nhiệm vụ: Dựa vào yêu cầu người dùng và cấu trúc DataFrame hiện tại, hãy viết mã Python để thao tác và phân tích.
+=== QUY TAC BAT BUOC - VI PHAM SE BI TU CHOI ===
 
-QUY TẮC BẮT BUỘC:
-1. KHÔNG tự tạo hay thêm số liệu giả. Chỉ dùng dữ liệu từ DataFrame 'df' có sẵn (được giả định là DataFrame của file trên).
-2. BẮT BUỘC thêm các dòng comment giải thích chi tiết bằng tiếng Việt ngay trong code:
-   # Đoạn code này sẽ [thao tác], sử dụng hàm [hàm_sử_dụng] của [thư_viện].
-3. Trả về đúng định dạng JSON:
+[TINH TOAN VEN DU LIEU - QUAN TRONG NHAT]
+1. TUYET DOI KHONG tao du lieu gia, mock data, dummy data, random data, hay bat ky so lieu nao khong co trong DataFrame 'df'.
+   - Cam: pd.DataFrame({{...}}), np.random.*, pd.util.testing.makeDataFrame(), hoac bat ky cach tao data gia nao khac.
+2. TUYET DOI KHONG import them dataset ngoai.
+   - Cam: pd.read_csv() voi path khac, requests.get(), urllib, open() file bat ky.
+3. CHI duoc dung cac cot da liet ke trong schema tren. Neu cot khong ton tai, bao loi ro rang trong explanation, KHONG tu dat ten cot moi.
+4. Neu du lieu khong du de tra loi cau hoi, noi thang trong explanation, KHONG co tinh tao du lieu de "du".
+5. DataFrame 'df' da duoc load san trong moi truong thuc thi. KHONG goi pd.read_csv lai.
+
+[MINH BACH CODE]
+6. Bat buoc comment tieng Viet giai thich moi buoc quan trong trong code.
+   Vi du: # Loc du lieu tinh Ha Noi, su dung ham isin() cua Pandas
+7. Code PHAI print ket qua dang JSON: print(df_result.to_json(orient='records')) hoac print(json.dumps(result))
+
+[DINH DANG TRA VE]
+Tra ve JSON nguyen thuy (KHONG co markdown ```json):
 {{
-  "explanation": "Tóm tắt ngắn gọn phương pháp đề xuất",
-  "code": "mã python có sẵn comment chi tiết (LƯU Ý: Mã Python PHẢI print ra kết quả dạng JSON array. vd: print(df.to_json(orient='records')))"
+  "explanation": "Mo ta ngan gon phuong phap va ly do chon phuong phap nay",
+  "code": "ma python day du, co comment, chi dung du lieu tu df co san"
 }}
-CHỈ trả về JSON nguyên thủy, không có dấu markdown ```json.
 """
+
 
         candidate_models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash-latest']
         ai_text = ""
@@ -653,7 +737,14 @@ print(result_df.to_json(orient='records'))
         # Use the project-safe template whenever Gemini has no usable answer.
         if not code:
             code, explanation, _ = local_analysis_code(request.prompt)
+            source = "template_fallback"
+        else:
+            source = "gemini"
         code = normalize_generated_python(code)
+
+        # Save to local SQLite log
+        _save_local_log(request.prompt, code, explanation, chart_type if chart_type else "bar",
+                        source=source, user_email=request.user_email)
 
         # 3. Save AI response to Supabase gracefully
         log_id = f"local_log_{int(time.time())}"
@@ -770,6 +861,94 @@ CHỈ trả về JSON nguyên thủy, không có dấu markdown ```json.
         print(f"Error in analyze-chart: {str(e)}")
         return local_four_axis_insight(request)
 
+
+@app.get("/api/ai/suggest-methods")
+async def suggest_analysis_methods():
+    """Return curated analysis method suggestions for users who don't know where to start."""
+    suggestions = [
+        {
+            "id": "trend",
+            "category": "Xu hướng thời gian",
+            "icon": "📈",
+            "title": "Phân tích xu hướng nhiệt độ theo năm",
+            "description": "Xem nhiệt độ trung bình các tỉnh tăng hay giảm theo thời gian",
+            "example_prompt": "Vẽ biểu đồ xu hướng nhiệt độ trung bình theo tháng của Hà Nội, TP.HCM và Đà Nẵng",
+            "difficulty": "Dễ",
+            "chart_hint": "line"
+        },
+        {
+            "id": "ranking",
+            "category": "Xếp hạng so sánh",
+            "icon": "🏆",
+            "title": "Xếp hạng tỉnh theo lượng mưa",
+            "description": "Tìm 10 tỉnh có lượng mưa cao nhất hoặc thấp nhất",
+            "example_prompt": "Xếp hạng 10 tỉnh có lượng mưa trung bình cao nhất",
+            "difficulty": "Dễ",
+            "chart_hint": "bar-horizontal"
+        },
+        {
+            "id": "seasonal",
+            "category": "Phân tích mùa vụ",
+            "icon": "🌸",
+            "title": "So sánh các mùa trong năm",
+            "description": "Xem sự khác biệt về thời tiết giữa 4 mùa Xuân-Hè-Thu-Đông",
+            "example_prompt": "So sánh nhiệt độ và lượng mưa trung bình theo 4 mùa của miền Bắc",
+            "difficulty": "Dễ",
+            "chart_hint": "bar"
+        },
+        {
+            "id": "correlation",
+            "category": "Tương quan",
+            "icon": "🔗",
+            "title": "Mối quan hệ nhiệt độ và độ ẩm",
+            "description": "Phân tích tương quan giữa nhiệt độ và độ ẩm không khí",
+            "example_prompt": "Phân tích tương quan giữa nhiệt độ trung bình và độ ẩm trung bình của toàn bộ các tỉnh",
+            "difficulty": "Trung bình",
+            "chart_hint": "scatter"
+        },
+        {
+            "id": "regional",
+            "category": "So sánh vùng miền",
+            "icon": "🗺️",
+            "title": "So sánh khí hậu 7 vùng của Việt Nam",
+            "description": "Nhìn tổng thể sự khác biệt khí hậu giữa các vùng địa lý",
+            "example_prompt": "So sánh nhiệt độ trung bình và lượng mưa trung bình của 7 vùng khí hậu Việt Nam",
+            "difficulty": "Trung bình",
+            "chart_hint": "radar"
+        },
+        {
+            "id": "extreme",
+            "category": "Phân tích cực đoan",
+            "icon": "⚡",
+            "title": "Phát hiện đợt nắng nóng / mưa lớn",
+            "description": "Tìm các ngày có nhiệt độ cao bất thường hoặc lượng mưa cực đại",
+            "example_prompt": "Tìm 20 ngày có nhiệt độ cao nhất trong lịch sử dữ liệu và tỉnh xảy ra",
+            "difficulty": "Trung bình",
+            "chart_hint": "bar-horizontal"
+        },
+        {
+            "id": "wind",
+            "category": "Phân tích gió",
+            "icon": "💨",
+            "title": "Phân tích hướng gió và tốc độ gió",
+            "description": "Xem hoa gió và phân bố tốc độ gió theo vùng miền",
+            "example_prompt": "Vẽ biểu đồ hoa gió cho miền Trung Việt Nam",
+            "difficulty": "Nâng cao",
+            "chart_hint": "wind-rose"
+        },
+        {
+            "id": "anomaly",
+            "category": "Phân tích bất thường",
+            "icon": "🚨",
+            "title": "Phát hiện tỉnh có khí hậu bất thường",
+            "description": "Tìm các tỉnh có chỉ số khí hậu khác biệt so với vùng xung quanh",
+            "example_prompt": "Tính điểm bất thường khí hậu tổng hợp (nhiệt độ, mưa, gió) cho từng tỉnh và xếp hạng",
+            "difficulty": "Nâng cao",
+            "chart_hint": "bar"
+        }
+    ]
+    return {"status": "success", "suggestions": suggestions}
+
 @app.get("/api/history")
 async def get_history():
     try:
@@ -779,6 +958,8 @@ async def get_history():
     except Exception as e:
         print(f"Error fetching history: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
 
 import sys
 import os
@@ -796,27 +977,99 @@ class ExecuteRequest(BaseModel):
 
 @app.post("/api/execute")
 async def execute_code(request: ExecuteRequest):
+    import time as _time
+    exec_start = _time.time()
+    error_log_str = ""
+    row_count_val = 0
+    table_data_str = ""
+    chart_data = None
+    chart_type = request.chart_type or "bar"
+    additional_charts = []
+    result_data = ""
+
     try:
         if not os.path.exists(CSV_PATH):
             raise FileNotFoundError(f"Không tìm thấy tệp dữ liệu: {CSV_PATH}")
 
         df = pd.read_csv(CSV_PATH)
+        row_count_val = len(df)
         safe_code = normalize_generated_python(request.code)
-        execution_env = {"__builtins__": __builtins__, "pd": pd, "df": df}
+
+        # Restricted builtins — block dangerous imports and file operations
+        safe_builtins = {
+            k: v for k, v in __builtins__.__dict__.items()
+            if k in (
+                'print', 'len', 'range', 'int', 'float', 'str', 'list', 'dict',
+                'tuple', 'set', 'sorted', 'min', 'max', 'sum', 'abs', 'round',
+                'enumerate', 'zip', 'map', 'filter', 'isinstance', 'type',
+                'True', 'False', 'None', 'bool', 'any', 'all', 'reversed',
+                'hasattr', 'getattr', 'ValueError', 'TypeError', 'KeyError',
+                'IndexError', 'Exception', 'StopIteration',
+            )
+        } if hasattr(__builtins__, '__dict__') else {
+            k: __builtins__[k] for k in (
+                'print', 'len', 'range', 'int', 'float', 'str', 'list', 'dict',
+                'tuple', 'set', 'sorted', 'min', 'max', 'sum', 'abs', 'round',
+                'enumerate', 'zip', 'map', 'filter', 'isinstance', 'type',
+                'bool', 'any', 'all', 'reversed',
+            ) if k in __builtins__
+        }
+        execution_env = {"__builtins__": safe_builtins, "pd": pd, "df": df, "json": json}
         exec(safe_code, execution_env, execution_env)
         chart_data = execution_env.get("chart_data")
         chart_type = execution_env.get("chart_type", request.chart_type or "bar")
         additional_charts = execution_env.get("additional_charts", [])
+
+        # Capture table_data: first 10 rows of result as JSON
+        table_data_raw = execution_env.get("table_data") or execution_env.get("df_result")
+        if table_data_raw is not None and hasattr(table_data_raw, 'head'):
+            try:
+                table_data_str = table_data_raw.head(10).to_json(orient='records', force_ascii=False)
+            except Exception:
+                table_data_str = ""
+        elif chart_data and isinstance(chart_data, list):
+            try:
+                table_data_str = json.dumps(chart_data[:10], ensure_ascii=False)
+            except Exception:
+                table_data_str = ""
+
         if not chart_data:
             raise ValueError("Mã phân tích chưa tạo chart_data. Hãy sinh lại đề xuất.")
         result_data = json.dumps(chart_data, ensure_ascii=False, default=str)
-    except Exception as e:
-        return {
-            "status": "error",
-            "error_message": str(e)
-        }
 
-    # Save logs opportunistically; analysis must not fail if Supabase is offline.
+    except Exception as e:
+        error_log_str = str(e)
+        exec_ms = int((_time.time() - exec_start) * 1000)
+        # Update SQLite error log if log_id is numeric
+        try:
+            log_id_int = int(str(request.log_id).replace("local_log_", ""))
+            conn = sqlite3.connect(SQLITE_PATH)
+            conn.execute(
+                "UPDATE ai_sessions SET error_log=?, execution_time_ms=?, status='rejected' WHERE id=?",
+                (error_log_str, exec_ms, log_id_int)
+            )
+            conn.commit(); conn.close()
+        except Exception:
+            pass
+        return {"status": "error", "error_message": error_log_str}
+
+    exec_ms = int((_time.time() - exec_start) * 1000)
+
+    # Update SQLite with execution results
+    try:
+        log_id_int = int(str(request.log_id).replace("local_log_", ""))
+        conn = sqlite3.connect(SQLITE_PATH)
+        conn.execute(
+            """UPDATE ai_sessions
+               SET status='approved', execution_time_ms=?, row_count=?, table_data=?, chart_data=?, chart_type=?
+               WHERE id=?""",
+            (exec_ms, row_count_val, table_data_str, result_data, chart_type, log_id_int)
+        )
+        conn.commit(); conn.close()
+    except Exception as upd_err:
+        print("SQLite update failed:", upd_err)
+
+    # Save logs opportunistically to Supabase
     try:
         supabase.table("execution_logs").insert({
             "chat_id": request.log_id,
@@ -832,6 +1085,9 @@ async def execute_code(request: ExecuteRequest):
         "chart_data": result_data,
         "chart_type": chart_type,
         "additional_charts": additional_charts,
+        "execution_time_ms": exec_ms,
+        "row_count": row_count_val,
+        "table_data": table_data_str,
         "raw_logs": ""
     }
 
@@ -854,6 +1110,81 @@ async def save_log(request: LogSaveRequest):
         return {"status": "success", "message": "Log saved successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# ---------- Local SQLite Log Endpoints ----------
+
+class FullLogSaveRequest(BaseModel):
+    user_email: str = ""
+    question: str
+    explanation: str = ""
+    original_code: str = ""
+    human_edited_code: str = ""
+    status: str = "approved"
+    chart_type: str = "bar"
+    chart_data: str = ""
+    insight_json: str = ""
+    source: str = "template"
+
+@app.post("/api/logs/save-full")
+async def save_full_log(request: FullLogSaveRequest):
+    try:
+        _save_local_log(
+            question=request.question,
+            code=request.original_code,
+            explanation=request.explanation,
+            chart_type=request.chart_type,
+            source=request.source,
+            user_email=request.user_email,
+            human_code=request.human_edited_code,
+            status=request.status,
+            chart_data=request.chart_data,
+            insight_json=request.insight_json,
+        )
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/logs/local")
+async def get_local_logs(user_email: str = ""):
+    try:
+        conn = sqlite3.connect(SQLITE_PATH)
+        conn.row_factory = sqlite3.Row
+        if user_email:
+            rows = conn.execute(
+                "SELECT * FROM ai_sessions WHERE user_email=? ORDER BY created_at DESC LIMIT 50",
+                (user_email,)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM ai_sessions ORDER BY created_at DESC LIMIT 50"
+            ).fetchall()
+        conn.close()
+        data = []
+        for row in rows:
+            item = dict(row)
+            # Parse chart_data back to list if possible
+            if item.get("chart_data"):
+                try:
+                    item["chart_data"] = json.loads(item["chart_data"])
+                except Exception:
+                    pass
+            if item.get("insight_json"):
+                try:
+                    item["insight_json"] = json.loads(item["insight_json"])
+                except Exception:
+                    pass
+            data.append(item)
+        return {"status": "success", "data": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.patch("/api/logs/local/{log_id}/status")
+async def update_log_status(log_id: int, status: str = "approved"):
+    conn = sqlite3.connect(SQLITE_PATH)
+    conn.execute("UPDATE ai_sessions SET status=? WHERE id=?", (status, log_id))
+    conn.commit()
+    conn.close()
+    return {"status": "success"}
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
