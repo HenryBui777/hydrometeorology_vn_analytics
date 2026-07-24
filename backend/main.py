@@ -189,6 +189,19 @@ def infer_general_analysis(prompt: str) -> tuple[str, str, str]:
         filters.append(f"df_work = df_work[df_work['season'].eq({season!r})]")
     filter_code = "\n".join(filters)
 
+    # Questions about an abnormal/extreme value need a time baseline, not one
+    # all-period average.  The monthly series lets the user see when the
+    # selected location differs most from its normal temperature.
+    if any(term in text for term in ("bat thuong", "cuc doan", "ky luc")):
+        metric = metrics[0]
+        return (f"""{filter_code}
+result_df = (df_work.groupby('month', as_index=False)[{metric!r}].mean()
+    .rename(columns={{'month': 'name', {metric!r}: 'value'}})
+    .sort_values('name'))
+result_df['name'] = result_df['name'].map(lambda month: f'Tháng {{month}}')
+chart_data = result_df.to_dict(orient='records')
+chart_type = 'line'""", "Câu hỏi về bất thường được phân tích theo diễn biến từng tháng để nhận diện các thời điểm nhiệt độ lệch rõ nhất, thay vì gộp thành một giá trị trung bình duy nhất.", "line")
+
     chart_type = select_visualization(text, metrics, provinces)
     wants_relationship = chart_type in ("scatter", "bubble")
     wants_time = chart_type in ("line", "multi-line", "area", "stacked-area")
@@ -807,7 +820,10 @@ async def execute_code(request: ExecuteRequest):
         chart_data = execution_env.get("chart_data")
         chart_type = execution_env.get("chart_type", request.chart_type or "bar")
         additional_charts = execution_env.get("additional_charts", [])
-        if not chart_data:
+        # An empty list is a valid result for a query without enough data to
+        # draw a chart. Only a missing chart_data variable is an execution
+        # error.
+        if chart_data is None:
             raise ValueError("Mã phân tích chưa tạo chart_data. Hãy sinh lại đề xuất.")
         result_data = json.dumps(chart_data, ensure_ascii=False, default=str)
     except Exception as e:
