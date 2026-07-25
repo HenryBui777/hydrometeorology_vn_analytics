@@ -188,6 +188,10 @@ hydrometeorology_vn_analytics/
 │   ├── public/data/kttv.csv         # CSV được serve tĩnh cho frontend
 │   └── package.json
 │
+├── 📂 docs/                         # Tài liệu hướng dẫn AI
+│   ├── AI_Prompt_Scenarios.md       # Kịch bản prompt mẫu
+│   └── AI_TRAINING_AND_RUN_GUIDE.md # Hướng dẫn huấn luyện & vận hành
+│
 ├── .env                             # Biến môi trường (KHÔNG commit)
 ├── .env.example                     # Template cấu hình
 ├── .gitignore
@@ -354,6 +358,7 @@ Hệ thống AI tuân thủ nguyên tắc **không thực thi ngầm**:
 <tr><td>Vite</td><td>8</td><td>Build tool & dev server</td></tr>
 <tr><td>Recharts</td><td>^3.9</td><td>Biểu đồ tương tác</td></tr>
 <tr><td>Monaco Editor</td><td>^4.7</td><td>Code editor với syntax highlight</td></tr>
+<tr><td>html2canvas</td><td>^1.4</td><td>Xuất biểu đồ sang ảnh PNG</td></tr>
 <tr>
   <td rowspan="4"><b>Backend</b></td>
   <td>FastAPI</td><td>0.115+</td><td>REST API framework</td>
@@ -379,6 +384,46 @@ Hệ thống AI tuân thủ nguyên tắc **không thực thi ngầm**:
 
 ---
 
+## 🗄️ Cấu trúc Database (`ai_logs.db`)
+
+SQLite cục bộ lưu toàn bộ lịch sử phiên AI. Bảng chính là **`ai_sessions`**:
+
+| Cột | Kiểu | Mô tả |
+|-----|------|-------|
+| `id` | INTEGER | Auto-increment primary key |
+| `user_email` | TEXT | Email người dùng (từ Supabase Auth) |
+| `question` | TEXT | Câu hỏi gốc của người dùng |
+| `explanation` | TEXT | Giải thích 5 mục do AI sinh |
+| `original_code` | TEXT | Code AI tạo ra ban đầu |
+| `human_edited_code` | TEXT | Code sau khi người dùng chỉnh sửa |
+| `human_modified` | INTEGER | `0` = không sửa · `1` = đã sửa |
+| `status` | TEXT | `pending` / `approved` |
+| `engine` | TEXT | `python` / `sql` / `r` |
+| `chart_type` | TEXT | Loại biểu đồ (`bar`, `line`, `radar`, …) |
+| `chart_data` | TEXT | JSON mảng dữ liệu cho biểu đồ |
+| `table_data` | TEXT | JSON bảng kết quả đầy đủ |
+| `insight_json` | TEXT | Phân tích 4 trục (descriptive/diagnostic/predictive/prescriptive) |
+| `ai_model` | TEXT | Model đã dùng |
+| `source` | TEXT | `openrouter` / `openrouter_verified_fallback` |
+| `execution_time_ms` | INTEGER | Thời gian thực thi (ms) |
+| `row_count` | INTEGER | Số dòng trong DataFrame đầu vào |
+| `error_log` | TEXT | Lỗi nếu có |
+| `parent_id` | INTEGER | ID phiên cha (multi-turn) |
+| `conversation_id` | TEXT | UUID nhóm hội thoại |
+| `created_at` | TEXT | Thời gian tạo (UTC) |
+
+**Dữ liệu minh họa:**
+
+```
+id  user_email                        question                                    engine  chart_type  status    execution_ms
+──  ────────────────────────────────  ──────────────────────────────────────────  ──────  ──────────  ────────  ────────────
+64  trunghieu210820055@gmail.com      Xu hướng nhiệt độ Hà Nội/TP.HCM/Đà Nẵng   python  multi-line  approved  225
+62  trunghieu210820055@gmail.com      Biến đổi nhiệt độ và lượng mưa theo tháng  r       line        approved   85
+61  trunghieu210820055@gmail.com      Sapa vs Đà Lạt tháng 12                    r       radar       approved  348
+```
+
+---
+
 ## 📄 License
 
-[MIT License](LICENSE) © 2026 
+[MIT License](LICENSE) © 2026 — Nhóm Đồ Án KTTV · Trường Đại học Khoa học Tự nhiên TP.HCM
