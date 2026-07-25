@@ -4,7 +4,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
-import google.generativeai as genai
 from supabase import create_client, Client
 from typing import Optional, List
 import time
@@ -14,6 +13,7 @@ import pandas as pd
 import unicodedata
 import sqlite3
 import datetime
+import requests
 
 # Load env
 load_dotenv()
@@ -74,7 +74,7 @@ def _save_local_log(question, code, explanation, chart_type, source="template",
                     engine="python", execution_time_ms=0, row_count=0, table_data="",
                     error_log="", ai_model="", human_modified=0):
     conn = sqlite3.connect(SQLITE_PATH)
-    conn.execute(
+    cursor = conn.execute(
         """INSERT INTO ai_sessions
            (user_email, question, explanation, original_code, human_edited_code,
             status, chart_type, chart_data, insight_json, source, engine,
@@ -86,6 +86,34 @@ def _save_local_log(question, code, explanation, chart_type, source="template",
     )
     conn.commit()
     conn.close()
+    return cursor.lastrowid
+
+
+def _parse_local_log_id(log_id) -> Optional[int]:
+    """Convert the frontend-safe local_log_<id> value back to SQLite's numeric id."""
+    try:
+        return int(str(log_id).replace("local_log_", ""))
+    except (TypeError, ValueError):
+        return None
+
+
+def _add_transparency_comments(code: str, explanation: str = "") -> str:
+    """Make every generated proposal understandable before a human approves it."""
+    header = (
+        "# Mã được tạo để người dùng xem xét trước khi chạy cục bộ.\n"
+        "# Dữ liệu chỉ dùng DataFrame df đã nạp sẵn; không đọc tệp hay gọi dữ liệu bên ngoài.\n"
+        f"# Mục tiêu: {(explanation or 'Tạo kết quả trực quan theo câu hỏi của người dùng.').replace(chr(10), ' ')[:260]}\n"
+    )
+    return header + (code or "")
+
+
+def _is_safe_generated_code(code: str) -> bool:
+    """Reject model output that cannot be executed in the local, restricted sandbox."""
+    forbidden = (
+        r"\bimport\b", r"\bopen\s*\(", r"\bread_csv\s*\(", r"\brequests\b",
+        r"\burllib\b", r"\bos\.", r"\bsys\.", r"\bsubprocess\b", r"\beval\s*\(", r"\bexec\s*\(",
+    )
+    return bool(code and "chart_data" in code and not any(re.search(pattern, code, re.I) for pattern in forbidden))
 
 # Setup CORS
 app.add_middleware(
@@ -100,13 +128,78 @@ app.add_middleware(
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# SQLite is the required local audit store. Remote Supabase mirrors are opt-in so
+# an unavailable network never blocks a proposal or produces misleading errors.
+ENABLE_SUPABASE_LOGS = os.getenv("ENABLE_SUPABASE_LOGS", "false").strip().lower() in {"1", "true", "yes"}
 
-# Setup Gemini
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-genai.configure(api_key=GEMINI_API_KEY)
+# OpenRouter is the provider used for proposal generation. The free router picks
+# an available free text model; set OPENROUTER_MODEL to a specific model if wanted.
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemma-4-31b-it:free").strip()
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# Select model
-model = genai.GenerativeModel('gemini-2.0-flash')
+
+def _openrouter_completion(system_prompt: str, user_prompt: str, max_tokens: int = 2200,
+                           require_safe_code: bool = False) -> str:
+    """Request a text completion from OpenRouter without exposing the key to the browser."""
+    if not OPENROUTER_API_KEY:
+        raise ValueError("Missing OPENROUTER_API_KEY")
+    models = list(dict.fromkeys([
+        OPENROUTER_MODEL,
+        "google/gemma-4-26b-a4b-it:free",
+        "google/gemma-4-31b-it:free",
+        "openrouter/free",
+    ]))
+    last_error = ""
+    for model_name in models:
+        response = requests.post(
+            OPENROUTER_URL,
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "http://localhost:5173",
+                "X-Title": "KTTV Analytics",
+            },
+            json={
+                "model": model_name,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "temperature": 0.15,
+                "max_tokens": max_tokens,
+            },
+            timeout=35,
+        )
+        if not response.ok:
+            last_error = f"{model_name}: HTTP {response.status_code} {response.text[:220]}"
+            if response.status_code in (429, 503):
+                continue
+            raise ValueError(last_error)
+        payload = response.json()
+        content = ((payload.get("choices") or [{}])[0].get("message") or {}).get("content", "").strip()
+        if not content:
+            last_error = f"{model_name}: empty response"
+            continue
+        if require_safe_code:
+            candidate = content.strip()
+            candidate = re.sub(r"^```(?:json)?\s*", "", candidate, flags=re.I)
+            candidate = re.sub(r"\s*```$", "", candidate).strip()
+            json_match = re.search(r"\{[\s\S]*\}", candidate)
+            if json_match:
+                candidate = json_match.group(0)
+            try:
+                proposed_code = json.loads(candidate).get("code", "")
+            except Exception:
+                code_match = re.search(r"```(?:python|py)?\s*([\s\S]*?)```", content, flags=re.I)
+                proposed_code = code_match.group(1) if code_match else content
+            if _is_safe_generated_code(normalize_generated_python(proposed_code)):
+                return content
+            else:
+                last_error = f"{model_name}: proposal lacks safe chart_data"
+                continue
+        return content
+    raise ValueError("No OpenRouter model available. " + last_error)
 
 class ChatRequest(BaseModel):
     prompt: str
@@ -570,6 +663,11 @@ chart_type = 'scatter'""", "Đối chiếu tác động của mây che phủ t�
 def normalize_generated_python(code: str) -> str:
     """Remove stale CSV reads and convert legacy printed JSON into chart_data."""
     safe_code = code or ""
+    # The restricted runtime already supplies pd and json. Free models often add
+    # these harmless imports by habit; remove them instead of rejecting a valid plan.
+    safe_code = re.sub(r"(?m)^\s*import\s+pandas\s+as\s+pd\s*$", "", safe_code)
+    safe_code = re.sub(r"(?m)^\s*import\s+json\s*$", "", safe_code)
+    safe_code = re.sub(r"(?m)^\s*from\s+pandas\s+import\s+.*$", "", safe_code)
     safe_code = re.sub(
         r"(?m)^\s*df\s*=\s*pd\.read_csv\([^\n]*\)\s*$",
         "# df is preloaded by the application.",
@@ -582,6 +680,8 @@ def normalize_generated_python(code: str) -> str:
     )
     if "chart_data" not in safe_code and re.search(r"\bresult_df\b", safe_code):
         safe_code += "\nchart_data = result_df.to_dict(orient='records')\n"
+    if "chart_data" not in safe_code and re.search(r"\bresult_list\b", safe_code):
+        safe_code += "\n# Chuẩn hóa danh sách kết quả do AI tạo cho giao diện biểu đồ.\nchart_data = result_list\n"
     if "chart_type" not in safe_code:
         safe_code += "\nchart_type = 'bar'\n"
     return safe_code
@@ -599,28 +699,37 @@ def read_root():
 @app.post("/api/ai/generate")
 async def generate_ai_response(request: ChatRequest):
     try:
-        # --- Layer 1: Local verified templates (fast, deterministic) ---
-        code, explanation, chart_type = local_analysis_code(request.prompt)
+        # Every request is planned by OpenRouter; local templates are retained only as offline reference.
+        code, explanation, chart_type = "", "", "bar"
         is_generic_fallback = (not code) or (code.strip().startswith("# Câu hỏi này"))
 
-        if not is_generic_fallback:
+        if False and not is_generic_fallback:
             # Template matched — use it directly
             code = normalize_generated_python(code)
-            _save_local_log(request.prompt, code, explanation, chart_type, source="template",
-                            user_email=request.user_email, engine=request.engine)
+            code = _add_transparency_comments(code, explanation)
+            session_id = _save_local_log(request.prompt, code, explanation, chart_type, source="template",
+                                         user_email=request.user_email, engine=request.engine,
+                                         ai_model="Quy tắc phân tích cục bộ")
             return {
                 "status": "success",
-                "log_id": f"local_log_{int(time.time())}",
+                "log_id": f"local_log_{session_id}",
                 "code": code,
                 "explanation": explanation,
                 "chart_type": chart_type,
+                "source": "template",
+                "ai_model": "Quy tắc phân tích cục bộ",
             }
 
-        # --- Layer 2: Gemini LLM for novel questions ---
-        user_res = supabase.table("chat_history").insert({
-            "role": "user",
-            "content": request.prompt
-        }).execute()
+        # --- OpenRouter LLM for every question ---
+        # Cloud chat history is optional. Local SQLite remains the authoritative audit log.
+        try:
+            if not ENABLE_SUPABASE_LOGS:
+                raise RuntimeError("Remote log mirroring is disabled")
+            supabase.table("chat_history").insert({"role": "user", "content": request.prompt}).execute()
+        except RuntimeError:
+            pass
+        except Exception as sb_err:
+            print("Supabase user log error (ignored):", sb_err)
 
         # Extract Dynamic Schema from CSV
         csv_path = CSV_PATH
@@ -634,7 +743,7 @@ async def generate_ai_response(request: ChatRequest):
             except Exception as e:
                 dynamic_context = str(e)
 
-        # 2. Call Gemini with multi-model fallback and bulletproof error handling
+        # 2. Build the OpenRouter request with the current local data schema
         system_prompt = f"""Ban la chuyen gia phan tich du lieu khi tuong thuy van Viet Nam, dong vai tro TRO GIUP (khong duoc tu quyet dinh).
 
 Ngu canh nguoi dung: {request.context}
@@ -662,13 +771,14 @@ Cau truc DataFrame hien tai (DAY LA DU LIEU DUY NHAT BAN DUOC PHEP SU DUNG):
 Tra ve JSON nguyen thuy (KHONG co markdown ```json):
 {{
   "explanation": "Mo ta ngan gon phuong phap va ly do chon phuong phap nay",
+  "chart_type": "bar | bar-horizontal | line | multi-line | area | stacked-area | composed | scatter | bubble | radar | donut | histogram | wind-rose | none",
   "code": "ma python day du, co comment, chi dung du lieu tu df co san"
 }}
 """
 
 
-        candidate_models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash-latest']
-        ai_text = ""
+        candidate_models = []  # Legacy loop disabled: OpenRouter is the only provider.
+        ai_text = _openrouter_completion(system_prompt, request.prompt, max_tokens=2200, require_safe_code=True)
         
         for model_name in candidate_models:
             try:
@@ -694,17 +804,24 @@ Tra ve JSON nguyen thuy (KHONG co markdown ```json):
         code = ""
 
         if ai_text:
-            if ai_text.startswith("```json"):
-                ai_text = ai_text[7:]
-            if ai_text.endswith("```"):
-                ai_text = ai_text[:-3]
+            ai_text = ai_text.strip()
+            # Accept common model wrappers while still requiring a JSON object.
+            ai_text = re.sub(r"^```(?:json)?\s*", "", ai_text, flags=re.I)
+            ai_text = re.sub(r"\s*```$", "", ai_text).strip()
+            json_match = re.search(r"\{[\s\S]*\}", ai_text)
+            if json_match:
+                ai_text = json_match.group(0)
             try:
                 parsed = json.loads(ai_text)
                 explanation = parsed.get("explanation", "")
                 code = parsed.get("code", "")
+                chart_type = parsed.get("chart_type", chart_type)
             except:
-                explanation = ai_text
-                code = ""
+                # Some free models return Python directly instead of the requested JSON.
+                # Accept it only when the normal safety validation succeeds below.
+                code_match = re.search(r"```(?:python|py)?\s*([\s\S]*?)```", ai_text, flags=re.I)
+                code = code_match.group(1) if code_match else ai_text
+                explanation = "Mã phân tích do OpenRouter tạo; người dùng cần kiểm tra trước khi phê duyệt chạy cục bộ."
 
         # Fallback if Gemini fails or is rate-limited
         if False and not code:  # legacy fallback retained only for reference
@@ -734,48 +851,84 @@ result_df = result_df.rename(columns=rename_dict)
 print(result_df.to_json(orient='records'))
 """
 
-        # Use the project-safe template whenever Gemini has no usable answer.
-        if not code:
-            code, explanation, _ = local_analysis_code(request.prompt)
-            source = "template_fallback"
-        else:
-            source = "gemini"
         code = normalize_generated_python(code)
+        # OpenRouter must produce valid, reviewable code. Never silently substitute a hard-coded answer.
+        if not _is_safe_generated_code(code):
+            raise ValueError("OpenRouter did not return safe analysis code with chart_data")
+        allowed_chart_types = {"bar", "bar-horizontal", "line", "multi-line", "area", "stacked-area", "composed", "scatter", "bubble", "radar", "donut", "histogram", "wind-rose", "none"}
+        if chart_type not in allowed_chart_types:
+            chart_type = "bar"
+        source = "openrouter"
+        code = _add_transparency_comments(code, explanation)
 
         # Save to local SQLite log
-        _save_local_log(request.prompt, code, explanation, chart_type if chart_type else "bar",
-                        source=source, user_email=request.user_email)
+        stored_chart_type = chart_type if chart_type else "bar"
+        model_label = f"OpenRouter / {OPENROUTER_MODEL}"
+        session_id = _save_local_log(request.prompt, code, explanation, stored_chart_type,
+                                     source=source, user_email=request.user_email,
+                                     engine=request.engine, ai_model=model_label)
 
         # 3. Save AI response to Supabase gracefully
-        log_id = f"local_log_{int(time.time())}"
         try:
-            ai_res = supabase.table("chat_history").insert({
+            if not ENABLE_SUPABASE_LOGS:
+                raise RuntimeError("Remote log mirroring is disabled")
+            supabase.table("chat_history").insert({
                 "role": "ai",
                 "content": explanation
             }).execute()
-            if ai_res.data:
-                log_id = ai_res.data[0]['id']
+        except RuntimeError:
+            pass
         except Exception as sb_err:
             print("Supabase log error (ignored):", sb_err)
 
         return {
             "status": "success",
-            "log_id": str(log_id),
+            "log_id": f"local_log_{session_id}",
             "code": code,
             "explanation": explanation,
-            "chart_type": "bar"
+            "chart_type": stored_chart_type,
+            "source": source,
+            "ai_model": model_label,
         }
 
     except Exception as e:
-        print(f"Error in generate endpoint: {str(e)}")
-        # Guaranteed safe return instead of 500 error!
-        code, explanation, chart_type = local_analysis_code(request.prompt)
+        print("Error in generate endpoint:", str(e).encode("ascii", "backslashreplace").decode())
+        # Free providers can return malformed code. Fall back transparently to a
+        # verified local plan so the user can still review and approve real-data code.
+        code, base_explanation, chart_type = local_analysis_code(request.prompt)
+        explanation = (
+            "OpenRouter chưa trả về mã có thể chạy an toàn; hệ thống dùng đề xuất cục bộ "
+            "đã kiểm chứng trên đúng bộ dữ liệu này. Bạn vẫn có thể sửa mã trước khi phê duyệt. "
+            + base_explanation
+        )
+        code = _add_transparency_comments(normalize_generated_python(code), explanation)
+        session_id = _save_local_log(request.prompt, code, explanation, chart_type,
+                                     source="openrouter_verified_fallback", user_email=request.user_email,
+                                     engine=request.engine, ai_model=f"OpenRouter fallback / {OPENROUTER_MODEL}")
         return {
             "status": "success",
-            "log_id": "fallback_log",
+            "log_id": f"local_log_{session_id}",
             "explanation": explanation,
             "code": code,
-            "chart_type": chart_type
+            "chart_type": chart_type,
+            "source": "openrouter_verified_fallback",
+            "ai_model": f"OpenRouter fallback / {OPENROUTER_MODEL}",
+        }
+        raise HTTPException(status_code=503, detail=f"OpenRouter chưa tạo được đề xuất: {str(e)[:420]}")
+        # Legacy fallback below is intentionally unreachable and retained for development reference.
+        code, explanation, chart_type = local_analysis_code(request.prompt)
+        code = _add_transparency_comments(normalize_generated_python(code), explanation)
+        session_id = _save_local_log(request.prompt, code, explanation, chart_type,
+                                     source="template_fallback", user_email=request.user_email,
+                                     engine=request.engine, ai_model="Quy tắc phân tích cục bộ")
+        return {
+            "status": "success",
+            "log_id": f"local_log_{session_id}",
+            "explanation": explanation,
+            "code": code,
+            "chart_type": chart_type,
+            "source": "template_fallback",
+            "ai_model": "Quy tắc phân tích cục bộ",
         }
 
 class AnalyzeChartRequest(BaseModel):
@@ -848,8 +1001,7 @@ BẮT BUỘC trả về chuẩn JSON với 4 trục (4-Axis Analytics):
 }}
 CHỈ trả về JSON nguyên thủy, không có dấu markdown ```json.
 """
-        response = model.generate_content(system_prompt)
-        ai_text = response.text.strip()
+        ai_text = _openrouter_completion(system_prompt, request.question, max_tokens=1000)
         if ai_text.startswith("```json"):
             ai_text = ai_text[7:]
         if ai_text.endswith("```"):
@@ -1021,7 +1173,9 @@ async def execute_code(request: ExecuteRequest):
         additional_charts = execution_env.get("additional_charts", [])
 
         # Capture table_data: first 10 rows of result as JSON
-        table_data_raw = execution_env.get("table_data") or execution_env.get("df_result")
+        table_data_raw = execution_env.get("table_data")
+        if table_data_raw is None:
+            table_data_raw = execution_env.get("df_result")
         if table_data_raw is not None and hasattr(table_data_raw, 'head'):
             try:
                 table_data_str = table_data_raw.head(10).to_json(orient='records', force_ascii=False)
@@ -1033,20 +1187,25 @@ async def execute_code(request: ExecuteRequest):
             except Exception:
                 table_data_str = ""
 
-        if not chart_data:
+        if chart_data is None:
             raise ValueError("Mã phân tích chưa tạo chart_data. Hãy sinh lại đề xuất.")
         result_data = json.dumps(chart_data, ensure_ascii=False, default=str)
 
     except Exception as e:
         error_log_str = str(e)
         exec_ms = int((_time.time() - exec_start) * 1000)
-        # Update SQLite error log if log_id is numeric
+        # Keep the failed local execution in the same audit record.
         try:
-            log_id_int = int(str(request.log_id).replace("local_log_", ""))
+            log_id_int = _parse_local_log_id(request.log_id)
+            if log_id_int is None:
+                raise ValueError("Invalid local log id")
             conn = sqlite3.connect(SQLITE_PATH)
             conn.execute(
-                "UPDATE ai_sessions SET error_log=?, execution_time_ms=?, status='rejected' WHERE id=?",
-                (error_log_str, exec_ms, log_id_int)
+                """UPDATE ai_sessions
+                   SET error_log=?, execution_time_ms=?, status='failed',
+                       human_edited_code=?, human_modified=CASE WHEN original_code <> ? THEN 1 ELSE 0 END
+                   WHERE id=?""",
+                (error_log_str, exec_ms, request.code, request.code, log_id_int)
             )
             conn.commit(); conn.close()
         except Exception:
@@ -1057,13 +1216,18 @@ async def execute_code(request: ExecuteRequest):
 
     # Update SQLite with execution results
     try:
-        log_id_int = int(str(request.log_id).replace("local_log_", ""))
+        log_id_int = _parse_local_log_id(request.log_id)
+        if log_id_int is None:
+            raise ValueError("Invalid local log id")
         conn = sqlite3.connect(SQLITE_PATH)
         conn.execute(
             """UPDATE ai_sessions
-               SET status='approved', execution_time_ms=?, row_count=?, table_data=?, chart_data=?, chart_type=?
+               SET status='approved', execution_time_ms=?, row_count=?, table_data=?, chart_data=?, chart_type=?,
+                   error_log='', human_edited_code=?,
+                   human_modified=CASE WHEN original_code <> ? THEN 1 ELSE 0 END
                WHERE id=?""",
-            (exec_ms, row_count_val, table_data_str, result_data, chart_type, log_id_int)
+            (exec_ms, row_count_val, table_data_str, result_data, chart_type,
+             request.code, request.code, log_id_int)
         )
         conn.commit(); conn.close()
     except Exception as upd_err:
@@ -1071,12 +1235,16 @@ async def execute_code(request: ExecuteRequest):
 
     # Save logs opportunistically to Supabase
     try:
+        if not ENABLE_SUPABASE_LOGS:
+            raise RuntimeError("Remote log mirroring is disabled")
         supabase.table("execution_logs").insert({
             "chat_id": request.log_id,
             "code": safe_code,
             "result_data": result_data,
             "status": "success"
         }).execute()
+    except RuntimeError:
+        pass
     except Exception as e:
         print("Failed to save log to Supabase:", e)
 
@@ -1114,6 +1282,7 @@ async def save_log(request: LogSaveRequest):
 # ---------- Local SQLite Log Endpoints ----------
 
 class FullLogSaveRequest(BaseModel):
+    log_id: str = ""
     user_email: str = ""
     question: str
     explanation: str = ""
@@ -1124,23 +1293,36 @@ class FullLogSaveRequest(BaseModel):
     chart_data: str = ""
     insight_json: str = ""
     source: str = "template"
+    engine: str = "python"
+    ai_model: str = ""
+    human_modified: bool = False
 
 @app.post("/api/logs/save-full")
 async def save_full_log(request: FullLogSaveRequest):
     try:
-        _save_local_log(
-            question=request.question,
-            code=request.original_code,
-            explanation=request.explanation,
-            chart_type=request.chart_type,
-            source=request.source,
-            user_email=request.user_email,
-            human_code=request.human_edited_code,
-            status=request.status,
-            chart_data=request.chart_data,
-            insight_json=request.insight_json,
+        log_id = _parse_local_log_id(request.log_id)
+        if log_id is not None:
+            conn = sqlite3.connect(SQLITE_PATH)
+            conn.execute(
+                """UPDATE ai_sessions SET user_email=?, question=?, explanation=?,
+                   human_edited_code=?, status=?, chart_type=?, chart_data=?, insight_json=?,
+                   source=?, engine=?, ai_model=?, human_modified=? WHERE id=?""",
+                (request.user_email, request.question, request.explanation,
+                 request.human_edited_code, request.status, request.chart_type,
+                 request.chart_data, request.insight_json, request.source, request.engine,
+                 request.ai_model, int(request.human_modified), log_id)
+            )
+            conn.commit(); conn.close()
+            return {"status": "success", "log_id": f"local_log_{log_id}", "updated": True}
+        session_id = _save_local_log(
+            question=request.question, code=request.original_code, explanation=request.explanation,
+            chart_type=request.chart_type, source=request.source, user_email=request.user_email,
+            human_code=request.human_edited_code, status=request.status,
+            chart_data=request.chart_data, insight_json=request.insight_json,
+            engine=request.engine, ai_model=request.ai_model,
+            human_modified=int(request.human_modified),
         )
-        return {"status": "success"}
+        return {"status": "success", "log_id": f"local_log_{session_id}", "updated": False}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1178,10 +1360,21 @@ async def get_local_logs(user_email: str = ""):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class SessionDecisionRequest(BaseModel):
+    status: str
+    human_edited_code: str = ""
+
+
 @app.patch("/api/logs/local/{log_id}/status")
-async def update_log_status(log_id: int, status: str = "approved"):
+async def update_log_status(log_id: int, request: SessionDecisionRequest):
+    if request.status not in {"pending", "approved", "rejected", "failed"}:
+        raise HTTPException(status_code=400, detail="Trạng thái không hợp lệ")
     conn = sqlite3.connect(SQLITE_PATH)
-    conn.execute("UPDATE ai_sessions SET status=? WHERE id=?", (status, log_id))
+    conn.execute(
+        """UPDATE ai_sessions SET status=?, human_edited_code=?,
+           human_modified=CASE WHEN original_code <> ? THEN 1 ELSE 0 END WHERE id=?""",
+        (request.status, request.human_edited_code, request.human_edited_code, log_id)
+    )
     conn.commit()
     conn.close()
     return {"status": "success"}

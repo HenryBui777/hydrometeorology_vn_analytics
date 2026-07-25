@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import { supabase } from './lib/supabase';
-import { predefinedQueries } from './mockData';
 import Sidebar from './components/Sidebar';
 import HomeDashboard from './components/HomeDashboard';
 import TimeSeriesView from './components/TimeSeriesView';
@@ -35,12 +34,9 @@ export default function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [datasetUploaded, setDatasetUploaded] = useState(true);
   const [chatHistory, setChatHistory] = useState([]);
-  // Initialize with a default successful query so the Results tab is pre-loaded with rich interactive charts
-  const [activeQuery, setActiveQuery] = useState({
-    ...predefinedQueries[0],
-    status: 'approved'
-  });
-  const [executionStatus, setExecutionStatus] = useState('success'); // 'idle' | 'running' | 'success' | 'failed'
+  // A proposal only exists after the user asks the AI; no fabricated demo result is preloaded.
+  const [activeQuery, setActiveQuery] = useState(null);
+  const [executionStatus, setExecutionStatus] = useState('idle'); // 'idle' | 'running' | 'success' | 'failed'
 
   const [user, setUser] = useState(null);
   const [isDark, setIsDark] = useState(false);
@@ -172,11 +168,20 @@ export default function App() {
             id: item.id,
             question: item.question,
             explanation: item.explanation,
-            code: item.original_code || item.human_edited_code,
+            code: item.human_edited_code || item.original_code,
+            originalCode: item.original_code,
             chartType: item.chart_type,
+            chart_type: item.chart_type,
             chartData: item.chart_data,
             status: item.status,
             source: item.source,
+            engine: item.engine || 'python',
+            aiModel: item.ai_model || '',
+            humanModified: Boolean(item.human_modified),
+            human_modified: item.human_modified,
+            executionTimeMs: item.execution_time_ms || 0,
+            execution_time_ms: item.execution_time_ms || 0,
+            errorMessage: item.error_log || '',
             created_at: item.created_at,
           })));
         }
@@ -216,6 +221,8 @@ export default function App() {
       if (queryObj) {
         setActiveQuery({
           ...queryObj,
+          originalCode: queryObj.code,
+          humanModified: false,
           status: 'pending'
         });
         setExecutionStatus('idle');
@@ -251,7 +258,8 @@ export default function App() {
         handleExecutionFinished('success', {
           chartData: parsedChartData,
           chartType: data.chart_type,
-          additionalCharts: Array.isArray(data.additional_charts) ? data.additional_charts : []
+          additionalCharts: Array.isArray(data.additional_charts) ? data.additional_charts : [],
+          executionTimeMs: data.execution_time_ms || 0,
         });
       } else {
         console.error("Execute error:", data.error_message || data.detail);
@@ -271,15 +279,31 @@ export default function App() {
     }
   };
 
-  const rejectQuery = () => {
+  const rejectQuery = async () => {
     if (!activeQuery) return;
+    const localId = String(activeQuery.id || '').replace('local_log_', '');
+    if (/^\d+$/.test(localId)) {
+      try {
+        const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+        await fetch(`${apiBase}/api/logs/local/${localId}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'rejected', human_edited_code: activeQuery.code || '' })
+        });
+      } catch (error) { console.warn('Không thể lưu trạng thái từ chối:', error); }
+    }
+    setHistoryList(prev => [{ ...activeQuery, status: 'rejected' }, ...prev.filter(item => String(item.id) !== String(activeQuery.id))]);
     setActiveQuery(null);
     setExecutionStatus('idle');
   };
 
   const updateActiveCode = (newCode) => {
     if (activeQuery) {
-      setActiveQuery({ ...activeQuery, code: newCode });
+      setActiveQuery({
+        ...activeQuery,
+        code: newCode,
+        humanModified: newCode !== (activeQuery.originalCode || activeQuery.code)
+      });
     }
   };
 
@@ -294,36 +318,30 @@ export default function App() {
           updatedQuery.chartData = resultData.chartData;
           updatedQuery.chartType = resultData.chartType;
           updatedQuery.additionalCharts = resultData.additionalCharts || [];
+          updatedQuery.executionTimeMs = resultData.executionTimeMs || 0;
         }
         
         // Save to local state
         setHistoryList(historyPrev => {
-          const exists = historyPrev.some(item => item.id === updatedQuery.id);
-          if (exists) return historyPrev;
-          return [updatedQuery, ...historyPrev];
+          const exists = historyPrev.some(item => String(item.id) === String(updatedQuery.id));
+          return exists
+            ? historyPrev.map(item => String(item.id) === String(updatedQuery.id) ? { ...item, ...updatedQuery } : item)
+            : [updatedQuery, ...historyPrev];
         });
-
-        // Persist to SQLite via API
-        try {
-          const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
-          fetch(`${apiBase}/api/logs/save-full`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              user_email: user?.email || '',
-              question: updatedQuery.question || '',
-              explanation: updatedQuery.explanation || '',
-              original_code: updatedQuery.code || '',
-              human_edited_code: updatedQuery.code || '',
-              status: 'approved',
-              chart_type: updatedQuery.chartType || 'bar',
-              chart_data: JSON.stringify(updatedQuery.chartData || []),
-              source: updatedQuery.source || 'template',
-            })
-          }).catch(e => console.warn('Log save failed:', e));
-        } catch(e) { /* non-critical */ }
         
         return updatedQuery;
+      });
+    } else if (status === 'failed') {
+      setActiveQuery(prev => {
+        if (!prev) return prev;
+        const failedQuery = { ...prev, status: 'failed' };
+        setHistoryList(historyPrev => {
+          const exists = historyPrev.some(item => String(item.id) === String(failedQuery.id));
+          return exists
+            ? historyPrev.map(item => String(item.id) === String(failedQuery.id) ? { ...item, ...failedQuery } : item)
+            : [failedQuery, ...historyPrev];
+        });
+        return failedQuery;
       });
     }
   };

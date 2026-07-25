@@ -164,6 +164,8 @@ export default function AIAnalystPortal({
           explanation: data.explanation,
           chartType: data.chart_type || 'bar',
           engine,
+          source: data.source || 'template',
+          aiModel: data.ai_model || '',
         }
       );
       setPromptInput('');
@@ -374,6 +376,30 @@ export default function AIAnalystPortal({
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.detail || `Backend trả về lỗi HTTP ${response.status}.`);
       setInsight(data);
+      // Store the displayed 4-axis interpretation with the same local session.
+      // This request only saves a record; it never runs the proposed Python again.
+      if (activeQuery?.id) {
+        fetch(`${apiBase}/api/logs/save-full`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            log_id: activeQuery.id,
+            user_email: user?.email || '',
+            question: activeQuery.question || '',
+            explanation: activeQuery.explanation || '',
+            original_code: activeQuery.originalCode || activeQuery.code || '',
+            human_edited_code: activeQuery.code || '',
+            status: activeQuery.status || 'approved',
+            chart_type: activeQuery.chartType || autoChartType || 'bar',
+            chart_data: JSON.stringify(activeQuery.chartData || []),
+            insight_json: JSON.stringify(data),
+            source: activeQuery.source || 'template',
+            engine: activeQuery.engine || 'python',
+            ai_model: activeQuery.aiModel || '',
+            human_modified: Boolean(activeQuery.humanModified),
+          })
+        }).catch((error) => console.warn('Could not save 4-axis report:', error));
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -694,6 +720,7 @@ export default function AIAnalystPortal({
                   approved: { label: 'Đã duyệt', cls: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
                   pending: { label: 'Chờ duyệt', cls: 'bg-amber-50 text-amber-700 border-amber-100' },
                   rejected: { label: 'Từ chối', cls: 'bg-rose-50 text-rose-700 border-rose-100' },
+                  failed: { label: 'Chạy lỗi', cls: 'bg-rose-50 text-rose-700 border-rose-100' },
                 };
                 const st = statusMap[item.status] || statusMap.approved;
 
@@ -711,13 +738,14 @@ export default function AIAnalystPortal({
                   area: 'Diện tích', scatter: 'Phân tán', pie: 'Tròn', donut: 'Donut',
                   radar: 'Radar', histogram: 'Histogram', 'wind-rose': 'Hoa gió',
                 };
-                const chartLabel = chartTypeMap[item.chart_type] || (item.chart_type || '—');
+                const storedChartType = item.chartType || item.chart_type;
+                const chartLabel = chartTypeMap[storedChartType] || (storedChartType || '—');
 
                 // Human modified
-                const wasModified = item.human_modified === 1 || item.human_modified === true;
+                const wasModified = item.humanModified || item.human_modified === 1 || item.human_modified === true;
 
                 // Execution time
-                const execTime = item.execution_time_ms > 0 ? `${item.execution_time_ms} ms` : '—';
+                const execTime = item.executionTimeMs > 0 ? `${item.executionTimeMs} ms` : (item.execution_time_ms > 0 ? `${item.execution_time_ms} ms` : '—');
 
                 // Format created_at
                 const timeStr = (() => {

@@ -1,6 +1,6 @@
 # 🌏 Hydrometeorology VN Analytics — Nền tảng Phân Tích & Trực Quan Hóa Dữ Liệu Khí Tượng Thủy Văn Việt Nam Tích Hợp Trợ Lý AI
 
-Nền tảng phân tích và trực quan hóa dữ liệu Khí tượng Thủy văn (KTTV) 34 tỉnh thành Việt Nam (dữ liệu cập nhật từ **Tháng 7/2025 đến Tháng 7/2026**). Hệ thống xây dựng trên kiến trúc **React + Vite + Tailwind CSS** kết hợp backend **FastAPI**, cơ sở dữ liệu **SQLite**, và mô hình **Trợ lý AI lập trình phân tích dữ liệu (Gemini AI)** chế độ Human-in-the-Loop.
+Nền tảng phân tích và trực quan hóa dữ liệu Khí tượng Thủy văn (KTTV) 34 tỉnh thành Việt Nam (dữ liệu cập nhật từ **Tháng 7/2025 đến Tháng 7/2026**). Hệ thống xây dựng trên kiến trúc **React + Vite + Tailwind CSS** kết hợp backend **FastAPI**, cơ sở dữ liệu **SQLite**, và mô hình **Trợ lý AI lập trình phân tích dữ liệu (OpenRouter)** theo chế độ Human-in-the-Loop.
 
 ---
 
@@ -116,7 +116,7 @@ flowchart TD
 
 ## 💻 Cấu Hình File Biến Môi Trường (`.env`)
 
-Tạo file `.env` tại thư mục gốc của dự án với đầy đủ thông tin kết nối Supabase Cloud DB, Gemini AI Key và Backend FastAPI:
+Tạo file `.env` tại thư mục gốc của dự án với đầy đủ thông tin kết nối Supabase Cloud DB, OpenRouter API Key và Backend FastAPI:
 
 ```ini
 # Cấu hình Supabase Cloud Database & OAuth Authentication
@@ -125,9 +125,9 @@ SUPABASE_KEY=your-supabase-service-role-or-anon-key
 VITE_SUPABASE_URL=https://your-supabase-project-id.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 
-# Cấu hình API Key Gemini AI
-GEMINI_API_KEY=AQ.Ab8RN6IeBa1n7oyTK4Lh7bngSYrFMYydDOHmiOVc4_fJL_1Wkw
-AI_ENGINE_MODEL=gemini-3.5-flash
+# Cấu hình OpenRouter AI
+OPENROUTER_API_KEY=your_openrouter_api_key
+OPENROUTER_MODEL=google/gemma-4-31b-it:free
 
 # Cấu hình Cơ sở dữ liệu SQLite Nội Bộ
 DATABASE_URL=sqlite:///./data/ai_logs.db
@@ -154,7 +154,6 @@ uvicorn>=0.22.0
 pandas>=2.0.0
 numpy>=1.24.0
 scikit-learn>=1.3.0
-google-generativeai>=0.3.0
 python-dotenv>=1.0.0
 pydantic>=2.0.0
 requests>=2.31.0
@@ -179,7 +178,8 @@ Ví dụ `.env` tối thiểu:
 ```ini
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your_supabase_key
-GEMINI_API_KEY=your_gemini_api_key
+OPENROUTER_API_KEY=your_openrouter_api_key
+OPENROUTER_MODEL=google/gemma-4-31b-it:free
 ```
 
 ### Cách chạy nhanh mỗi lần làm bài
