@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=28&pause=800&color=10B981&center=true&vCenter=true&width=700&lines=🌧️+Hydrometeorology+VN+Analytics;Nền+tảng+phân+tích+khí+tượng+thủy+văn;AI+%7C+Visualization+%7C+Open+Data" alt="Typing SVG" />
+<img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&size=28&pause=800&color=10B981&center=true&vCenter=true&width=700&lines=%F0%9F%8C%A7%EF%B8%8F+Hydrometeorology+VN+Analytics;N%E1%BB%81n+t%E1%BA%A3ng+ph%C3%A2n+t%C3%ADch+kh%C3%AD+t%C6%B0%E1%BB%A3ng+th%E1%BB%A7y+v%C3%A2n;AI+%7C+Visualization+%7C+Open+Data" alt="Typing SVG" />
 
 <br/>
 
