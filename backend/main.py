@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import google.generativeai as genai
+from openai import OpenAI as OpenAIClient
 from supabase import create_client, Client
 from typing import Optional, List
 import time
@@ -74,7 +75,7 @@ def _save_local_log(question, code, explanation, chart_type, source="template",
                     engine="python", execution_time_ms=0, row_count=0, table_data="",
                     error_log="", ai_model="", human_modified=0):
     conn = sqlite3.connect(SQLITE_PATH)
-    conn.execute(
+    cur = conn.execute(
         """INSERT INTO ai_sessions
            (user_email, question, explanation, original_code, human_edited_code,
             status, chart_type, chart_data, insight_json, source, engine,
@@ -85,7 +86,9 @@ def _save_local_log(question, code, explanation, chart_type, source="template",
          execution_time_ms, row_count, table_data, error_log, ai_model, human_modified)
     )
     conn.commit()
+    row_id = cur.lastrowid
     conn.close()
+    return row_id  # Return SQLite ID so caller can use it as log_id
 
 # Setup CORS
 app.add_middleware(
@@ -101,11 +104,35 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Setup Gemini
+# Setup Gemini (fallback)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 
-# Select model
+# Setup 9Router (primary AI layer — OpenAI-compatible local proxy)
+# Chạy: npm install -g 9router && 9router  → http://localhost:20128
+NINE_ROUTER_URL = os.getenv("NINE_ROUTER_URL", "http://localhost:20128/v1")
+NINE_ROUTER_API_KEY = os.getenv("NINE_ROUTER_API_KEY", "9router")
+NINE_ROUTER_MODEL = os.getenv("NINE_ROUTER_MODEL", "auto")  # 9Router tự chọn model tốt nhất
+
+def _call_9router(prompt: str, system: str) -> str:
+    """Gọi 9Router (OpenAI-compatible proxy). Trả về text hoặc raise Exception nếu offline."""
+    client = OpenAIClient(
+        base_url=NINE_ROUTER_URL,
+        api_key=NINE_ROUTER_API_KEY,
+        timeout=8.0  # Timeout 8 giây — nếu 9Router offline sẽ nhanh chóng fallback
+    )
+    response = client.chat.completions.create(
+        model=NINE_ROUTER_MODEL,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt}
+        ],
+        max_tokens=2048,
+        temperature=0.2
+    )
+    return response.choices[0].message.content.strip()
+
+# Select Gemini model
 model = genai.GenerativeModel('gemini-2.0-flash')
 
 class ChatRequest(BaseModel):
@@ -244,15 +271,30 @@ def infer_general_analysis(prompt: str) -> tuple[str, str, str]:
     if not metrics:
         metrics = ["temp_mean"]
 
-    filters = ["df_work = df.copy()"]
+    filters = [
+        "# Đoạn code này tạo bản sao dữ liệu gốc để tránh làm thay đổi DataFrame ban đầu, sử dụng hàm copy() của Pandas.",
+        "df_work = df.copy()"
+    ]
     if provinces:
-        filters.append(f"df_work = df_work[df_work['province'].isin({provinces!r})]")
+        filters += [
+            f"# Đoạn code này lọc chỉ giữ lại các tỉnh/thành phố được yêu cầu ({', '.join(provinces)}), sử dụng hàm isin() của Pandas.",
+            f"df_work = df_work[df_work['province'].isin({provinces!r})]"
+        ]
     if regions:
-        filters.append(f"df_work = df_work[df_work['region'].isin({regions!r})]")
+        filters += [
+            f"# Đoạn code này lọc chỉ giữ lại dữ liệu thuộc vùng khí hậu được yêu cầu ({', '.join(regions)}), sử dụng hàm isin() của Pandas.",
+            f"df_work = df_work[df_work['region'].isin({regions!r})]"
+        ]
     if month_match:
-        filters.append(f"df_work = df_work[df_work['month'].eq({int(month_match.group(1))})]")
+        filters += [
+            f"# Đoạn code này lọc chỉ giữ lại dữ liệu của tháng {int(month_match.group(1))} trong năm, sử dụng hàm eq() của Pandas.",
+            f"df_work = df_work[df_work['month'].eq({int(month_match.group(1))})]"
+        ]
     if season:
-        filters.append(f"df_work = df_work[df_work['season'].eq({season!r})]")
+        filters += [
+            f"# Đoạn code này lọc chỉ giữ lại dữ liệu của mùa {season}, sử dụng hàm eq() của Pandas.",
+            f"df_work = df_work[df_work['season'].eq({season!r})]"
+        ]
     filter_code = "\n".join(filters)
 
     chart_type = select_visualization(text, metrics, provinces)
@@ -269,12 +311,19 @@ chart_type = 'none'""", "Không tạo biểu đồ vì dữ liệu hiện tại 
         return (f"""{filter_code}
 df_work = df_work.dropna(subset=['wind_direction_10m_dominant', 'wind_speed_max']).copy()
 bins = [-22.5, 22.5, 67.5, 112.5, 157.5, 202.5, 247.5, 292.5, 337.5, 382.5]
-labels = ['Bắc', 'Đông Bắc', 'Đông', 'Đông Nam', 'Nam', 'Tây Nam', 'Tây', 'Tây Bắc', 'Bắc']
-df_work['wind_direction'] = pd.cut((df_work['wind_direction_10m_dominant'] + 22.5) % 360, bins=bins, labels=labels, include_lowest=True)
+labels = ['Bac', 'Dong Bac', 'Dong', 'Dong Nam', 'Nam', 'Tay Nam', 'Tay', 'Tay Bac', 'Bac_360']
+df_work['wind_direction'] = pd.cut((df_work['wind_direction_10m_dominant'] + 22.5) % 360, bins=bins, labels=labels, include_lowest=True, ordered=False)
+# Gop 2 nhom Bac (0 do va 360 do) thanh 1 nhom duy nhat
+df_work['wind_direction'] = df_work['wind_direction'].astype(str).replace('Bac_360', 'Bac')
 result_df = (df_work.groupby('wind_direction', observed=True, as_index=False)['wind_speed_max'].mean()
     .rename(columns={{'wind_direction': 'name'}}))
+# Sap xep theo thu tu huong gio
+order = ['Bac', 'Dong Bac', 'Dong', 'Dong Nam', 'Nam', 'Tay Nam', 'Tay', 'Tay Bac']
+result_df['_ord'] = result_df['name'].apply(lambda x: order.index(x) if x in order else 99)
+result_df = result_df.sort_values('_ord').drop(columns=['_ord'])
 chart_data = result_df.to_dict(orient='records')
-chart_type = 'wind-rose'""", "Biểu đồ hoa gió được chọn vì câu hỏi có hướng gió hoặc tốc độ gió; mỗi cánh thể hiện tốc độ gió trung bình theo hướng.", "wind-rose")
+chart_type = 'wind-rose'""", "Bieu do hoa gio duoc chon vi cau hoi co huong gio hoac toc do gio; moi canh the hien toc do gio trung binh theo huong.", "wind-rose")
+
 
     if chart_type == "histogram":
         metric = metrics[0]
@@ -298,44 +347,96 @@ chart_type = 'histogram'""", "Biểu đồ tần suất được chọn để ch
         size_metric = metrics[2] if chart_type == "bubble" else None
         selected = ["province", x_metric, y_metric] + ([size_metric] if size_metric else [])
         return (f"""{filter_code}
+# Đoạn code này chọn các cột cần thiết và loại bỏ hàng thiếu dữ liệu, sử dụng hàm dropna() của Pandas.
 result_df = df_work[{selected!r}].dropna().copy()
+# Đoạn code này giới hạn tối đa 800 điểm để biểu đồ không bị quá dày, sử dụng hàm sample() của Pandas.
 if len(result_df) > 800:
     result_df = result_df.sample(800, random_state=42)
-result_df = result_df.rename(columns={{'province': 'name'}})
+# Đoạn code này đổi tên cột 'province' thành 'name' theo chuẩn biểu đồ, sử dụng hàm rename() của Pandas.
+result_df = result_df.rename(columns={{"province": "name"}})
+# Đoạn code này chuyển DataFrame thành danh sách dict để frontend đọc được, sử dụng hàm to_dict() của Pandas.
 chart_data = result_df.to_dict(orient='records')
-chart_type = '{chart_type}'""", "Biểu đồ phân tán được chọn để kiểm tra mối quan hệ giữa các biến được hỏi.", chart_type)
+chart_type = '{chart_type}'""",
+        f"""Yêu cầu: Phân tích mối quan hệ giữa {x_metric} và {y_metric} trên dữ liệu khí tượng.
+Các bước thực hiện:
+1. Lọc dữ liệu theo điều kiện đã chọn (tỉnh, vùng, tháng).
+2. Chọn các cột phân tích và loại bỏ giá trị thiếu.
+3. Giới hạn 800 mẫu ngẫu nhiên nếu dữ liệu quá lớn.
+4. Chuẩn hóa tên cột và xuất dữ liệu cho biểu đồ.
+Kết quả mong đợi: Biểu đồ phân tán với mỗi điểm là một tỉnh/bản ghi, trục X là {x_metric}, trục Y là {y_metric}.""", chart_type)
 
     # A time question uses a line chart; each explicitly named province becomes one series.
     if wants_time and not month_match:
         metric = metrics[0]
         if chart_type == "stacked-area":
             return (f"""{filter_code}
+# Đoạn code này nhóm dữ liệu theo tháng và vùng rồi tính trung bình, sử dụng hàm groupby() và unstack() của Pandas.
 result_df = (df_work.groupby(['month', 'region'])[{metric!r}].mean().unstack('region').reset_index())
-result_df = result_df.rename(columns={{'month': 'name'}}).sort_values('name')
+# Đoạn code này đổi tên cột và sắp xếp theo thứ tự tháng tăng dần, sử dụng hàm sort_values() của Pandas.
+result_df = result_df.rename(columns={{"month": "name"}}).sort_values('name')
+# Đoạn code này định dạng lại số tháng thành dạng chữ 'Tháng 1', 'Tháng 2'...
 result_df['name'] = result_df['name'].map(lambda month: f'Tháng {{month}}')
+# Đoạn code này xuất dữ liệu cho biểu đồ miền chồng, sử dụng hàm to_dict() của Pandas.
 chart_data = result_df.to_dict(orient='records')
-chart_type = 'stacked-area'""", "Biểu đồ miền chồng được chọn để theo dõi phần đóng góp của từng vùng theo thời gian.", "stacked-area")
+chart_type = 'stacked-area'""",
+            """Yêu cầu: Xem đóng góp của mỗi vùng địa lý theo tháng trong năm.
+Các bước thực hiện:
+1. Lọc dữ liệu theo điều kiện.
+2. Tính trung bình chỉ số theo tháng cho từng vùng.
+3. Chuyển sang dạng wide-format (mỗi cột là một vùng).
+4. Định dạng tên tháng và xuất dữ liệu.
+Kết quả mong đợi: Biểu đồ miền chồng, mỗi màu là một vùng địa lý.""", "stacked-area")
         if len(provinces) >= 2 or len(regions) >= 2:
             series_key = 'province' if len(provinces) >= 2 else 'region'
             return (f"""{filter_code}
+# Đoạn code này nhóm dữ liệu theo tháng và {series_key} rồi tính trung bình {metric}, sử dụng groupby() và unstack() của Pandas.
 result_df = (df_work.groupby(['month', {series_key!r}])[{metric!r}].mean().unstack({series_key!r}).reset_index())
-result_df = result_df.rename(columns={{'month': 'name'}}).sort_values('name')
+# Đoạn code này đổi tên và sắp xếp theo thứ tự tháng tăng dần, sử dụng sort_values() của Pandas.
+result_df = result_df.rename(columns={{"month": "name"}}).sort_values('name')
+# Đoạn code này hiển thị tên tháng dạng chữ 'Tháng 1'...'Tháng 12' thay vì số nguyên.
 result_df['name'] = result_df['name'].map(lambda month: f'Tháng {{month}}')
+# Đoạn code này xuất dữ liệu cho biểu đồ đa đường, sử dụng to_dict() của Pandas.
 chart_data = result_df.to_dict(orient='records')
-chart_type = '{chart_type}'""", "Biểu đồ theo thời gian được chọn để so sánh diễn biến theo tháng của các địa điểm được nêu.", chart_type)
+chart_type = '{chart_type}'""",
+            f"""Yêu cầu: So sánh diễn biến của {metric} theo tháng cho từng {series_key}.
+Các bước thực hiện:
+1. Lọc dữ liệu theo điều kiện đã chọn.
+2. Tính giá trị trung bình của {metric} theo tháng cho mỗi {series_key}.
+3. Chuyển sang dạng wide-format để mỗi cột là một chuỗi.
+4. Định dạng tên tháng và xuất dữ liệu.
+Kết quả mong đợi: Biểu đồ đa đường, mỗi đường là diễn biến của một địa điểm.""", chart_type)
         return (f"""{filter_code}
+# Đoạn code này nhóm dữ liệu theo tháng và tính giá trị trung bình của {metric}, sử dụng groupby() của Pandas.
 result_df = (df_work.groupby('month', as_index=False)[{metric!r}].mean()
-    .rename(columns={{'month': 'name', {metric!r}: 'value'}}).sort_values('name'))
+    .rename(columns={{"month": "name", {metric!r}: "value"}}).sort_values('name'))
+# Đoạn code này chuyển số tháng thành nhãn chữ 'Tháng 1'...'Tháng 12' bằng hàm map() của Pandas.
 result_df['name'] = result_df['name'].map(lambda month: f'Tháng {{month}}')
+# Đoạn code này xuất dữ liệu dạng danh sách dict cho biểu đồ đường, sử dụng to_dict() của Pandas.
 chart_data = result_df.to_dict(orient='records')
-chart_type = '{chart_type}'""", "Biểu đồ theo thời gian được chọn để thể hiện diễn biến theo tháng.", chart_type)
+chart_type = '{chart_type}'""",
+        f"""Yêu cầu: Xem diễn biến của {metric} theo tháng trong năm.
+Các bước thực hiện:
+1. Lọc dữ liệu theo điều kiện.
+2. Tính giá trị trung bình của {metric} cho mỗi tháng.
+3. Định dạng tên tháng và sắp xếp tăng dần.
+4. Xuất dữ liệu cho biểu đồ đường.
+Kết quả mong đợi: Biểu đồ đường thể hiện xu hướng theo 12 tháng.""", chart_type)
 
     if chart_type == "radar":
         return (f"""{filter_code}
+# Đoạn code này tính giá trị trung bình của các chỉ số cho mỗi tỉnh, sử dụng hàm groupby().agg() của Pandas.
 summary = (df_work.groupby('province', as_index=False).agg({', '.join(f"{metric}=({metric!r}, 'mean')" for metric in metrics)}))
-chart_data = [{{'name': metric, **{{row['province']: round(float(row[metric]), 2) for _, row in summary.iterrows()}}}}
+# Đoạn code này chuyển sang định dạng radar: mỗi dòng là một chỉ số, mỗi cột là một tỉnh.
+chart_data = [{{"name": metric, **{{row["province"]: round(float(row[metric]), 2) for _, row in summary.iterrows()}}}}
               for metric in {metrics!r}]
-chart_type = 'radar'""", "Radar được chọn vì câu hỏi so sánh tối đa hai địa điểm trên nhiều tiêu chí định lượng.", "radar")
+# Đoạn code này xác định kiểu biểu đồ là radar để frontend hiển thị đúng dạng.
+chart_type = 'radar'""",
+        f"""Yêu cầu: So sánh nhiều chỉ số ({', '.join(metrics)}) của các địa điểm trên cùng một biểu đồ.
+Các bước thực hiện:
+1. Lọc dữ liệu theo điều kiện.
+2. Tính trung bình của từng chỉ số cho mỗi tỉnh.
+3. Chuyển sang định dạng radar: mỗi trục là một chỉ số.
+Kết quả mong đợi: Biểu đồ radar với mỗi địa điểm là một đa giác.""", "radar")
 
     # Asking about a region means the result must list only the provinces
     # inside that region, never the whole national dataset.
@@ -345,10 +446,12 @@ chart_type = 'radar'""", "Radar được chọn vì câu hỏi so sánh tối đ
     # safely switches to a horizontal bar chart instead of a cluttered donut.
     output_type = chart_type
     return (f"""{filter_code}
+# Đoạn code này nhóm dữ liệu theo {group} và tính giá trị trung bình, sử dụng hàm groupby().agg() của Pandas.
 result_df = (df_work.groupby('{group}', as_index=False).agg({aggregations})
     .rename(columns={{'{group}': 'name'}}))
+# Đoạn code này kiểm tra số nhóm dữ liệu — cần ít nhất 2 nhóm mới vẽ biểu đồ có ý nghĩa.
 if len(result_df) < 2:
-    # A single value cannot form a meaningful comparison chart.
+    # Một giá trị duy nhất không tạo thành biểu đồ so sánh có ý nghĩa.
     chart_data = []
     chart_type = 'none'
 else:
@@ -365,8 +468,16 @@ else:
         chart_data = result_df[['name', {metrics[0]!r}]].rename(columns={{{metrics[0]!r}: 'value'}}).to_dict(orient='records')
         chart_type = 'donut'
     else:
+        # Nhiều hơn 5 nhóm: dùng biểu đồ cột ngang để dễ đọc.
         chart_data = result_df.to_dict(orient='records')
-        chart_type = 'bar-horizontal' if '{output_type}' == 'donut' else '{output_type}'""", "Biểu đồ được chọn theo mục tiêu phân tích, số biến và các điều kiện lọc được nhận diện từ yêu cầu. Nếu chỉ còn một giá trị sau lọc, hệ thống sẽ không vẽ biểu đồ để tránh trực quan hóa sai lệch.", output_type)
+        chart_type = 'bar-horizontal' if '{output_type}' == 'donut' else '{output_type}'""",
+    f"""Yêu cầu: Tính giá trị trung bình của {', '.join(metrics)} theo {group} từ dữ liệu khí tượng.
+Các bước thực hiện:
+1. Lọc dữ liệu theo điều kiện (tỉnh, vùng, tháng, mùa).
+2. Nhóm theo {group} và tính giá trị trung bình.
+3. Kiểm tra số nhóm: nếu chỉ 1 nhóm thì không vẽ biểu đồ.
+4. Tự động chọn loại biểu đồ phù hợp với số nhóm.
+Kết quả mong đợi: Biểu đồ cột/ngang thể hiện giá trị trung bình theo từng {group}.""", output_type)
 
 
 def local_analysis_code(prompt: str) -> tuple[str, str, str]:
@@ -616,7 +727,7 @@ async def generate_ai_response(request: ChatRequest):
                 "chart_type": chart_type,
             }
 
-        # --- Layer 2: Gemini LLM for novel questions ---
+        # --- Layer 2: AI LLM (9Router → Gemini fallback) cho câu hỏi mới ---
         user_res = supabase.table("chat_history").insert({
             "role": "user",
             "content": request.prompt
@@ -634,61 +745,100 @@ async def generate_ai_response(request: ChatRequest):
             except Exception as e:
                 dynamic_context = str(e)
 
-        # 2. Call Gemini with multi-model fallback and bulletproof error handling
-        system_prompt = f"""Ban la chuyen gia phan tich du lieu khi tuong thuy van Viet Nam, dong vai tro TRO GIUP (khong duoc tu quyet dinh).
+        engine_label = "SQL" if request.engine == "sql" else "Python"
+        system_prompt = f"""Bạn là chuyên gia phân tích dữ liệu khí tượng thủy văn Việt Nam. Vai trò: TRỢ GIÚP — không được tự quyết định thay người dùng.
 
-Ngu canh nguoi dung: {request.context}
+Ngữ cảnh: {request.context}
+Ngôn ngữ mã nguồn: {engine_label}
 
-Cau truc DataFrame hien tai (DAY LA DU LIEU DUY NHAT BAN DUOC PHEP SU DUNG):
+Cấu trúc DataFrame (CHỈ dùng các cột này, 'df' đã được load sẵn — KHÔNG gọi read_csv lại):
 {dynamic_context}
 
-=== QUY TAC BAT BUOC - VI PHAM SE BI TU CHOI ===
+=== QUY TẮC BẮT BUỘC ===
 
-[TINH TOAN VEN DU LIEU - QUAN TRONG NHAT]
-1. TUYET DOI KHONG tao du lieu gia, mock data, dummy data, random data, hay bat ky so lieu nao khong co trong DataFrame 'df'.
-   - Cam: pd.DataFrame({{...}}), np.random.*, pd.util.testing.makeDataFrame(), hoac bat ky cach tao data gia nao khac.
-2. TUYET DOI KHONG import them dataset ngoai.
-   - Cam: pd.read_csv() voi path khac, requests.get(), urllib, open() file bat ky.
-3. CHI duoc dung cac cot da liet ke trong schema tren. Neu cot khong ton tai, bao loi ro rang trong explanation, KHONG tu dat ten cot moi.
-4. Neu du lieu khong du de tra loi cau hoi, noi thang trong explanation, KHONG co tinh tao du lieu de "du".
-5. DataFrame 'df' da duoc load san trong moi truong thuc thi. KHONG goi pd.read_csv lai.
+[DỮ LIỆU]
+1. TUYỆT ĐỐI KHÔNG tạo dữ liệu giả (pd.DataFrame({{...}}), np.random.*, mock data).
+2. TUYỆT ĐỐI KHÔNG import dataset ngoài (pd.read_csv() path khác, requests, open() file).
+3. CHỈ dùng cột đã liệt kê trong schema. Nếu cột không tồn tại, báo lỗi trong explanation.
+4. Code PHẢI kết thúc bằng: chart_data = [...] và chart_type = '...'
 
-[MINH BACH CODE]
-6. Bat buoc comment tieng Viet giai thich moi buoc quan trong trong code.
-   Vi du: # Loc du lieu tinh Ha Noi, su dung ham isin() cua Pandas
-7. Code PHAI print ket qua dang JSON: print(df_result.to_json(orient='records')) hoac print(json.dumps(result))
+[QUY TẮC XẾP HẠNG "TOP N" — QUAN TRỌNG]
+Khi người dùng hỏi "N tỉnh cao nhất", "top N", "5 tỉnh có...", "3 tỉnh thấp nhất"... PHẢI dùng sort_values + head(N):
+# Đoạn code này sắp xếp giảm dần theo nhiệt độ trung bình để tìm các tỉnh cao nhất, sử dụng hàm sort_values() của Pandas.
+result_df = result_df.sort_values('temp_mean', ascending=False)
+# Đoạn code này chỉ giữ lại 5 tỉnh đầu tiên (cao nhất), sử dụng hàm head() của Pandas.
+result_df = result_df.head(5)
+KHÔNG được trả về toàn bộ dữ liệu khi người dùng chỉ hỏi N phần tử.
 
-[DINH DANG TRA VE]
-Tra ve JSON nguyen thuy (KHONG co markdown ```json):
+[ĐỊNH DẠNG GIẢI THÍCH — BẮT BUỘC]
+Trường "explanation" phải viết ĐẦY ĐỦ, CỤ THỂ cho câu hỏi NÀY (không dùng template chung):
+"Yêu cầu: [mô tả cụ thể người dùng muốn phân tích gì, chỉ số nào, so sánh gì, phạm vi nào].
+Các bước thực hiện:
+1. [Bước 1: thao tác gì, dùng hàm gì, lọc theo điều kiện gì — cụ thể]
+2. [Bước 2: tiếp theo]
+3. [...]
+Kết quả mong đợi: [mô tả biểu đồ/bảng hiển thị gì, trục X là gì, trục Y là gì, đơn vị là gì]"
+
+[ĐỊNH DẠNG COMMENT CODE — BẮT BUỘC]
+MỖI dòng hoặc nhóm lệnh PHẢI có comment tiếng Việt ngay TRÊN, theo đúng mẫu:
+# Đoạn code này [làm gì cụ thể], sử dụng hàm [hàm()] của [thư viện].
+Ví dụ chuẩn:
+# Đoạn code này tạo bản sao dữ liệu để không làm thay đổi DataFrame gốc, sử dụng hàm copy() của Pandas.
+df_work = df.copy()
+# Đoạn code này nhóm dữ liệu theo tỉnh và tính nhiệt độ trung bình mỗi tỉnh, sử dụng hàm groupby() và mean() của Pandas.
+result_df = df_work.groupby('province')['temp_mean'].mean().reset_index()
+# Đoạn code này sắp xếp giảm dần để tìm tỉnh có nhiệt độ cao nhất, sử dụng hàm sort_values() của Pandas.
+result_df = result_df.sort_values('temp_mean', ascending=False)
+# Đoạn code này chỉ giữ lại 5 tỉnh đầu tiên có nhiệt độ cao nhất, sử dụng hàm head() của Pandas.
+result_df = result_df.head(5)
+KHÔNG bỏ qua dòng nào không có comment. KHÔNG viết comment chung như "# xử lý dữ liệu".
+
+[ĐỊNH DẠNG TRẢ VỀ]
+Trả về JSON thuần (KHÔNG có markdown ```json):
 {{
-  "explanation": "Mo ta ngan gon phuong phap va ly do chon phuong phap nay",
-  "code": "ma python day du, co comment, chi dung du lieu tu df co san"
+  "explanation": "[Yêu cầu / Các bước / Kết quả mong đợi — cụ thể cho câu hỏi này]",
+  "code": "[{engine_label} code với comment tiếng Việt kiểu 'Đoạn code này...' trên MỖI dòng/nhóm lệnh]"
 }}
 """
 
-
-        candidate_models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash-latest']
         ai_text = ""
-        
-        for model_name in candidate_models:
-            try:
-                m = genai.GenerativeModel(model_name)
-                # Set a 3.5-second timeout to prevent UI hanging when Google API is slow/throttled
-                response = m.generate_content(
-                    f"{system_prompt}\n\nCâu hỏi: {request.prompt}",
-                    request_options={'timeout': 3.5}
-                )
-                ai_text = response.text.strip()
-                if ai_text:
-                    break
-            except Exception as model_err:
-                print(f"Model {model_name} failed quickly: {model_err}")
-                # If quota is exceeded (429), all models on this API key will fail, so break immediately
-                err_str = str(model_err)
-                if "429" in err_str or "Quota exceeded" in err_str or "RESOURCE_EXHAUSTED" in err_str:
-                    print("API Key Quota Exceeded. Switching immediately to Fast Offline Generator.")
-                    break
-                continue
+        ai_source = "unknown"
+
+        # === Layer 2a: Thử 9Router trước (nếu đang chạy local) ===
+        try:
+            ai_text = _call_9router(
+                f"Câu hỏi: {request.prompt}",
+                system_prompt
+            )
+            if ai_text:
+                ai_source = "9router"
+                print(f"[AI] 9Router responded successfully")
+        except Exception as router_err:
+            print(f"[AI] 9Router unavailable ({router_err}), falling back to Gemini...")
+
+        # === Layer 2b: Fallback sang Gemini nếu 9Router offline ===
+        if not ai_text:
+            candidate_models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash-latest']
+            for model_name in candidate_models:
+                try:
+                    m = genai.GenerativeModel(model_name)
+                    # Set a 3.5-second timeout to prevent UI hanging when Google API is slow/throttled
+                    response = m.generate_content(
+                        f"{system_prompt}\n\nCâu hỏi: {request.prompt}",
+                        request_options={'timeout': 3.5}
+                    )
+                    ai_text = response.text.strip()
+                    if ai_text:
+                        ai_source = f"gemini/{model_name}"
+                        break
+                except Exception as model_err:
+                    print(f"Model {model_name} failed quickly: {model_err}")
+                    # If quota is exceeded (429), all models on this API key will fail, so break immediately
+                    err_str = str(model_err)
+                    if "429" in err_str or "Quota exceeded" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                        print("API Key Quota Exceeded. Switching immediately to Fast Offline Generator.")
+                        break
+                    continue
 
         explanation = ""
         code = ""
@@ -742,28 +892,29 @@ print(result_df.to_json(orient='records'))
             source = "gemini"
         code = normalize_generated_python(code)
 
-        # Save to local SQLite log
-        _save_local_log(request.prompt, code, explanation, chart_type if chart_type else "bar",
-                        source=source, user_email=request.user_email)
+        # Save to local SQLite — get real row ID to use as log_id for execute endpoint
+        resolved_chart_type = chart_type if chart_type else "bar"
+        sqlite_row_id = _save_local_log(
+            request.prompt, code, explanation, resolved_chart_type,
+            source=source, user_email=request.user_email, engine=request.engine
+        )
 
         # 3. Save AI response to Supabase gracefully
-        log_id = f"local_log_{int(time.time())}"
+        log_id = str(sqlite_row_id)  # Use real SQLite ID so /api/execute can UPDATE it
         try:
             ai_res = supabase.table("chat_history").insert({
                 "role": "ai",
                 "content": explanation
             }).execute()
-            if ai_res.data:
-                log_id = ai_res.data[0]['id']
         except Exception as sb_err:
             print("Supabase log error (ignored):", sb_err)
 
         return {
             "status": "success",
-            "log_id": str(log_id),
+            "log_id": log_id,
             "code": code,
             "explanation": explanation,
-            "chart_type": "bar"
+            "chart_type": resolved_chart_type
         }
 
     except Exception as e:
@@ -834,19 +985,28 @@ def local_four_axis_insight(request: AnalyzeChartRequest) -> dict:
 async def analyze_chart(request: AnalyzeChartRequest):
     try:
         data_sample = str(request.chart_data[:5]) if len(request.chart_data) > 5 else str(request.chart_data)
-        system_prompt = f"""Bạn là chuyên gia phân tích dữ liệu. Hãy phân tích biểu đồ dựa trên dữ liệu sau.
-Câu hỏi gốc: {request.question}
-Loại biểu đồ: {request.chart_type}
-Dữ liệu mẫu (tối đa 5 dòng): {data_sample}
+        system_prompt = f"""Ban la chuyen gia phan tich du lieu khi tuong thuy van Viet Nam.
+Cau hoi goc cua nguoi dung: \"{request.question}\"
+Loai bieu do: {request.chart_type}
+Du lieu mau (toi da 5 dong): {data_sample}
 
-BẮT BUỘC trả về chuẩn JSON với 4 trục (4-Axis Analytics):
+Hay phan tich SAU VA LINH HOAT dua tren dung noi dung cau hoi va du lieu thuc te.
+NGHIEM CAM viet chung chung, copy template. PHAI cu the hoa theo cau hoi va so lieu trong du lieu.
+
+Bat buoc tra ve JSON voi 4 truc phan tich (4-Axis Analytics).
+Moi truc PHAI:
+- Neu ten cu the cac tinh/vung/gia tri xuat hien trong du lieu
+- Tra loi dung vao cau hoi nguoi dung dat ra
+- Dung so lieu thuc te tu du lieu mau neu co
+- Linh hoat theo loai cau hoi (so sanh, xu huong, tuong quan, phan bo...)
+
 {{
-  "descriptive": "Phân tích Mô tả: Chuyện gì đang xảy ra?",
-  "diagnostic": "Phân tích Chẩn đoán: Tại sao nó xảy ra?",
-  "predictive": "Phân tích Dự đoán: Chuyện gì sẽ xảy ra tiếp theo?",
-  "prescriptive": "Phân tích Đề xuất: Chúng ta nên làm gì?"
+  "descriptive": "[Mo ta: Dang xay ra dieu gi trong du lieu? Neu cu the so lieu, ten dia diem, gia tri cao/thap]",
+  "diagnostic": "[Chan doan: Tai sao lai co ket qua nhu vay? Giai thich nguyen nhan khi hau, dia ly, mua vu lien quan den cau hoi]",
+  "predictive": "[Du doan: Xu huong tiep theo se nhu the nao? Cu the hoa theo loai phan tich dang lam]",
+  "prescriptive": "[De xuat: Can lam gi? Kien nghi hanh dong cu the phu hop voi ket qua phan tich]"
 }}
-CHỈ trả về JSON nguyên thủy, không có dấu markdown ```json.
+CHI tra ve JSON nguyen thuy, khong co markdown ```json.
 """
         response = model.generate_content(system_prompt)
         ai_text = response.text.strip()

@@ -30,6 +30,36 @@ const FIELD_LABELS = {
   variability_score: 'Điểm thất thường tổng hợp', ratio: 'Tỷ lệ bốc hơi/giờ nắng'
 };
 const fieldLabel = (key) => FIELD_LABELS[key] || String(key || '').replaceAll('_', ' ');
+
+// Infer the Y-axis metric label. For multi-series charts (yKeys = provinces/regions),
+// try to detect the metric from the question text or fall back to a generic label.
+const METRIC_KEYWORDS = [
+  ['temp_mean',  ['nhiệt độ trung bình', 'nhiệt độ tb', 'temp_mean']],
+  ['temp_max',   ['nhiệt độ cao nhất', 'temp_max']],
+  ['temp_min',   ['nhiệt độ thấp nhất', 'temp_min']],
+  ['precipitation_sum', ['lượng mưa', 'mưa', 'precipitation']],
+  ['humidity_mean', ['độ ẩm', 'humidity']],
+  ['sunshine_hours', ['giờ nắng', 'nắng', 'sunshine']],
+  ['wind_speed_max', ['tốc độ gió', 'gió', 'wind']],
+  ['et0', ['bốc hơi', 'et0']],
+  ['cloud_cover', ['mây', 'cloud']],
+  ['pressure', ['áp suất', 'pressure']],
+];
+const inferYAxisLabel = (yKeys, question = '') => {
+  // If the first yKey is a known metric, use it directly
+  if (FIELD_LABELS[yKeys[0]]) return FIELD_LABELS[yKeys[0]];
+  // Otherwise, try to detect from question text
+  const q = (question || '').toLowerCase();
+  for (const [metric, keywords] of METRIC_KEYWORDS) {
+    if (keywords.some(k => q.includes(k))) return FIELD_LABELS[metric] || metric;
+  }
+  return 'Giá trị đo';
+};
+
+// Format table column header: map key to Vietnamese label with unit
+const tableColLabel = (key) => FIELD_LABELS[key] || (key === 'name' ? 'Đối tượng' : String(key).replaceAll('_', ' '));
+// Round numeric values to 2 decimal places for display
+const roundVal = (v) => typeof v === 'number' ? +v.toFixed(2) : v;
 const formatChartValue = (value) => typeof value === 'number' ? Number(value).toFixed(2) : value;
 const formatAxisTick = (value) => {
   const numericValue = typeof value === 'number' ? value : Number(value);
@@ -190,6 +220,8 @@ export default function AIAnalystPortal({
     const scatterY = yKeys[1] || yKeys[0];
     const categoryLabel = inferCategoryLabel(data, xKey, chartType);
     const displayTitle = chart?.title || activeQuery?.question || autoChartLabel;
+    // Smart Y-axis label: works for both single-metric and multi-series (province) charts
+    const yAxisLabel = inferYAxisLabel(yKeys, activeQuery?.question || '');
 
     return (
       <div className="mt-4" id="chart-export-area">
@@ -200,8 +232,8 @@ export default function AIAnalystPortal({
               <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
                 <XAxis dataKey={xKey} tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: categoryLabel, position: 'insideBottom', offset: -2 }} />
-                <YAxis tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
-                <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => categoryLabel + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <YAxis tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: yAxisLabel, angle: -90, position: 'insideLeft', offset: 8 }} />
+                <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => categoryLabel + ': ' + label} contentStyle={{ borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', boxShadow: '0 8px 24px rgba(0,0,0,0.13)', padding: '10px 14px', fontSize: 13, fontWeight: 500 }} itemStyle={{ color: '#1e293b' }} labelStyle={{ fontWeight: 700, color: '#0f172a', marginBottom: 4 }} />
                 <Legend />
                 {yKeys.map((key, i) => <Bar key={key} name={fieldLabel(key)} dataKey={key} fill={COLORS[i % COLORS.length]} radius={[4, 4, 0, 0]} />)}
               </BarChart>
@@ -210,7 +242,7 @@ export default function AIAnalystPortal({
                 <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
                 <XAxis type="number" tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), position: 'insideBottom', offset: -2 }} />
                 <YAxis type="category" dataKey={xKey} stroke="#64748b" fontSize={12} width={110} label={{ value: categoryLabel, angle: -90, position: 'insideLeft', offset: 35 }} />
-                <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => categoryLabel + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => categoryLabel + ': ' + label} contentStyle={{ borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', boxShadow: '0 8px 24px rgba(0,0,0,0.13)', padding: '10px 14px', fontSize: 13, fontWeight: 500 }} itemStyle={{ color: '#1e293b' }} labelStyle={{ fontWeight: 700, color: '#0f172a', marginBottom: 4 }} />
                 <Legend />
                 {yKeys.map((key, i) => <Bar key={key} name={fieldLabel(key)} dataKey={key} fill={COLORS[i % COLORS.length]} radius={[0, 4, 4, 0]} />)}
               </BarChart>
@@ -218,8 +250,8 @@ export default function AIAnalystPortal({
               <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
                 <XAxis dataKey={xKey} tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: categoryLabel, position: 'insideBottom', offset: -2 }} />
-                <YAxis tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
-                <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => categoryLabel + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <YAxis tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: yAxisLabel, angle: -90, position: 'insideLeft', offset: 8 }} />
+                <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => categoryLabel + ': ' + label} contentStyle={{ borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', boxShadow: '0 8px 24px rgba(0,0,0,0.13)', padding: '10px 14px', fontSize: 13, fontWeight: 500 }} itemStyle={{ color: '#1e293b' }} labelStyle={{ fontWeight: 700, color: '#0f172a', marginBottom: 4 }} />
                 <Legend />
                 {yKeys.map((key, i) => <Line key={key} name={fieldLabel(key)} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />)}
               </LineChart>
@@ -227,8 +259,8 @@ export default function AIAnalystPortal({
               <AreaChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
                 <XAxis dataKey={xKey} tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: categoryLabel, position: 'insideBottom', offset: -2 }} />
-                <YAxis tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
-                <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} />
+                <YAxis tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: yAxisLabel, angle: -90, position: 'insideLeft', offset: 8 }} />
+                <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} contentStyle={{ borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', boxShadow: '0 8px 24px rgba(0,0,0,0.13)', padding: '10px 14px', fontSize: 13, fontWeight: 500 }} itemStyle={{ color: '#1e293b' }} labelStyle={{ fontWeight: 700, color: '#0f172a', marginBottom: 4 }} />
                 <Legend />
                 {yKeys.map((key, i) => <Area key={key} stackId={chartType === 'stacked-area' ? 'total' : undefined} name={fieldLabel(key)} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} fill={COLORS[i % COLORS.length]} fillOpacity={0.25} />)}
               </AreaChart>
@@ -264,7 +296,7 @@ export default function AIAnalystPortal({
               </ScatterChart>
             ) : (
               <PieChart>
-                <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => categoryLabel + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => categoryLabel + ': ' + label} contentStyle={{ borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', boxShadow: '0 8px 24px rgba(0,0,0,0.13)', padding: '10px 14px', fontSize: 13, fontWeight: 500 }} itemStyle={{ color: '#1e293b' }} labelStyle={{ fontWeight: 700, color: '#0f172a', marginBottom: 4 }} />
                 <Legend />
                 <Pie data={data} dataKey={yKeys[0]} name={fieldLabel(yKeys[0])} nameKey={xKey} cx="50%" cy="50%" innerRadius={chartType === 'donut' ? 64 : 0} outerRadius={120} label>
                   {data.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
@@ -289,13 +321,13 @@ export default function AIAnalystPortal({
         <table className="min-w-full text-left text-sm bg-white">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
-              {columns.map(col => <th key={col} className="px-6 py-3 font-bold text-slate-600 uppercase tracking-wider">{col}</th>)}
+              {columns.map(col => <th key={col} className="px-6 py-3 font-bold text-slate-600 uppercase tracking-wider">{tableColLabel(col)}</th>)}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {data.map((row, i) => (
               <tr key={i} className="hover:bg-slate-50 transition-colors">
-                {columns.map(col => <td key={col} className="px-6 py-3 text-slate-800">{row[col]}</td>)}
+                {columns.map(col => <td key={col} className="px-6 py-3 text-slate-800">{roundVal(row[col])}</td>)}
               </tr>
             ))}
           </tbody>
@@ -528,8 +560,19 @@ export default function AIAnalystPortal({
             <div className="space-y-2">
               <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">"{activeQuery.question}"</h3>
               <div className="bg-blue-50/50 dark:bg-slate-700/50 border border-blue-100 dark:border-slate-600 p-4 rounded-xl text-sm text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
-                <p className="font-semibold text-slate-800 dark:text-slate-200">Giải thích:</p>
-                <p className="mt-1">{activeQuery.explanation || 'Đề xuất đã sẵn sàng. Hãy xem lại mã bên dưới trước khi chạy.'}</p>
+                <p className="font-semibold text-slate-800 dark:text-slate-200 mb-2">Giải thích:</p>
+                {(activeQuery.explanation || 'Đề xuất đã sẵn sàng. Hãy xem lại mã bên dưới trước khi chạy.')
+                  .split('\n')
+                  .map((line, i) => {
+                    if (!line.trim()) return null;
+                    const isStep = /^\d+\./.test(line.trim());
+                    const isHeader = line.startsWith('Yêu cầu:') || line.startsWith('Các bước') || line.startsWith('Kết quả');
+                    return (
+                      <p key={i} className={`mt-1 ${isHeader ? 'font-semibold text-slate-800 dark:text-slate-100 mt-3' : ''} ${isStep ? 'pl-4 text-slate-600 dark:text-slate-400' : ''}`}>
+                        {line}
+                      </p>
+                    );
+                  })}
               </div>
             </div>
 
@@ -681,8 +724,6 @@ export default function AIAnalystPortal({
                 <th className="px-5 py-3">Câu hỏi</th>
                 <th className="px-5 py-3">Ngôn ngữ mã nguồn</th>
                 <th className="px-5 py-3">Loại biểu đồ</th>
-                <th className="px-5 py-3">Có sửa code?</th>
-                <th className="px-5 py-3">Thời gian thực thi</th>
                 <th className="px-5 py-3">Thời gian truy vấn</th>
                 <th className="px-5 py-3">Báo cáo</th>
                 <th className="px-5 py-3 text-right">Thao tác</th>
@@ -738,12 +779,6 @@ export default function AIAnalystPortal({
                     <span className={`${langLabel.cls} text-[10px] font-bold px-2 py-1 rounded-md`}>{langLabel.label}</span>
                   </td>
                   <td className="px-5 py-4 text-slate-600 text-[11px] font-medium">{chartLabel}</td>
-                  <td className="px-5 py-4 text-center">
-                    {wasModified
-                      ? <span className="text-amber-600 font-bold text-[11px]">✏️ Có</span>
-                      : <span className="text-slate-400 text-[11px]">—</span>}
-                  </td>
-                  <td className="px-5 py-4 text-slate-500 font-mono text-[10px]">{execTime}</td>
                   <td className="px-5 py-4 text-slate-500 font-mono text-[10px] whitespace-nowrap">{timeStr}</td>
                   <td className="px-5 py-4">
                     <button
@@ -773,7 +808,7 @@ export default function AIAnalystPortal({
                 );
               })}
               {historyList.length === 0 && (
-                <tr><td colSpan="9" className="text-center py-6 text-slate-500">Chưa có lịch sử phân tích nào.</td></tr>
+                <tr><td colSpan="7" className="text-center py-6 text-slate-500">Chưa có lịch sử phân tích nào.</td></tr>
               )}
 
             </tbody>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import html2canvas from 'html2canvas';
 import { supabase } from './lib/supabase';
 import { predefinedQueries } from './mockData';
@@ -159,31 +159,36 @@ export default function App() {
   // History loaded from local SQLite API
   const [historyList, setHistoryList] = useState([]);
 
-  // Load history from SQLite on mount
-  useEffect(() => {
-    const loadHistory = async () => {
-      try {
-        const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
-        const email = user?.email || '';
-        const res = await fetch(`${apiBase}/api/logs/local?user_email=${encodeURIComponent(email)}`);
-        const json = await res.json();
-        if (json.status === 'success' && Array.isArray(json.data)) {
-          setHistoryList(json.data.map(item => ({
-            id: item.id,
-            question: item.question,
-            explanation: item.explanation,
-            code: item.original_code || item.human_edited_code,
-            chartType: item.chart_type,
-            chartData: item.chart_data,
-            status: item.status,
-            source: item.source,
-            created_at: item.created_at,
-          })));
-        }
-      } catch (e) { console.warn('Could not load AI history:', e); }
-    };
-    loadHistory();
+  // Extract loadHistory as reusable callback so it can be called after execute
+  const loadHistory = useCallback(async () => {
+    try {
+      const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+      const email = user?.email || '';
+      const res = await fetch(`${apiBase}/api/logs/local?user_email=${encodeURIComponent(email)}`);
+      const json = await res.json();
+      if (json.status === 'success' && Array.isArray(json.data)) {
+        setHistoryList(json.data.map(item => ({
+          id: item.id,
+          question: item.question,
+          explanation: item.explanation,
+          code: item.original_code || item.human_edited_code,
+          chart_type: item.chart_type,        // for history table badge
+          chartType: item.chart_type,         // for chart rendering
+          chartData: item.chart_data,
+          status: item.status,
+          source: item.source,
+          engine: item.engine || 'python',    // Python / SQL / natural
+          execution_time_ms: item.execution_time_ms || 0,
+          row_count: item.row_count || 0,
+          human_modified: item.human_modified || 0,
+          created_at: item.created_at,
+        })));
+      }
+    } catch (e) { console.warn('Could not load AI history:', e); }
   }, [user]);
+
+  // Load history on mount and when user changes
+  useEffect(() => { loadHistory(); }, [loadHistory]);
 
   // Derived state: check if activeQuery is pending approval
   const pendingReviewCount = (activeQuery && activeQuery.status === 'pending') ? 1 : 0;
@@ -283,7 +288,6 @@ export default function App() {
     }
   };
 
-  // Triggered when Execution completes
   const handleExecutionFinished = (status, resultData = null) => {
     setExecutionStatus(status);
     if (status === 'success') {
@@ -295,36 +299,10 @@ export default function App() {
           updatedQuery.chartType = resultData.chartType;
           updatedQuery.additionalCharts = resultData.additionalCharts || [];
         }
-        
-        // Save to local state
-        setHistoryList(historyPrev => {
-          const exists = historyPrev.some(item => item.id === updatedQuery.id);
-          if (exists) return historyPrev;
-          return [updatedQuery, ...historyPrev];
-        });
-
-        // Persist to SQLite via API
-        try {
-          const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
-          fetch(`${apiBase}/api/logs/save-full`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              user_email: user?.email || '',
-              question: updatedQuery.question || '',
-              explanation: updatedQuery.explanation || '',
-              original_code: updatedQuery.code || '',
-              human_edited_code: updatedQuery.code || '',
-              status: 'approved',
-              chart_type: updatedQuery.chartType || 'bar',
-              chart_data: JSON.stringify(updatedQuery.chartData || []),
-              source: updatedQuery.source || 'template',
-            })
-          }).catch(e => console.warn('Log save failed:', e));
-        } catch(e) { /* non-critical */ }
-        
         return updatedQuery;
       });
+      // Reload history from SQLite to get updated execution_time_ms, row_count, chart_type
+      setTimeout(() => loadHistory(), 500);
     }
   };
 
