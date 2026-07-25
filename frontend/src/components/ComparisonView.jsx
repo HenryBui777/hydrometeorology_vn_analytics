@@ -26,6 +26,7 @@ import {
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
+import ExportPDFButton from './ExportPDFButton';
 
 const METRICS = [
   { key: 'temp', label: 'Nhiệt độ TB (°C)' },
@@ -686,11 +687,12 @@ export default function ComparisonView() {
   if (error) return null;
 
   return (
-    <div className="space-y-6 animate-fade-in pb-12">
+    <div id="comparison-export-area" className="space-y-6 animate-fade-in pb-12">
 
 
       {/* Sub Tab Navigation */}
-      <div className="flex gap-2 border-b border-slate-200 pb-2">
+      <div className="flex gap-2 border-b border-slate-200 pb-2 justify-between items-center">
+        <div className="flex gap-2">
         <button
           onClick={() => setSubTab('provinces')}
           className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer ${subTab === 'provinces'
@@ -718,6 +720,8 @@ export default function ComparisonView() {
         >
           <CalendarDays className="h-4 w-4" /> So sánh các mùa
         </button>
+        </div>
+        <ExportPDFButton targetId="comparison-export-area" fileName="so-sanh-doi-chieu" />
       </div>
 
       {/* RENDER TAB 1: PROVINCES COMPARISON */}
