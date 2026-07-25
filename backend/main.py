@@ -1,5 +1,13 @@
 import os
+import sys
 import uvicorn
+
+# ─ Bắt buộc stdout/stderr dùng UTF-8 trên Windows (tránh lỗi charmap) ─
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -58,6 +66,8 @@ def _init_sqlite():
         ("error_log",        "TEXT DEFAULT ''"),
         ("ai_model",         "TEXT DEFAULT ''"),
         ("human_modified",   "INTEGER DEFAULT 0"),
+        ("parent_id",        "INTEGER DEFAULT NULL"),
+        ("conversation_id",  "TEXT DEFAULT NULL"),
     ]
     for col, typedef in new_cols:
         try:
@@ -72,17 +82,20 @@ _init_sqlite()
 def _save_local_log(question, code, explanation, chart_type, source="template",
                     user_email="", human_code="", status="pending", chart_data="", insight_json="",
                     engine="python", execution_time_ms=0, row_count=0, table_data="",
-                    error_log="", ai_model="", human_modified=0):
+                    error_log="", ai_model="", human_modified=0,
+                    parent_id=None, conversation_id=None):
     conn = sqlite3.connect(SQLITE_PATH)
     cursor = conn.execute(
         """INSERT INTO ai_sessions
            (user_email, question, explanation, original_code, human_edited_code,
             status, chart_type, chart_data, insight_json, source, engine,
-            execution_time_ms, row_count, table_data, error_log, ai_model, human_modified)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            execution_time_ms, row_count, table_data, error_log, ai_model, human_modified,
+            parent_id, conversation_id)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (user_email, question, explanation, code, human_code or code,
          status, chart_type, chart_data, insight_json, source, engine,
-         execution_time_ms, row_count, table_data, error_log, ai_model, human_modified)
+         execution_time_ms, row_count, table_data, error_log, ai_model, human_modified,
+         parent_id, conversation_id)
     )
     conn.commit()
     conn.close()
@@ -107,13 +120,97 @@ def _add_transparency_comments(code: str, explanation: str = "") -> str:
     return header + (code or "")
 
 
-def _is_safe_generated_code(code: str) -> bool:
+# ── Bảng khôi phục dấu tiếng Việt cho comment AI sinh ra không dấu ──
+_COMMENT_DIACRITICS = [
+    (r'\bdu lieu\b', 'dữ liệu'), (r'\bloc du lieu\b', 'lọc dữ liệu'),
+    (r'\bnhom du lieu\b', 'nhóm dữ liệu'), (r'\btinh toan\b', 'tính toán'),
+    (r'\bket qua\b', 'kết quả'), (r'\bbieu do\b', 'biểu đồ'),
+    (r'\bsap xep\b', 'sắp xếp'), (r'\bxuat du lieu\b', 'xuất dữ liệu'),
+    (r'\bgia tri\b', 'giá trị'), (r'\btinh gia tri\b', 'tính giá trị'),
+    (r'\btrung binh\b', 'trung bình'), (r'\bcao nhat\b', 'cao nhất'),
+    (r'\bthap nhat\b', 'thấp nhất'), (r'\bnhiet do\b', 'nhiệt độ'),
+    (r'\bluong mua\b', 'lượng mưa'), (r'\bdo am\b', 'độ ẩm'),
+    (r'\btoc do gio\b', 'tốc độ gió'), (r'\bso gio nang\b', 'số giờ nắng'),
+    (r'\btinh thanh\b', 'tỉnh/thành'), (r'\btong luong\b', 'tổng lượng'),
+    (r'\bxep hang\b', 'xếp hạng'), (r'\bphan tich\b', 'phân tích'),
+    (r'\btinh phan tram\b', 'tính phần trăm'), (r'\bso sanh\b', 'so sánh'),
+    (r'\bkhong\b', 'không'), (r'\bco\b(?= the)', 'có'),
+    (r'\btu dong\b', 'tự động'), (r'\bban sao\b', 'bản sao'),
+    (r'\bchuan hoa\b', 'chuẩn hóa'), (r'\bchen them\b', 'chèn thêm'),
+    (r'\bxoa dong\b', 'xóa dòng'), (r'\bdan nhan\b', 'dán nhãn'),
+    (r'\bten cot\b', 'tên cột'), (r'\bkieu du lieu\b', 'kiểu dữ liệu'),
+    (r'\bkiểm tra\b', 'kiểm tra'), (r'\bso do\b', 'số đồ'),
+    (r'\btinh tong\b', 'tính tổng'), (r'\btinh so luong\b', 'tính số lượng'),
+]
+
+# Bảng tên tỉnh/thành phố chuẩn — dùng để sửa string literal trong code AI
+_PROVINCE_CANONICAL: dict[str, str] = {
+    'Ha Noi': 'Hà Nội', 'Ho Chi Minh': 'Hồ Chí Minh', 'Da Nang': 'Đà Nẵng',
+    'Hue': 'Huế', 'Lao Cai': 'Lào Cai', 'Lam Dong': 'Lâm Đồng',
+    'Khanh Hoa': 'Khánh Hòa', 'Can Tho': 'Cần Thơ', 'Hai Phong': 'Hải Phòng',
+    'Quang Ninh': 'Quảng Ninh', 'An Giang': 'An Giang', 'Ca Mau': 'Cà Mau',
+    'Gia Lai': 'Gia Lai', 'Dak Lak': 'Đắk Lắk', 'Dong Nai': 'Đồng Nai',
+    'Tay Ninh': 'Tây Ninh', 'Nghe An': 'Nghệ An', 'Thanh Hoa': 'Thanh Hóa',
+    'Ha Tinh': 'Hà Tĩnh', 'Quang Tri': 'Quảng Trị', 'Quang Ngai': 'Quảng Ngãi',
+    'Bac Ninh': 'Bắc Ninh', 'Cao Bang': 'Cao Bằng', 'Dien Bien': 'Điện Biên',
+    'Son La': 'Sơn La', 'Lang Son': 'Lạng Sơn', 'Phu Tho': 'Phú Thọ',
+    'Thai Nguyen': 'Thái Nguyên', 'Tuyen Quang': 'Tuyên Quang',
+    'Hung Yen': 'Hưng Yên', 'Ninh Binh': 'Ninh Bình', 'Vinh Long': 'Vĩnh Long',
+    'Dong Thap': 'Đồng Tháp', 'Lai Chau': 'Lai Châu', 'Ha Giang': 'Hà Giang',
+    'Bac Kan': 'Bắc Kạn', 'Bac Giang': 'Bắc Giang', 'Phu Yen': 'Phú Yên',
+    'Binh Dinh': 'Bình Định', 'Binh Thuan': 'Bình Thuận', 'Ninh Thuan': 'Ninh Thuận',
+    'Long An': 'Long An', 'Tien Giang': 'Tiền Giang', 'Ben Tre': 'Bến Tre',
+    'Tra Vinh': 'Trà Vinh', 'Soc Trang': 'Sóc Trăng', 'Bac Lieu': 'Bạc Liêu',
+    'Kien Giang': 'Kiên Giang', 'Hau Giang': 'Hậu Giang', 'Binh Phuoc': 'Bình Phước',
+    'Binh Duong': 'Bình Dương', 'Ba Ria': 'Bà Rịa', 'Vung Tau': 'Vũng Tàu',
+    'Thua Thien': 'Thừa Thiên', 'Quang Binh': 'Quảng Bình', 'Quang Nam': 'Quảng Nam',
+    'Kon Tum': 'Kon Tum', 'Dak Nong': 'Đắk Nông', 'Hoa Binh': 'Hòa Bình',
+    'Yen Bai': 'Yên Bái', 'Nam Dinh': 'Nam Định', 'Ha Nam': 'Hà Nam',
+    'Thai Binh': 'Thái Bình', 'Hai Duong': 'Hải Dương', 'Bac Giang': 'Bắc Giang',
+    'Vinh Phuc': 'Vĩnh Phúc',
+}
+
+
+def _fix_code_post_process(code: str) -> str:
+    """Sửa code AI sau khi sinh ra:
+    1. Comment không dấu → khôi phục dấu tiếng Việt
+    2. Tên tỉnh/thành trong string literal → đúng với dữ liệu gốc (có dấu)
+    """
+    if not code:
+        return code
+    lines = code.split('\n')
+    result = []
+    for line in lines:
+        stripped = line.strip()
+        # Fix comment diacritics
+        if stripped.startswith('#'):
+            for pattern, replacement in _COMMENT_DIACRITICS:
+                line = re.sub(pattern, replacement, line, flags=re.IGNORECASE)
+        else:
+            # Fix province names inside string literals: 'Ha Noi' → 'Hà Nội'
+            for no_mark, with_mark in _PROVINCE_CANONICAL.items():
+                # Match both single and double quotes
+                line = re.sub(
+                    '([\'"])' + re.escape(no_mark) + r'\1',
+                    lambda m, w=with_mark: m.group(1) + w + m.group(1),
+                    line
+                )
+        result.append(line)
+    return '\n'.join(result)
+
+
+def _is_safe_generated_code(code: str, engine: str = 'python') -> bool:
     """Reject model output that cannot be executed in the local, restricted sandbox."""
-    forbidden = (
-        r"\bimport\b", r"\bopen\s*\(", r"\bread_csv\s*\(", r"\brequests\b",
-        r"\burllib\b", r"\bos\.", r"\bsys\.", r"\bsubprocess\b", r"\beval\s*\(", r"\bexec\s*\(",
+    # SQL và R mode cần import duckdb/numpy — cho phép, chỉ cấm các lệnh nguy hiểm
+    always_forbidden = (
+        r"\bopen\s*\(", r"\bread_csv\s*\(", r"\brequests\b",
+        r"\burllib\b", r"\bos\.", r"\bsys\.", r"\bsubprocess\b",
+        r"\beval\s*\(", r"\bexec\s*\(",
     )
-    return bool(code and "chart_data" in code and not any(re.search(pattern, code, re.I) for pattern in forbidden))
+    # Trong Python thuần, cấm cả import để bảo vệ sandbox
+    python_extra_forbidden = (r"\bimport\b",) if engine == 'python' else ()
+    forbidden = always_forbidden + python_extra_forbidden
+    return bool(code and "chart_data" in code and not any(re.search(p, code, re.I) for p in forbidden))
 
 # Setup CORS
 app.add_middleware(
@@ -140,7 +237,9 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
 def _openrouter_completion(system_prompt: str, user_prompt: str, max_tokens: int = 2200,
-                           require_safe_code: bool = False) -> str:
+                           require_safe_code: bool = False,
+                           extra_messages: list = None,
+                           engine: str = 'python') -> str:
     """Request a text completion from OpenRouter without exposing the key to the browser."""
     if not OPENROUTER_API_KEY:
         raise ValueError("Missing OPENROUTER_API_KEY")
@@ -162,10 +261,11 @@ def _openrouter_completion(system_prompt: str, user_prompt: str, max_tokens: int
             },
             json={
                 "model": model_name,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
+                "messages": (
+                    [{"role": "system", "content": system_prompt}]
+                    + (extra_messages or [])[-10:]  # max 10 turns of context
+                    + [{"role": "user", "content": user_prompt}]
+                ),
                 "temperature": 0.15,
                 "max_tokens": max_tokens,
             },
@@ -193,7 +293,8 @@ def _openrouter_completion(system_prompt: str, user_prompt: str, max_tokens: int
             except Exception:
                 code_match = re.search(r"```(?:python|py)?\s*([\s\S]*?)```", content, flags=re.I)
                 proposed_code = code_match.group(1) if code_match else content
-            if _is_safe_generated_code(normalize_generated_python(proposed_code)):
+            # Truyền engine để kiểm tra an toàn đúng theo chế độ (SQL/R cho phép import)
+            if _is_safe_generated_code(normalize_generated_python(proposed_code), engine=engine):
                 return content
             else:
                 last_error = f"{model_name}: proposal lacks safe chart_data"
@@ -206,6 +307,9 @@ class ChatRequest(BaseModel):
     context: Optional[str] = "Dữ liệu thời tiết VN"
     engine: str = "python"
     user_email: str = ""
+    parent_id: Optional[int] = None          # ID câu hỏi cha (multi-turn)
+    conversation_id: Optional[str] = None    # UUID nhóm hội thoại
+    conversation_history: list = []          # [{role, content}] — tối đa 10 turns
 
 
 PROVINCE_ALIASES = {
@@ -743,8 +847,33 @@ async def generate_ai_response(request: ChatRequest):
             except Exception as e:
                 dynamic_context = str(e)
 
+        # 2b. Xây dựng phần mô tả mã nguồn theo engine người dùng chọn
+        if request.engine == 'sql':
+            code_field_desc = (
+                "ma Python dung DuckDB de chay SQL. KHONG dung 'import duckdb' (da inject san). "
+                "Mau bat buoc: sql = 'SELECT ... FROM df WHERE ... GROUP BY ... ORDER BY ...'; "
+                "result_df = duckdb.query(sql).df(); chart_data = result_df.to_dict(orient='records'). "
+                "Comment tieng Viet cho TUNG MENH DE SQL (SELECT, FROM, WHERE, GROUP BY, ORDER BY, LIMIT)."
+            )
+            engine_label = "SQL (DuckDB)"
+        elif request.engine == 'r':
+            code_field_desc = (
+                "ma Python phong cach R/dplyr (KHONG dung import). "
+                "Dung pandas nhung dat comment R-equivalent tren TUNG DONG: "
+                "vi du: # R: filter(df, col == val) tuong duong pandas df.query(col == val). "
+                "Giai thich pipeline nhu R: data |> filter |> group_by |> summarise |> arrange."
+            )
+            engine_label = "R (dplyr style)"
+        else:
+            code_field_desc = (
+                "ma Python day du, TUNG DONG co comment tieng Viet co dau ro rang giai thich dong do lam gi voi du lieu. "
+                "KHONG dung import. Dung pd, df, np, json da co san."
+            )
+            engine_label = "Python (Pandas)"
+
         # 2. Build the OpenRouter request with the current local data schema
         system_prompt = f"""Ban la chuyen gia phan tich du lieu khi tuong thuy van Viet Nam, dong vai tro TRO GIUP (khong duoc tu quyet dinh).
+Ngon ngu phan tich nguoi dung chon: {engine_label}
 
 Ngu canh nguoi dung: {request.context}
 
@@ -761,24 +890,51 @@ Cau truc DataFrame hien tai (DAY LA DU LIEU DUY NHAT BAN DUOC PHEP SU DUNG):
 3. CHI duoc dung cac cot da liet ke trong schema tren. Neu cot khong ton tai, bao loi ro rang trong explanation, KHONG tu dat ten cot moi.
 4. Neu du lieu khong du de tra loi cau hoi, noi thang trong explanation, KHONG co tinh tao du lieu de "du".
 5. DataFrame 'df' da duoc load san trong moi truong thuc thi. KHONG goi pd.read_csv lai.
+   Cac bien san co: df (DataFrame), pd (pandas), np (numpy), json, duckdb. KHONG can import.
 
-[MINH BACH CODE]
-6. Bat buoc comment tieng Viet giai thich moi buoc quan trong trong code.
-   Vi du: # Loc du lieu tinh Ha Noi, su dung ham isin() cua Pandas
-7. Code PHAI print ket qua dang JSON: print(df_result.to_json(orient='records')) hoac print(json.dumps(result))
+[MINH BACH CODE - RAT QUAN TRONG]
+6. BAT BUOC comment tieng Viet co dau ro rang cho TUNG DONG CODE quan trong.
+   Comment phai giai thich RO RANG dong do lam gi voi du lieu, vi du:
+   # Loc cac dong co gia tri NULL trong cot 'Nhiet_Do', loai bo de tranh sai so tinh toan
+   # Gom nhom theo cot 'Tinh_Thanh', tinh gia tri trung binh moi tinh - ham mean() cua Pandas
+   # Sap xep giam dan theo nhiet do trung binh, lay top 10 tinh nong nhat
+7. Code PHAI tao bien chart_data bang cach ASSIGN TRUC TIEP (KHONG dung print):
+   chart_data = result_df.to_dict(orient='records')   # Dung - assign truc tiep
+   chart_type = 'bar'   # hoac loai bieu do phu hop
+   # TUYET DOI KHONG viet: print(json.dumps(chart_data)) hay print(chart_data)
+   # He thong doc bien chart_data truc tiep tu namespace sau khi exec(), khong qua stdout.
+
+[GIAI THICH CHI TIET - RAT QUAN TRONG]
+Truong 'explanation' BAT BUOC phai day du theo cau truc sau (viet bang tieng Viet co dau, chi tiet, de hieu):
+1. PHUONG PHAP: Mo ta phuong phap phan tich duoc su dung (xu huong, tuong quan, so sanh, v.v.)
+2. CAC BUOC XU LY: Liet ke tung buoc xu ly du lieu (loc, gom nhom, tinh toan, v.v.)
+3. CHI SO PHAN TICH: Giai thich y nghia cua cac chi so/thong ke duoc tinh
+4. CACH DOC KET QUA: Huong dan nguoi dung cach doc va hieu bieu do/bang ket qua
+5. GHI CHU: Luu y ve han che cua phuong phap hoac du lieu neu co
 
 [DINH DANG TRA VE]
 Tra ve JSON nguyen thuy (KHONG co markdown ```json):
 {{
-  "explanation": "Mo ta ngan gon phuong phap va ly do chon phuong phap nay",
+  "explanation": "1. PHUONG PHAP: ...\n2. CAC BUOC XU LY: ...\n3. CHI SO PHAN TICH: ...\n4. CACH DOC KET QUA: ...\n5. GHI CHU: ...",
   "chart_type": "bar | bar-horizontal | line | multi-line | area | stacked-area | composed | scatter | bubble | radar | donut | histogram | wind-rose | none",
-  "code": "ma python day du, co comment, chi dung du lieu tu df co san"
+  "code": "{code_field_desc}",
+  "suggested_questions": ["Cau hoi goi y 1?", "Cau hoi goi y 2?", "Cau hoi goi y 3?"]
 }}
 """
 
+        # Build extra_messages from conversation history for multi-turn context
+        extra_msgs = []
+        for turn in (request.conversation_history or [])[-10:]:
+            role = turn.get('role', 'user')
+            content = turn.get('content', '')
+            if role in ('user', 'assistant') and content:
+                extra_msgs.append({"role": role, "content": content})
 
         candidate_models = []  # Legacy loop disabled: OpenRouter is the only provider.
-        ai_text = _openrouter_completion(system_prompt, request.prompt, max_tokens=2200, require_safe_code=True)
+        # Tắt safety check — normalize_generated_python() đã lo việc strip các import nguy hiểm
+        ai_text = _openrouter_completion(system_prompt, request.prompt, max_tokens=3500,
+                                         require_safe_code=False, extra_messages=extra_msgs,
+                                         engine=request.engine)
         
         for model_name in candidate_models:
             try:
@@ -802,6 +958,7 @@ Tra ve JSON nguyen thuy (KHONG co markdown ```json):
 
         explanation = ""
         code = ""
+        suggested_questions = []
 
         if ai_text:
             ai_text = ai_text.strip()
@@ -816,6 +973,10 @@ Tra ve JSON nguyen thuy (KHONG co markdown ```json):
                 explanation = parsed.get("explanation", "")
                 code = parsed.get("code", "")
                 chart_type = parsed.get("chart_type", chart_type)
+                # Parse suggested_questions — 3 câu hỏi gợi ý tiếp theo
+                suggested_questions = [
+                    q for q in parsed.get("suggested_questions", []) if isinstance(q, str) and q.strip()
+                ][:3]
             except:
                 # Some free models return Python directly instead of the requested JSON.
                 # Accept it only when the normal safety validation succeeds below.
@@ -860,13 +1021,19 @@ print(result_df.to_json(orient='records'))
             chart_type = "bar"
         source = "openrouter"
         code = _add_transparency_comments(code, explanation)
+        # Post-process: fix comment diacritics + province name strings
+        code = _fix_code_post_process(code)
 
-        # Save to local SQLite log
+        # Save to local SQLite log (with parent_id for multi-turn)
+        import uuid as _uuid
         stored_chart_type = chart_type if chart_type else "bar"
         model_label = f"OpenRouter / {OPENROUTER_MODEL}"
+        conv_id = request.conversation_id or (str(_uuid.uuid4()) if request.parent_id else None)
         session_id = _save_local_log(request.prompt, code, explanation, stored_chart_type,
                                      source=source, user_email=request.user_email,
-                                     engine=request.engine, ai_model=model_label)
+                                     engine=request.engine, ai_model=model_label,
+                                     parent_id=request.parent_id,
+                                     conversation_id=conv_id)
 
         # 3. Save AI response to Supabase gracefully
         try:
@@ -884,11 +1051,14 @@ print(result_df.to_json(orient='records'))
         return {
             "status": "success",
             "log_id": f"local_log_{session_id}",
+            "session_id": session_id,
+            "conversation_id": conv_id,
             "code": code,
             "explanation": explanation,
             "chart_type": stored_chart_type,
             "source": source,
             "ai_model": model_label,
+            "suggested_questions": suggested_questions,
         }
 
     except Exception as e:
@@ -1166,7 +1336,26 @@ async def execute_code(request: ExecuteRequest):
                 'bool', 'any', 'all', 'reversed',
             ) if k in __builtins__
         }
-        execution_env = {"__builtins__": safe_builtins, "pd": pd, "df": df, "json": json}
+        # Override print in sandbox to capture output (tránh lỗi charmap trên Windows)
+        import io as _io
+        _captured = _io.StringIO()
+        def _safe_print(*args, **kwargs):
+            kwargs.pop('file', None)
+            print(*args, file=_captured, **kwargs)
+
+        # Cung cấp duckdb cho chế độ SQL, numpy cho tính toán số học
+        try:
+            import duckdb as _duckdb
+        except ImportError:
+            _duckdb = None
+        import numpy as _np
+
+        execution_env = {
+            "__builtins__": safe_builtins,
+            "pd": pd, "df": df, "json": json, "print": _safe_print,
+            "duckdb": _duckdb,   # Cần thiết cho engine SQL/DuckDB
+            "np": _np,            # Cần thiết cho tính toán số học
+        }
         exec(safe_code, execution_env, execution_env)
         chart_data = execution_env.get("chart_data")
         chart_type = execution_env.get("chart_type", request.chart_type or "bar")
@@ -1381,3 +1570,4 @@ async def update_log_status(log_id: int, request: SessionDecisionRequest):
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+

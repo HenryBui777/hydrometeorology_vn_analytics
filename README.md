@@ -1,259 +1,384 @@
-# 🌏 Hydrometeorology VN Analytics — Nền tảng Phân Tích & Trực Quan Hóa Dữ Liệu Khí Tượng Thủy Văn Việt Nam Tích Hợp Trợ Lý AI
+<div align="center">
 
-Nền tảng phân tích và trực quan hóa dữ liệu Khí tượng Thủy văn (KTTV) 34 tỉnh thành Việt Nam (dữ liệu cập nhật từ **Tháng 7/2025 đến Tháng 7/2026**). Hệ thống xây dựng trên kiến trúc **React + Vite + Tailwind CSS** kết hợp backend **FastAPI**, cơ sở dữ liệu **SQLite**, và mô hình **Trợ lý AI lập trình phân tích dữ liệu (OpenRouter)** theo chế độ Human-in-the-Loop.
+<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=28&pause=800&color=10B981&center=true&vCenter=true&width=700&lines=🌧️+Hydrometeorology+VN+Analytics;Nền+tảng+phân+tích+khí+tượng+thủy+văn;AI+%7C+Visualization+%7C+Open+Data" alt="Typing SVG" />
 
----
+<br/>
 
-## 📁 Cấu Trúc Thư Mục Đồ Án
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev)
+[![Supabase](https://img.shields.io/badge/Supabase-Cloud-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
+[![OpenRouter](https://img.shields.io/badge/OpenRouter-Gemma_4_31B-FF6B35?style=for-the-badge&logo=openai&logoColor=white)](https://openrouter.ai)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-```text
-hydrometeorology_vn_analytics/
-├── .env                         # Cấu hình biến môi trường (AI Key, Database, Port)
-├── .env.example                 # File mẫu cấu hình môi trường
-├── requirements.txt             # Thư viện Python phục vụ Backend & Data Pipeline
-├── package.json                 # Cấu hình dự án Frontend
-├── README.md                    # Tài liệu hướng dẫn đồ án
-├── data/                        # Thư mục dữ liệu
-│   ├── ai_logs.db               # SQLite lưu vết lịch sử câu hỏi & mã Python/SQL do AI sinh
-│   ├── processed/
-│   │   └── cleaned_data.csv     # Dữ liệu sạch đã xử lý
-│   └── raw/
-│       └── vietnam_kttv_34tinh_*.csv  # Dữ liệu thô 34 tỉnh thành
-├── src/                         # Mã nguồn Python Backend & Pipeline
-│   ├── 01_crawl.py              # Script thu thập dữ liệu KTTV từ Open-Meteo API
-│   ├── 02_preprocess.py         # Script chuẩn hóa & làm sạch dữ liệu CSV
-│   └── backend/
-│       ├── main.py              # FastAPI Web Application entrypoint
-│       ├── database.py          # Kết nối & quản lý SQLite DB
-│       └── routers/
-│           └── ai_router.py     # API Router xử lý tích hợp Gemini AI Analyst
-└── frontend/                    # Ứng dụng Web Single Page (React + Vite)
-    ├── public/
-    │   ├── data/kttv.csv        # Tập dữ liệu CSV chuẩn dùng cho Frontend
-    │   └── vietnam_merged_provinces.geojson # Bản đồ hình học 34 tỉnh thành
-    ├── src/
-    │   ├── main.jsx             # Entry point React
-    │   ├── App.jsx              # Routing các tab & State ứng dụng
-    │   ├── index.css            # Styling hệ thống & Tailwind utilities
-    │   ├── context/
-    │   │   └── DataContext.jsx  # Global Context quản lý bộ lọc & chế độ mù màu
-    │   ├── hooks/
-    │   │   └── useCsvData.js    # Custom Hook nạp & lọc dữ liệu CSV
-    │   └── components/
-    │       ├── Header.jsx           # Thanh Header chính & điều hướng tab
-    │       ├── Sidebar.jsx          # Thanh Menu điều hướng
-    │       ├── HomeDashboard.jsx    # Tab 1: Dashboard Tổng quan
-    │       ├── TimeSeriesView.jsx   # Tab 2: Chuỗi Thời Gian
-    │       ├── ComparisonView.jsx   # Tab 3: So Sánh Vùng Miền
-    │       ├── AnalysisView.jsx     # Tab 4: Phân Tích & Dự Báo
-    │       ├── AIAnalystPortal.jsx  # Tab 5: Trợ Lý Lập Trình AI
-    │       └── DatasetManagement.jsx # Tab 6: Quản Lý Tập Dữ Liệu
-    └── vite.config.js
-```
+<br/>
+
+> **Nền tảng phân tích và trực quan hóa dữ liệu khí tượng thủy văn Việt Nam tích hợp trợ lý AI.**  
+> Dữ liệu 34 tỉnh/thành từ Open-Meteo API · Dashboard tương tác · Trợ lý AI với Human-in-the-Loop
+
+</div>
 
 ---
 
-## 🏗️ Kiến Trúc Pipeline Dữ Liệu & AI Engine
+## 📋 Mục lục
 
-Sơ đồ thể hiện luồng xử lý từ thu thập dữ liệu, lưu trữ cơ sở dữ liệu, đến máy chủ FastAPI, mô hình AI Gemini và giao diện React Web:
+| | |
+|---|---|
+| [✨ Tính năng](#-tính-năng) | [🏗️ Kiến trúc](#️-kiến-trúc-hệ-thống) |
+| [📁 Cấu trúc dự án](#-cấu-trúc-dự-án) | [⚡ Cài đặt nhanh](#-cài-đặt-nhanh) |
+| [🔑 Cấu hình môi trường](#-cấu-hình-biến-môi-trường) | [🚀 Khởi động](#-khởi-động) |
+| [🤖 Trợ lý AI](#-trợ-lý-ai--human-in-the-loop) | [🛠️ Công nghệ](#️-công-nghệ-sử-dụng) |
+
+---
+
+## ✨ Tính năng
+
+<table>
+<tr>
+<td width="50%">
+
+### 📊 Dashboard Trực quan
+- Biểu đồ tương tác: **line, bar, area, scatter, radar, pie, donut, wind-rose, histogram**
+- Bộ lọc liên động: **vùng địa lý · năm · tháng · mùa**
+- Dữ liệu **34 tỉnh/thành** · 7 vùng khí hậu
+- So sánh đa tỉnh, đa mùa, đa năm
+- Chế độ **dark / light** tự động
+
+</td>
+<td width="50%">
+
+### 🤖 Trợ lý AI (Human-in-the-Loop)
+- Sinh mã phân tích bằng **ngôn ngữ tự nhiên**
+- 3 engine: **Python (Pandas) · SQL (DuckDB) · R (dplyr style)**
+- **Phê duyệt trước khi chạy** — không thực thi ngầm
+- Hội thoại **đa lượt** có ngữ cảnh (conversation chains)
+- Gợi ý **3 câu hỏi tiếp theo** sau mỗi kết quả
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 🔒 Bảo mật & Sandbox
+- Thực thi trong **namespace cô lập** với builtins bị giới hạn
+- **Không** truy cập mạng, file hệ thống, subprocess
+- Khóa API chỉ nằm ở biến môi trường backend
+- Ghi nhận flag `human_modified` nếu người dùng chỉnh sửa mã
+
+</td>
+<td width="50%">
+
+### 💾 Lịch sử & Xuất dữ liệu
+- Log đầy đủ vào **SQLite** cục bộ (`data/ai_logs.db`)
+- Tùy chọn đồng bộ lên **Supabase** Cloud
+- Xuất kết quả bảng ra **CSV** (BOM UTF-8, mở được Excel)
+- **Lưu biểu đồ dạng PNG** trực tiếp từ giao diện (độ phân giải 2×, nền trắng)
+- Xem lại mã AI gốc vs. mã người dùng đã duyệt
+
+</td>
+</tr>
+</table>
+
+---
+
+## 🏗️ Kiến trúc hệ thống
 
 ```mermaid
 flowchart TD
-    subgraph Data_Pipeline ["1. Pipeline Thu Thập & Xử Lý Dữ Liệu"]
-        A[Open-Meteo API / Raw Data] -->|01_crawl.py| B[Raw CSV Data]
-        B -->|02_preprocess.py| C[Cleaned CSV / Data Engine]
-        C --> D[(public/data/kttv.csv)]
+    A(["🌐 Open-Meteo API\narchive-api.open-meteo.com"]) --> B
+
+    subgraph ETL [" 📥 Data Layer "]
+        B["🐍 01_crawl.py\nThu thập 34 tỉnh/thành"] --> C["🔧 02_preprocess.py\nLàm sạch & chuẩn hóa"]
+        C --> D[("📄 cleaned_data.csv")]
     end
 
-    subgraph Backend_Engine ["2. FastAPI Server & Database"]
-        E[FastAPI Server :8000] -->|SQLite Connection| F[(data/ai_logs.db)]
-        E -->|System Prompt & User Query| G[Google Gemini AI Engine]
-        G -->|Sinh mã Python/SQL & AI Analysis| E
+    D --> E
+    D --> F
+
+    subgraph FRONTEND [" 🖥️ Frontend Layer — React 19 / Vite 8 "]
+        E["📊 Dashboard\nRecharts · Bộ lọc vùng/năm/mùa"]
+        F["🤖 AI Analyst Portal\nMonaco Editor · Engine Selector"]
     end
 
-    subgraph Frontend_App ["3. Frontend Single Page App (React + Vite)"]
-        H[React Web App :5173] -->|useCsvData Hook| D
-        H -->|HTTP POST Request| E
-        H -->|Global State / Filters| I[DataContext & Tab Views]
+    F -- "REST API" --> G
+    E -- "REST API" --> G
+
+    subgraph BACKEND [" ⚙️ Backend Layer — FastAPI "]
+        G["🔀 API Router"]
+        G --> H["✨ /api/ai/generate\nSinh mã + giải thích"]
+        G --> I["▶️ /api/ai/execute\nSandbox exec()"]
+        G --> J["📋 /api/ai/history\nLịch sử phiên"]
     end
+
+    H --> K(["🧠 OpenRouter\nGoogle Gemma 4 31B"])
+    I --> L[("🗄️ SQLite\ndata/ai_logs.db")]
+    J --> L
+    I -.->|ENABLE_SUPABASE_LOGS=true| M(["☁️ Supabase\nCloud Mirror"])
+
+    style ETL fill:#0f2027,stroke:#10b981,color:#e2e8f0
+    style FRONTEND fill:#0f2027,stroke:#3b82f6,color:#e2e8f0
+    style BACKEND fill:#0f2027,stroke:#8b5cf6,color:#e2e8f0
+    style A fill:#065f46,stroke:#10b981,color:#fff
+    style K fill:#7c3aed,stroke:#8b5cf6,color:#fff
+    style M fill:#1e3a5f,stroke:#3b82f6,color:#fff
+    style L fill:#1c1917,stroke:#78716c,color:#e2e8f0
+    style D fill:#1c1917,stroke:#78716c,color:#e2e8f0
+```
+
+### Luồng AI (Human-in-the-Loop)
+
+```mermaid
+sequenceDiagram
+    actor User as 👤 Người dùng
+    participant FE as 🖥️ Frontend
+    participant BE as ⚙️ FastAPI
+    participant AI as 🧠 OpenRouter/Gemma
+    participant DB as 🗄️ SQLite
+
+    User->>FE: Đặt câu hỏi (chọn engine)
+    FE->>BE: POST /api/ai/generate
+    BE->>AI: System prompt + schema + 10 lượt hội thoại
+    AI-->>BE: JSON {code, explanation, suggested_questions}
+    BE->>BE: normalize_generated_python()<br/>+ fix_code_post_process()
+    BE->>DB: INSERT ai_sessions (status=pending)
+    BE-->>FE: code + explanation + 3 câu hỏi gợi ý
+    FE-->>User: Hiển thị Monaco Editor
+
+    User->>User: Đọc / chỉnh sửa code (tùy ý)
+    User->>FE: Nhấn "Chạy phân tích"
+    FE->>BE: POST /api/ai/execute
+    BE->>BE: exec() trong sandbox cô lập
+    BE->>DB: UPDATE (status=approved, chart_data, human_modified)
+    BE-->>FE: chart_data + table_data + execution_time_ms
+    FE-->>User: Biểu đồ + Bảng kết quả
 ```
 
 ---
 
-## 🎯 Chi Tiết Chức Năng 6 Tab Trên Giao Diện
 
-### 1. 📊 Dashboard Tổng Quan (`HomeDashboard.jsx`)
-- **Bộ lọc 3 chiều toàn diện:** Lọc linh hoạt theo **Khu vực** (7 vùng địa lý), **Thời gian** (Đầy đủ 12 tháng: Tháng 7/2025 - Tháng 7/2026), và **4 Mùa** (Xuân, Hè, Thu, Đông).
-- **4 Thẻ KPI Cảnh Báo Thông Minh:** Cập nhật thời gian thực chỉ số Nhiệt độ, Lượng mưa, Chỉ số UV (với biểu tượng Kính râm 👓), và Khô hạn.
-- **Bản đồ Khí hậu Tương tác:** Bản đồ GeoJSON 34 tỉnh thành Việt Nam với zoom/pan linh hoạt, hover tooltip chi tiết chỉ số từng tỉnh, phân màu rành mạch giữa *Trạm đo trực tiếp* và *Dữ liệu sáp nhập/nội suy*.
-- **Khung Thông Tin Vùng/Cả Nước:** Tự động đồng bộ số liệu và nhảy tên vùng hoặc hiển thị chỉ số **Toàn Quốc (Cả nước)** khi chọn lọc.
-- **Bảng Xếp Hạng Khí Hậu Tùy Biến:** Cụm bộ lọc riêng cho phép chuyển đổi **Top Cao Nhất ↔ Top Thấp Nhất**, **Top 5 ↔ Top 10**, và hỗ trợ trọn bộ 4 chỉ số (Nhiệt độ, Lượng mưa, Độ ẩm, Tốc độ gió). Các thứ hạng 1, 2, 3 được bo vòng tròn **Huy chương Vàng 🥇, Bạc 🥈, Đồng 🥉** nổi bật.
+## 📁 Cấu trúc dự án
 
-### 2. 📈 Chuỗi Thời Gian (`TimeSeriesView.jsx`)
-- **Biểu đồ Đa đường (Multi-line Chart):** Trực quan hóa diễn biến chỉ số theo thời gian của nhiều tỉnh thành trên cùng một trục tọa độ.
-- **Tùy chọn chỉ số đa dạng:** Phân tích biến thiên Nhiệt độ trung bình, Nhiệt độ cao nhất/thấp nhất, Lượng mưa, Độ ẩm, và Tốc độ gió.
-- **Xác định đỉnh điểm & điểm bất thường:** Tự động phát hiện các mốc ngày có thời tiết cực đoan.
-
-### 3. ⚔️ So Sánh Vùng Miền (`ComparisonView.jsx`)
-- **Đối chiếu khí hậu 7 vùng địa lý:** So sánh trực quan chỉ số giữa các vùng (Bắc Bộ, Trung Bộ, Nam Bộ, Tây Nguyên,...).
-- **Biểu đồ Ra-đa & Biểu đồ Cột ngang:** Đánh giá điểm tương đồng và khác biệt về đặc trưng khí hậu giữa các vùng miền.
-
-### 4. 🔬 Phân Tích & Dự Báo (`AnalysisView.jsx`)
-- **Mô hình tương quan đa biến:** Phân tích mối liên hệ giữa các yếu tố KTTV (Nhiệt độ vs Lượng mưa, Bức xạ mặt trời vs Nhiệt độ).
-- **Phân bố khí hậu theo mùa:** Trực quan hóa sự chuyển giao thời tiết qua 4 mùa trong năm.
-
-### 5. 🤖 Trợ Lý Lập Trình AI (`AIAnalystPortal.jsx`)
-- **Tích hợp Gemini AI Engine:** Cho phép người dùng nhập câu hỏi bằng tiếng Việt tự nhiên.
-- **Tự động sinh mã phân tích:** AI tự động viết đoạn mã Python Pandas hoặc truy vấn SQL để xử lý tập dữ liệu.
-- **Chế độ Human-in-the-Loop:** Giao diện xem xét mã nguồn (Code Review), sửa mã và phê duyệt trước khi thực thi.
-
-### 6. 📁 Quản Lý Tập Dữ Liệu (`DatasetManagement.jsx`)
-- **Quản lý dữ liệu KTTV 34 tỉnh thành:** Hiển thị và xem trước 12.410 bản ghi dữ liệu.
-- **Nạp tập dữ liệu mới:** Cho phép nạp tập dữ liệu CSV tùy chỉnh hoặc khôi phục tập dữ liệu mặc định.
-- **Cấu trúc trường dữ liệu:** Cung cấp thông tin chi tiết các cột chỉ số khí tượng.
-
----
-
-## 💻 Cấu Hình File Biến Môi Trường (`.env`)
-
-Tạo file `.env` tại thư mục gốc của dự án với đầy đủ thông tin kết nối Supabase Cloud DB, OpenRouter API Key và Backend FastAPI:
-
-```ini
-# Cấu hình Supabase Cloud Database & OAuth Authentication
-SUPABASE_URL=https://your-supabase-project-id.supabase.co
-SUPABASE_KEY=your-supabase-service-role-or-anon-key
-VITE_SUPABASE_URL=https://your-supabase-project-id.supabase.co
-VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
-
-# Cấu hình OpenRouter AI
-OPENROUTER_API_KEY=your_openrouter_api_key
-OPENROUTER_MODEL=google/gemma-4-31b-it:free
-
-# Cấu hình Cơ sở dữ liệu SQLite Nội Bộ
-DATABASE_URL=sqlite:///./data/ai_logs.db
-DB_PATH=./data/ai_logs.db
-
-# Cấu hình Server FastAPI Backend
-HOST=0.0.0.0
-PORT=8000
-BACKEND_URL=http://localhost:8000
-
-# Cấu hình Frontend React Vite
-VITE_API_BASE_URL=http://localhost:8000
+```
+hydrometeorology_vn_analytics/
+│
+├── 📂 src/                          # Scripts thu thập & tiền xử lý dữ liệu
+│   ├── 01_crawl.py                  # Thu thập từ Open-Meteo API (34 tỉnh)
+│   └── 02_preprocess.py             # Làm sạch & chuẩn hóa → CSV
+│
+├── 📂 data/
+│   ├── raw/                         # CSV thô từ Open-Meteo
+│   ├── processed/cleaned_data.csv   # Dữ liệu đã làm sạch (nguồn gốc)
+│   └── ai_logs.db                   # SQLite: lịch sử phiên AI
+│
+├── 📂 backend/                      # FastAPI backend chính
+│   └── main.py                      # Entry point — tất cả API endpoints
+│
+├── 📂 frontend/                     # React / Vite frontend
+│   ├── src/
+│   │   ├── App.jsx                  # Router & layout chính
+│   │   ├── components/
+│   │   │   ├── AIAnalystPortal.jsx  # Trợ lý AI (giao diện chính)
+│   │   │   ├── AnalysisView.jsx     # Dashboard biểu đồ
+│   │   │   ├── SettingsView.jsx     # Cài đặt API key
+│   │   │   ├── AnimatedBackground.jsx
+│   │   │   └── ...
+│   │   └── hooks/
+│   │       └── useCsvData.js        # Hook tải & lọc CSV
+│   ├── public/data/kttv.csv         # CSV được serve tĩnh cho frontend
+│   └── package.json
+│
+├── .env                             # Biến môi trường (KHÔNG commit)
+├── .env.example                     # Template cấu hình
+├── .gitignore
+├── requirements.txt                 # Python dependencies
+├── README.md
+└── LICENSE
 ```
 
 ---
 
-## 🛠️ Danh Sách Thư Viện Python (`requirements.txt`)
+## ⚡ Cài đặt nhanh
 
-File `requirements.txt` bao gồm các thư viện cần thiết:
+### Yêu cầu hệ thống
 
-```text
-fastapi>=0.100.0
-uvicorn>=0.22.0
-pandas>=2.0.0
-numpy>=1.24.0
-scikit-learn>=1.3.0
-python-dotenv>=1.0.0
-pydantic>=2.0.0
-requests>=2.31.0
-duckdb>=0.9.0
+| Công cụ | Phiên bản tối thiểu |
+|---------|---------------------|
+| Python | 3.10+ |
+| Node.js | 18+ |
+| npm | 9+ |
+
+### 1. Clone & chuẩn bị
+
+```bash
+git clone https://github.com/HenryBui777/hydrometeorology_vn_analytics.git
+cd hydrometeorology_vn_analytics
+
+# Tạo file .env từ template
+cp .env.example .env
+# → Mở .env và điền OPENROUTER_API_KEY, SUPABASE_URL, SUPABASE_KEY
 ```
 
----
+### 2. Cài đặt backend
 
-## 🚀 Hướng Dẫn Chạy Đồ Án (Windows PowerShell)
+```bash
+# Cài thư viện Python
+pip install -r requirements.txt
 
-> Mở **2 cửa sổ PowerShell**: một cửa sổ chạy Backend và một cửa sổ chạy Frontend.
-> Không chạy lệnh `uvicorn src.backend.main:app ...` trong thư mục `src/backend`, vì phiên bản đồ án đang sử dụng entrypoint `backend/main.py`.
-
-### 0. Điều kiện cần
-
-- Python 3.10 trở lên và Node.js 18 trở lên.
-- Có sẵn dữ liệu tại `data/processed/cleaned_data.csv`.
-- Tạo file `.env` ở thư mục gốc dự án. Để chạy Dashboard cơ bản, có thể dùng cấu hình Supabase/Gemini của nhóm. Nếu muốn dùng chức năng Gemini, điền khóa của riêng bạn và **không đưa khóa lên GitHub**.
-
-Ví dụ `.env` tối thiểu:
-
-```ini
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your_supabase_key
-OPENROUTER_API_KEY=your_openrouter_api_key
-OPENROUTER_MODEL=google/gemma-4-31b-it:free
+# Hoặc dùng venv (khuyến nghị)
+python -m venv venv
+venv\Scripts\activate          # Windows
+source venv/bin/activate       # macOS / Linux
+pip install -r requirements.txt
 ```
 
-### Cách chạy nhanh mỗi lần làm bài
+### 3. Cài đặt frontend
 
-**Terminal 1 – Backend:**
-
-```powershell
-cd D:\download\hydrometeorology_vn_analytics
-python -m pip install -r requirements.txt
-cd backend
-python main.py
-```
-
-Khi terminal hiện `Uvicorn running on http://127.0.0.1:8000`, backend đã hoạt động. Có thể kiểm tra tại `http://127.0.0.1:8000/docs`.
-
-**Terminal 2 – Frontend:**
-
-```powershell
-cd D:\download\hydrometeorology_vn_analytics\frontend
+```bash
+cd frontend
 npm install
+```
+
+### 4. Chuẩn bị dữ liệu (nếu chưa có)
+
+```bash
+# Thu thập dữ liệu từ Open-Meteo (cần kết nối mạng, ~5-10 phút)
+python src/01_crawl.py
+
+# Làm sạch & xuất CSV
+python src/02_preprocess.py
+
+# Copy CSV vào thư mục public của frontend
+cp data/processed/cleaned_data.csv frontend/public/data/kttv.csv
+```
+
+> **Lưu ý:** `frontend/public/data/kttv.csv` đã có sẵn trong repo — bỏ qua bước này nếu chỉ muốn chạy demo.
+
+---
+
+## 🔑 Cấu hình biến môi trường
+
+Mở file `.env` và điền các giá trị:
+
+| Biến | Bắt buộc | Mô tả | Lấy ở đâu |
+|------|----------|-------|-----------|
+| `OPENROUTER_API_KEY` | ✅ | API key cho trợ lý AI | [openrouter.ai/keys](https://openrouter.ai/keys) |
+| `SUPABASE_URL` | ✅ | URL project Supabase | Supabase → Project Settings → API |
+| `SUPABASE_KEY` | ✅ | Service role key | Supabase → Project Settings → API |
+| `VITE_SUPABASE_URL` | ✅ | URL Supabase (frontend) | Giống `SUPABASE_URL` |
+| `VITE_SUPABASE_ANON_KEY` | ✅ | Anon/public key (frontend) | Supabase → anon key |
+| `OPENROUTER_MODEL` | ⚙️ | Mô hình AI | Mặc định: `google/gemma-4-31b-it:free` |
+| `VITE_API_BASE_URL` | ⚙️ | URL backend | Mặc định: `http://localhost:8000` |
+| `ENABLE_SUPABASE_LOGS` | ❌ | Đồng bộ logs lên cloud | Mặc định: `false` |
+
+---
+
+## 🚀 Khởi động
+
+### Backend (FastAPI)
+
+```bash
+# Từ thư mục gốc
+cd backend
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Hoặc (Windows, tránh lỗi encoding):
+
+```powershell
+$env:PYTHONUTF8='1'
+py -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+→ API docs: **http://localhost:8000/docs**
+
+### Frontend (React/Vite)
+
+```bash
+cd frontend
 npm run dev
 ```
 
-Mở địa chỉ Vite in ra trong terminal (thường là `http://localhost:5173`).
+→ Giao diện: **http://localhost:5173**
 
-Sau lần đầu, chỉ cần chạy `python main.py` ở terminal Backend và `npm run dev` ở terminal Frontend. Nhấn `Ctrl + C` để dừng từng server.
+### Chạy cả hai cùng lúc (PowerShell)
 
-### Khắc phục nhanh
-
-- **Trang trắng hoặc chưa nhận thay đổi:** nhấn `Ctrl + F5` trên trình duyệt.
-- **AI báo `Failed to fetch`:** kiểm tra Backend đang chạy ở cổng `8000` và Frontend ở `5173`.
-- **Cổng 5173 đang bận:** dừng terminal Vite cũ bằng `Ctrl + C`, rồi chạy lại `npm run dev`.
-- **AI trả về kết quả cũ:** tạo một câu hỏi mới sau khi khởi động lại Backend.
+```powershell
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend; `$env:PYTHONUTF8='1'; py -m uvicorn main:app --reload"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev"
+```
 
 ---
 
-## Hướng Dẫn Khởi Chạy Source Code (tham khảo chi tiết)
+## 🤖 Trợ lý AI — Human-in-the-Loop
 
-### Bước 1: Khởi chạy Backend FastAPI (Port 8000)
+Hệ thống AI tuân thủ nguyên tắc **không thực thi ngầm**:
 
-1. Mở cửa sổ Terminal tại thư mục gốc của dự án (`d:\hydrometeorology_vn_analytics`).
-2. Cài đặt các thư viện Python:
-   ```powershell
-   pip install -r requirements.txt
-   ```
-3. Khởi chạy máy chủ FastAPI Backend:
-   ```powershell
-   cd backend
-   python main.py
-   ```
-   *(Backend sẽ chạy tại: `http://localhost:8000` - Tài liệu Swagger API tại: `http://localhost:8000/docs`)*
+```
+1. Người dùng đặt câu hỏi bằng tiếng Việt tự nhiên
+        ↓
+2. AI (OpenRouter / Gemma 4 31B) sinh mã + giải thích 5 mục:
+   • Phương pháp phân tích
+   • Các bước xử lý
+   • Chỉ số & metric
+   • Cách đọc kết quả
+   • Ghi chú hạn chế dữ liệu
+        ↓
+3. Mã hiển thị trong Monaco Editor → Người dùng đọc, chỉnh sửa (tùy ý)
+        ↓
+4. Nhấn "Chạy phân tích" → Backend exec() trong sandbox cô lập
+        ↓
+5. Kết quả: biểu đồ + bảng dữ liệu + 3 câu hỏi gợi ý tiếp theo
+        ↓
+6. Toàn bộ ghi vào SQLite (original_code vs human_edited_code)
+```
 
----
+### Chọn engine phân tích
 
-### Bước 2: Khởi chạy Frontend React Vite (Port 5173)
-
-1. Mở một cửa sổ Terminal mới và di chuyển vào thư mục `frontend`:
-   ```powershell
-   cd frontend
-   ```
-2. Cài đặt Node modules (chỉ cần chạy lần đầu):
-   ```powershell
-   npm install
-   ```
-3. Khởi chạy Development Server:
-   ```powershell
-   npm run dev
-   ```
-4. Truy cập ứng dụng trên trình duyệt web tại địa chỉ: `http://localhost:5173`
+| Engine | Mô tả |
+|--------|-------|
+| 🐍 **Python** | Pandas thuần, không cần import (`pd`, `df`, `np` đã inject sẵn) |
+| 🗃️ **SQL** | DuckDB query trực tiếp trên DataFrame trong RAM |
+| 📊 **R** | Python với comment R-equivalent (cho người dùng nền R) |
 
 ---
 
-## ♿ Chế Độ Mù Màu (Colorblind Accessibility)
+## 🛠️ Công nghệ sử dụng
 
-Hệ thống hỗ trợ **Colorblind Mode** sử dụng bảng màu **Okabe-Ito Palette** chuẩn quốc tế:
-- Tự động chuyển đổi màu bản đồ, chú thích chấm tròn, các thẻ KPI và tiêu đề bảng xếp hạng sang tông màu tương phản cao (`#E69F00` và `#0072B2`).
-- Đảm bảo người dùng có thị giác màu bất thường (dị thị sắc giác) luôn quan sát và phân tích dữ liệu dễ dàng.
+<table>
+<tr><th>Lớp</th><th>Công nghệ</th><th>Phiên bản</th><th>Mục đích</th></tr>
+<tr>
+  <td rowspan="4"><b>Frontend</b></td>
+  <td>React</td><td>19</td><td>UI framework</td>
+</tr>
+<tr><td>Vite</td><td>8</td><td>Build tool & dev server</td></tr>
+<tr><td>Recharts</td><td>^3.9</td><td>Biểu đồ tương tác</td></tr>
+<tr><td>Monaco Editor</td><td>^4.7</td><td>Code editor với syntax highlight</td></tr>
+<tr>
+  <td rowspan="4"><b>Backend</b></td>
+  <td>FastAPI</td><td>0.115+</td><td>REST API framework</td>
+</tr>
+<tr><td>Pandas</td><td>2.x</td><td>Xử lý dữ liệu CSV</td></tr>
+<tr><td>DuckDB</td><td>1.x</td><td>SQL trực tiếp trên DataFrame</td></tr>
+<tr><td>SQLite</td><td>built-in</td><td>Lưu lịch sử AI cục bộ</td></tr>
+<tr>
+  <td rowspan="3"><b>AI & Cloud</b></td>
+  <td>OpenRouter</td><td>-</td><td>AI gateway (Gemma 4 31B)</td>
+</tr>
+<tr><td>Supabase</td><td>-</td><td>Auth + cloud log mirror</td></tr>
+<tr><td>Open-Meteo API</td><td>-</td><td>Nguồn dữ liệu khí tượng miễn phí</td></tr>
+</table>
+
+---
+
+## 📊 Dữ liệu
+
+- **Nguồn:** [Open-Meteo Historical API](https://archive-api.open-meteo.com)
+- **Phạm vi:** 34 tỉnh/thành · 7 vùng địa lý · 2025–2026
+- **Các chỉ số:** nhiệt độ (min/max/mean) · lượng mưa · độ ẩm · giờ nắng · tốc độ gió · bốc hơi (ET₀) · mây che phủ
+
+---
+
+## 📄 License
+
+[MIT License](LICENSE) © 2026 

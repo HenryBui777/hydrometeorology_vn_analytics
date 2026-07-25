@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import html2canvas from 'html2canvas';
 import Editor from '@monaco-editor/react';
 import {
   Terminal, Sparkles, Send, Play, X, CheckCircle, AlertTriangle,
   Cpu, Workflow, Clock, FileText, ChevronRight, BarChart2,
-  Table, Download, Eye
+  Table, Download, Eye, MessageSquare
 } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import {
@@ -27,9 +28,45 @@ const FIELD_LABELS = {
   cloud_cover: 'Độ che phủ mây (%)', et0: 'Lượng bốc hơi tham chiếu (mm)', pressure: 'Áp suất khí quyển (hPa)',
   shortwave_radiation_sum: 'Tổng bức xạ mặt trời', dew_point: 'Điểm sương (°C)', amplitude: 'Biên độ nhiệt (°C)',
   temp_range: 'Biên độ nhiệt (°C)', rain_std: 'Độ lệch chuẩn lượng mưa (mm)', score: 'Điểm tiềm năng',
-  variability_score: 'Điểm thất thường tổng hợp', ratio: 'Tỷ lệ bốc hơi/giờ nắng'
+  variability_score: 'Điểm thất thường tổng hợp', ratio: 'Tỷ lệ bốc hơi/giờ nắng',
+  // --- Các key không dấu mà AI model hay sinh ra ---
+  nhiet_do_trung_binh: 'Nhiệt độ trung bình (°C)', nhiet_do: 'Nhiệt độ (°C)',
+  nhiet_do_cao_nhat: 'Nhiệt độ cao nhất (°C)', nhiet_do_thap_nhat: 'Nhiệt độ thấp nhất (°C)',
+  luong_mua: 'Lượng mưa (mm)', luong_mua_trung_binh: 'Lượng mưa trung bình (mm)',
+  tong_luong_mua: 'Tổng lượng mưa (mm)', luong_mua_tb: 'Lượng mưa TB (mm)',
+  do_am: 'Độ ẩm (%)', do_am_trung_binh: 'Độ ẩm trung bình (%)',
+  toc_do_gio: 'Tốc độ gió (km/h)', so_gio_nang: 'Số giờ nắng (giờ)',
+  nhom_luong_mua: 'Nhóm lượng mưa', nhom: 'Nhóm',
+  tinh: 'Tỉnh/thành phố', thanh_pho: 'Thành phố', vung: 'Vùng',
+  chenh_lech: 'Chênh lệch', he_so_tuong_quan: 'Hệ số tương quan',
+  trung_binh: 'Trung bình', tong: 'Tổng', so_luong: 'Số lượng',
+  mua_mua: 'Mùa mưa', mua_kho: 'Mùa khô',
+  gia_tri: 'Giá trị', chi_so: 'Chỉ số',
 };
-const fieldLabel = (key) => FIELD_LABELS[key] || String(key || '').replaceAll('_', ' ');
+
+// Khôi phục dấu tiếng Việt cho nhãn trả về từ AI không dấu
+const WORD_DIACRITICS = {
+  'nhiet': 'nhiệt', 'luong': 'lượng', 'mua': 'mưa', 'nhom': 'nhóm',
+  'tinh': 'tỉnh', 'thanh': 'thành', 'pho': 'phố', 'vung': 'vùng',
+  'mien': 'miền', 'chenh': 'chênh', 'lech': 'lệch', 'biet': 'biệt',
+  'trung': 'trung', 'binh': 'bình', 'cao': 'cao', 'thap': 'thấp',
+  'nhat': 'nhất', 'tong': 'tổng', 'so': 'số', 'gio': 'giờ',
+  'nang': 'nắng', 'am': 'ẩm', 'ap': 'áp', 'suat': 'suất',
+  'toc': 'tốc', 'huong': 'hướng', 'mua kho': 'mùa khô', 'mua mua': 'mùa mưa',
+  'gia tri': 'giá trị', 'chi so': 'chỉ số', 'he so': 'hệ số',
+  'tuong quan': 'tương quan', 'phan tich': 'phân tích',
+};
+const restoreDiacritics = (text) => {
+  if (!text) return text;
+  let result = String(text).replace(/_/g, ' ');
+  // Thay thế từng cụm từ đã biết
+  Object.entries(WORD_DIACRITICS).forEach(([noMark, withMark]) => {
+    result = result.replace(new RegExp(`\\b${noMark}\\b`, 'gi'), withMark);
+  });
+  // Capitalize từ đầu
+  return result.charAt(0).toUpperCase() + result.slice(1);
+};
+const fieldLabel = (key) => FIELD_LABELS[key] || FIELD_LABELS[String(key || '').toLowerCase()] || restoreDiacritics(key);
 const formatChartValue = (value) => typeof value === 'number' ? Number(value).toFixed(2) : value;
 const formatAxisTick = (value) => {
   const numericValue = typeof value === 'number' ? value : Number(value);
@@ -84,6 +121,31 @@ export default function AIAnalystPortal({
   const [engine, setEngine] = useState('python');
   const [generateError, setGenerateError] = useState('');
   const [isColorBlind, setIsColorBlind] = useState(false);
+  // Ref trỏ đến vùng biểu đồ để xuất PNG
+  const chartRef = useRef(null);
+
+  // Hàm chụp biểu đồ thành file PNG và tải về máy người dùng
+  const handleExportPng = useCallback(async () => {
+    // Lấy element theo id cố định (chart-export-area là wrapper của Recharts)
+    const target = document.getElementById('chart-export-area');
+    if (!target) return;
+    try {
+      const canvas = await html2canvas(target, {
+        backgroundColor: '#ffffff', // nền trắng để ảnh rõ
+        scale: 2,                   // x2 độ phân giải (Retina-ready)
+        useCORS: true,
+        logging: false,
+      });
+      // Tạo link tải xuống tự động
+      const link = document.createElement('a');
+      const timestamp = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', 'h');
+      link.download = `bieudo_kttv_${timestamp}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (err) {
+      console.error('PNG export failed:', err);
+    }
+  }, []);
 
   // Methodology suggestion state
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -95,6 +157,28 @@ export default function AIAnalystPortal({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [exportingId, setExportingId] = useState(null);
   const [exportData, setExportData] = useState(null);
+
+  // ─ Đối đáp liên tục (multi-turn conversation) ─
+  const [conversationHistory, setConversationHistory] = useState([]);
+  const [followUpInput, setFollowUpInput] = useState('');
+  const [isFollowingUp, setIsFollowingUp] = useState(false);
+  const [parentSessionId, setParentSessionId] = useState(null);
+  const [conversationId, setConversationId] = useState(null);
+  // Dùng ID-based thay vì boolean — tự động reset khi có phiên mới
+  const [endedConversationId, setEndedConversationId] = useState(null);
+  // conversationEnded chỉ true khi endedConversationId khớp với conversationId hiện tại
+  const conversationEnded = endedConversationId !== null && endedConversationId === conversationId;
+  // ─ Phân trang lịch sử (5 dòng/trang) ─
+  const [historyPage, setHistoryPage] = useState(0);
+  const HISTORY_PAGE_SIZE = 5;
+
+  // Câu hỏi gợi ý từ AI sau khi thực thi xong
+  const [suggestedQuestions, setSuggestedQuestions] = useState([]);
+  // Toggle bộ câu hỏi mẫu phân loại theo độ khó
+  const [showSampleQuestions, setShowSampleQuestions] = useState(false);
+  const [sampleDifficulty, setSampleDifficulty] = useState('easy');
+  // Dark mode toggle
+  const [darkMode, setDarkMode] = useState(() => document.documentElement.classList.contains('dark'));
 
   const COLORS = isColorBlind ? COLORS_COLORBLIND : COLORS_DEFAULT;
   const autoChartType = useMemo(() => {
@@ -143,16 +227,36 @@ export default function AIAnalystPortal({
     if (!promptInput.trim()) return;
     setGenerateError('');
     setIsGenerating(true);
+    // Bắt đầu hội thoại mới, reset trạng thái cũ
+    setConversationHistory([]);
+    setParentSessionId(null);
+    setConversationId(null);
+    setEndedConversationId(null); // Reset banner "hoàn thành" khi có câu hỏi mới
 
     try {
       const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
       const response = await fetch(`${apiBase}/api/ai/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: promptInput, context: 'Dữ liệu thời tiết Việt Nam', engine, user_email: user?.email || '', chat_history: chatHistory.slice(-8) })
+        body: JSON.stringify({
+          prompt: promptInput, context: 'Dữ liệu thời tiết Việt Nam',
+          engine, user_email: user?.email || '', conversation_history: []
+        })
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.detail || `Backend trả về lỗi HTTP ${response.status}.`);
+
+      // Lưu session_id và conversation_id cho các turn tiếp theo
+      const sid = data.session_id || null;
+      const cid = data.conversation_id || null;
+      setParentSessionId(sid);
+      setConversationId(cid);
+      setConversationHistory([
+        { role: 'user', content: promptInput, sessionId: sid },
+        { role: 'assistant', content: data.explanation || '', code: data.code || '', sessionId: sid },
+      ]);
+      // Lưu câu hỏi gợi ý từ AI để hiển thị sau khi thực thi
+      setSuggestedQuestions(data.suggested_questions || []);
 
       submitQuery(
         `Đã tạo xong mã nguồn phân tích bằng Python. Vui lòng kiểm tra và phê duyệt.`,
@@ -177,6 +281,116 @@ export default function AIAnalystPortal({
     }
   };
 
+  // Gửi yêu cầu tiếp theo trong hội thoại (multi-turn follow-up)
+  const handleFollowUp = async () => {
+    if (!followUpInput.trim() || isFollowingUp) return;
+    setIsFollowingUp(true);
+    const prevCode = activeQuery?.code || '';
+    try {
+      const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+
+      // Xây dựng prompt có ngữ cảnh: gửi code hiện tại + yêu cầu chỉnh sửa
+      // AI cần biết đủ code đầy đủ đang chạy để chỉnh sửa đúng
+      const originalQuestion = conversationHistory[0]?.content || activeQuery?.question || '';
+      const contextualizedPrompt = [
+        `Câu hỏi gốc được phân tích: "${originalQuestion}"`,
+        ``,
+        `Code Python hiện tại đang dùng (đã được phê duyệt và chạy thành công):`,
+        '```python',
+        prevCode,
+        '```',
+        ``,
+        `Yêu cầu chỉnh sửa cụ thể: ${followUpInput}`,
+        ``,
+        `Hãy chỉnh sửa code trên theo yêu cầu, giữ nguyên biến df và cấu trúc, chỉ thay đổi những phần cần thiết.`,
+      ].join('\n');
+
+      // Gửi lịch sử hội thoại (các turns trước) cho AI giữ ngữ cảnh
+      const historyForAI = conversationHistory.map(t => ({
+        role: t.role,
+        content: t.role === 'assistant'
+          ? `Giải thích: ${t.content}\nCode:\n${t.code || ''}`
+          : t.content
+      }));
+
+      const response = await fetch(`${apiBase}/api/ai/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: contextualizedPrompt,
+          context: `Chỉnh sửa phân tích khí tượng - câu hỏi gốc: ${originalQuestion}`,
+          engine: activeQuery?.engine || engine,
+          user_email: user?.email || '',
+          parent_id: parentSessionId,
+          conversation_id: conversationId,
+          conversation_history: historyForAI
+        })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `Lỗi HTTP ${response.status}`);
+
+      const newSid = data.session_id || null;
+      setParentSessionId(newSid);
+      // Thêm turn mới vào lịch sử hội thoại
+      setConversationHistory(prev => [
+        ...prev,
+        { role: 'user', content: followUpInput },
+        { role: 'assistant', content: data.explanation || '', code: data.code || '', sessionId: newSid, prevCode },
+      ]);
+      // Cập nhật suggested questions mới
+      setSuggestedQuestions(data.suggested_questions || []);
+
+      // submitQuery dùng câu hỏi gốc để hiển thị nhất quán trong UI
+      submitQuery('Cập nhật mã phân tích theo yêu cầu chỉnh sửa.', 'ai', {
+        id: data.log_id,
+        question: `[Chỉnh sửa] ${followUpInput}`,
+        code: data.code,
+        explanation: data.explanation,
+        chartType: data.chart_type || activeQuery?.chartType || 'bar',
+        engine: activeQuery?.engine || engine,
+        source: data.source || 'template',
+        aiModel: data.ai_model || '',
+      });
+      setFollowUpInput('');
+    } catch (error) {
+      console.error(error);
+      setGenerateError(error.message || 'Không thể gửi yêu cầu tiếp theo.');
+    } finally {
+      setIsFollowingUp(false);
+    }
+  };
+
+  // Hiển thị diff giữa code cũ và code mới (giống cơ chế antigravity)
+  const renderCodeDiff = (prevCode, newCode) => {
+    if (!prevCode || !newCode || prevCode === newCode) return null;
+    const prev = prevCode.split('\n'), next = newCode.split('\n');
+    const diff = [];
+    let pi = 0, ni = 0;
+    while (pi < prev.length || ni < next.length) {
+      if (pi >= prev.length) { diff.push({ t: '+', l: next[ni++] }); }
+      else if (ni >= next.length) { diff.push({ t: '-', l: prev[pi++] }); }
+      else if (prev[pi] === next[ni]) { diff.push({ t: ' ', l: prev[pi] }); pi++; ni++; }
+      else { diff.push({ t: '-', l: prev[pi++] }); diff.push({ t: '+', l: next[ni++] }); }
+    }
+    const changed = diff.map((d, i) => d.t !== ' ' ? i : -1).filter(i => i >= 0);
+    if (!changed.length) return null;
+    const show = new Set();
+    changed.forEach(i => { for (let j = Math.max(0, i - 2); j <= Math.min(diff.length - 1, i + 2); j++) show.add(j); });
+    return (
+      <div className="mt-2 rounded-lg overflow-hidden border border-slate-200 text-[10px] font-mono max-h-48 overflow-y-auto">
+        <div className="bg-slate-800 text-slate-300 px-3 py-1 text-[10px] font-bold sticky top-0">
+          📝 Thay đổi so với phiên trước
+        </div>
+        {diff.map((d, i) => !show.has(i) ? null : (
+          <div key={i} className={`px-3 py-0.5 ${d.t === '+' ? 'bg-emerald-50 text-emerald-800' : d.t === '-' ? 'bg-rose-50 text-rose-700 line-through opacity-70' : 'bg-white text-slate-500'}`}>
+            <span className="mr-2 font-bold select-none">{d.t === '+' ? '+' : d.t === '-' ? '-' : ' '}</span>{d.l}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+
   const renderInteractiveChart = (chart = null) => {
     const data = chart?.data || activeQuery?.chartData;
     const chartType = chart?.type || autoChartType;
@@ -194,7 +408,7 @@ export default function AIAnalystPortal({
     const displayTitle = chart?.title || activeQuery?.question || autoChartLabel;
 
     return (
-      <div className="mt-4" id="chart-export-area">
+      <div className="mt-4" id="chart-export-area" ref={chartRef}>
         <h4 className="mb-3 text-center text-sm font-extrabold uppercase tracking-wide text-slate-700">{displayTitle}</h4>
         <div className="h-96 w-full">
           <ResponsiveContainer width="100%" height="100%">
@@ -203,7 +417,7 @@ export default function AIAnalystPortal({
                 <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
                 <XAxis dataKey={xKey} tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: categoryLabel, position: 'insideBottom', offset: -2 }} />
                 <YAxis tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
-                <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => categoryLabel + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => categoryLabel + ': ' + label} contentStyle={{ backgroundColor: '#ffffff', color: '#0f172a', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.25)', fontSize: '13px', fontWeight: '600' }} labelStyle={{ color: '#334155', fontWeight: '700', marginBottom: '4px' }} itemStyle={{ color: '#0f172a' }} />
                 <Legend />
                 {yKeys.map((key, i) => <Bar key={key} name={fieldLabel(key)} dataKey={key} fill={COLORS[i % COLORS.length]} radius={[4, 4, 0, 0]} />)}
               </BarChart>
@@ -212,7 +426,7 @@ export default function AIAnalystPortal({
                 <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
                 <XAxis type="number" tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), position: 'insideBottom', offset: -2 }} />
                 <YAxis type="category" dataKey={xKey} stroke="#64748b" fontSize={12} width={110} label={{ value: categoryLabel, angle: -90, position: 'insideLeft', offset: 35 }} />
-                <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => categoryLabel + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => categoryLabel + ': ' + label} contentStyle={{ backgroundColor: '#ffffff', color: '#0f172a', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.25)', fontSize: '13px', fontWeight: '600' }} labelStyle={{ color: '#334155', fontWeight: '700', marginBottom: '4px' }} itemStyle={{ color: '#0f172a' }} />
                 <Legend />
                 {yKeys.map((key, i) => <Bar key={key} name={fieldLabel(key)} dataKey={key} fill={COLORS[i % COLORS.length]} radius={[0, 4, 4, 0]} />)}
               </BarChart>
@@ -221,7 +435,7 @@ export default function AIAnalystPortal({
                 <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
                 <XAxis dataKey={xKey} tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: categoryLabel, position: 'insideBottom', offset: -2 }} />
                 <YAxis tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
-                <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => categoryLabel + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => categoryLabel + ': ' + label} contentStyle={{ backgroundColor: '#ffffff', color: '#0f172a', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.25)', fontSize: '13px', fontWeight: '600' }} labelStyle={{ color: '#334155', fontWeight: '700', marginBottom: '4px' }} itemStyle={{ color: '#0f172a' }} />
                 <Legend />
                 {yKeys.map((key, i) => <Line key={key} name={fieldLabel(key)} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />)}
               </LineChart>
@@ -230,7 +444,7 @@ export default function AIAnalystPortal({
                 <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
                 <XAxis dataKey={xKey} tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: categoryLabel, position: 'insideBottom', offset: -2 }} />
                 <YAxis tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
-                <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} />
+                <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} contentStyle={{ backgroundColor: '#ffffff', color: '#0f172a', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.25)', fontSize: '13px', fontWeight: '600' }} labelStyle={{ color: '#334155', fontWeight: '700', marginBottom: '4px' }} itemStyle={{ color: '#0f172a' }} />
                 <Legend />
                 {yKeys.map((key, i) => <Area key={key} stackId={chartType === 'stacked-area' ? 'total' : undefined} name={fieldLabel(key)} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} fill={COLORS[i % COLORS.length]} fillOpacity={0.25} />)}
               </AreaChart>
@@ -240,7 +454,7 @@ export default function AIAnalystPortal({
                 <XAxis dataKey={xKey} tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: categoryLabel, position: 'insideBottom', offset: -2 }} />
                 <YAxis yAxisId="left" tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[0]), angle: -90, position: 'insideLeft', offset: 8 }} />
                 <YAxis yAxisId="right" orientation="right" tickFormatter={formatAxisTick} stroke="#64748b" fontSize={12} label={{ value: fieldLabel(yKeys[1]), angle: 90, position: 'insideRight', offset: 8 }} />
-                <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} />
+                <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => fieldLabel(xKey) + ': ' + label} contentStyle={{ backgroundColor: '#ffffff', color: '#0f172a', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.25)', fontSize: '13px', fontWeight: '600' }} labelStyle={{ color: '#334155', fontWeight: '700', marginBottom: '4px' }} itemStyle={{ color: '#0f172a' }} />
                 <Legend />
                 <Bar yAxisId="left" name={fieldLabel(yKeys[0])} dataKey={yKeys[0]} fill={COLORS[0]} radius={[4, 4, 0, 0]} />
                 <Line yAxisId="right" name={fieldLabel(yKeys[1])} type="monotone" dataKey={yKeys[1]} stroke={COLORS[2]} strokeWidth={3} />
@@ -252,7 +466,7 @@ export default function AIAnalystPortal({
                 <PolarRadiusAxis tickFormatter={formatAxisTick} fontSize={10} />
                 {yKeys.map((key, index) => <Radar key={key} name={fieldLabel(key)} dataKey={key} stroke={COLORS[index % COLORS.length]} fill={COLORS[index % COLORS.length]} fillOpacity={0.22} />)}
                 <Legend />
-                <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} />
+                <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} contentStyle={{ backgroundColor: '#ffffff', color: '#0f172a', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.25)', fontSize: '13px', fontWeight: '600' }} labelStyle={{ color: '#334155', fontWeight: '700' }} itemStyle={{ color: '#0f172a' }} />
               </RadarChart>
             ) : chartType === 'scatter' || chartType === 'bubble' ? (
               <ScatterChart margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -266,7 +480,7 @@ export default function AIAnalystPortal({
               </ScatterChart>
             ) : (
               <PieChart>
-                <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => categoryLabel + ': ' + label} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <Tooltip formatter={(value, name) => [formatChartValue(value), fieldLabel(name)]} labelFormatter={(label) => categoryLabel + ': ' + label} contentStyle={{ backgroundColor: '#ffffff', color: '#0f172a', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.25)', fontSize: '13px', fontWeight: '600' }} labelStyle={{ color: '#334155', fontWeight: '700', marginBottom: '4px' }} itemStyle={{ color: '#0f172a' }} />
                 <Legend />
                 <Pie data={data} dataKey={yKeys[0]} name={fieldLabel(yKeys[0])} nameKey={xKey} cx="50%" cy="50%" innerRadius={chartType === 'donut' ? 64 : 0} outerRadius={120} label>
                   {data.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
@@ -291,19 +505,46 @@ export default function AIAnalystPortal({
         <table className="min-w-full text-left text-sm bg-white">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
-              {columns.map(col => <th key={col} className="px-6 py-3 font-bold text-slate-600 uppercase tracking-wider">{col}</th>)}
+              {columns.map(col => <th key={col} className="px-6 py-3 font-bold text-slate-600 uppercase tracking-wider">{fieldLabel(col)}</th>)}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {data.map((row, i) => (
               <tr key={i} className="hover:bg-slate-50 transition-colors">
-                {columns.map(col => <td key={col} className="px-6 py-3 text-slate-800">{row[col]}</td>)}
+                {columns.map(col => <td key={col} className="px-6 py-3 text-slate-800">{typeof row[col] === 'number' ? Number(row[col]).toLocaleString('vi-VN', {maximumFractionDigits: 2}) : String(row[col] ?? '—')}</td>)}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
     );
+  };
+
+  // Hàm xuất dữ liệu bảng ra file CSV
+  const handleExportCsv = (overrideData = null) => {
+    const data = overrideData || activeQuery?.chartData;
+    if (!data || !Array.isArray(data) || data.length === 0) return;
+    const columns = Object.keys(data[0]);
+    // Dòng tiêu đề với tên cột có đơn vị
+    const header = columns.map(c => `"${fieldLabel(c)}"`).join(',');
+    // Dữ liệu từng dòng, escape dấu phẩy và ngoặc kép
+    const rows = data.map(row =>
+      columns.map(c => {
+        const v = row[c];
+        if (v === null || v === undefined) return '';
+        const s = typeof v === 'number' ? Number(v).toFixed(2) : String(v);
+        return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
+      }).join(',')
+    );
+    // Tạo Blob UTF-8 với BOM để Excel mở đúng tiếng Việt
+    const csvContent = '\uFEFF' + [header, ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `phan_tich_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleExportPDF = async (item) => {
@@ -413,6 +654,47 @@ export default function AIAnalystPortal({
     }
   }, [executionStatus, activeQuery]);
 
+  // Áp dụng / gỡ dark mode
+  useEffect(() => {
+    if (darkMode) document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+  }, [darkMode]);
+
+  // Các thẻ phương pháp phân tích nhanh (hiển thị cố định, không cần gọi API)
+  const METHODOLOGY_CARDS = [
+    { id: 'trend',       icon: '📈', label: 'Xu hướng',    color: 'bg-blue-50 border-blue-200 hover:border-blue-500 text-blue-800',   prompt: 'Phân tích xu hướng biến đổi nhiệt độ và lượng mưa theo từng tháng trong năm trên toàn quốc.' },
+    { id: 'compare',     icon: '⚖️',  label: 'So sánh vùng', color: 'bg-violet-50 border-violet-200 hover:border-violet-500 text-violet-800', prompt: 'So sánh nhiệt độ trung bình, lượng mưa và độ ẩm giữa Miền Bắc, Miền Trung và Miền Nam.' },
+    { id: 'correlation', icon: '🔗',  label: 'Tương quan',   color: 'bg-emerald-50 border-emerald-200 hover:border-emerald-500 text-emerald-800', prompt: 'Tìm mối tương quan giữa nhiệt độ và độ ẩm toàn quốc. Vẽ scatter plot để kiểm chứng.' },
+    { id: 'seasonal',    icon: '🌦️', label: 'Mùa vụ',     color: 'bg-amber-50 border-amber-200 hover:border-amber-500 text-amber-800',   prompt: 'Phân tích đặc điểm khí hậu theo 4 mùa Xuân Hạ Thu Đông trên toàn quốc.' },
+    { id: 'anomaly',     icon: '⚠️', label: 'Bất thường',  color: 'bg-rose-50 border-rose-200 hover:border-rose-500 text-rose-800',     prompt: 'Tìm các tỉnh thành có chỉ số khí tượng bất thường nhất (outlier). Vẽ scatter plot để làm nổi bật.' },
+    { id: 'ranking',     icon: '🏆',  label: 'Xếp hạng',    color: 'bg-orange-50 border-orange-200 hover:border-orange-500 text-orange-800',  prompt: 'Xếp hạng top 10 tỉnh có lượng mưa cao nhất và top 10 tỉnh nóng nhất trong năm.' },
+  ];
+
+  // 15 câu hỏi mẫu từ tài liệu hướng dẫn đồ án, phân loại theo độ khó
+  const SAMPLE_QUESTIONS = {
+    easy: [
+      'Hãy vẽ biểu đồ cột thể hiện Top 5 tỉnh thành có nhiệt độ trung bình cao nhất.',
+      'Vẽ biểu đồ đường xem diễn biến nhiệt độ của Thủ đô Hà Nội qua 12 tháng.',
+      'Cho tôi xem tổng lượng mưa trung bình chia theo 4 mùa trong năm.',
+      'So sánh số giờ nắng trung bình giữa 3 vùng: Miền Bắc, Miền Trung và Miền Nam.',
+      'Liệt kê 10 tỉnh có lượng mưa thấp nhất, vẽ biểu đồ để tôi xem nơi nào khô hạn nhất.',
+    ],
+    medium: [
+      'Vẽ biểu đồ kép (đường và cột) thể hiện đồng thời nhiệt độ và lượng mưa của TP.HCM theo từng tháng.',
+      'So sánh mức độ chênh lệch giữa nhiệt độ cao nhất và thấp nhất của các tỉnh vùng Tây Nguyên.',
+      'Nhiệt độ và độ ẩm ở khu vực miền Bắc có tỷ lệ nghịch với nhau không? Hãy vẽ biểu đồ phân tán để kiểm chứng.',
+      '3 tỉnh ven biển (Đà Nẵng, Nha Trang, Vũng Tàu) có đặc điểm gió và lượng bốc hơi thế nào? Dùng Radar Chart.',
+      'Mùa hè ở đâu khắc nghiệt hơn? So sánh nhiệt độ và số giờ nắng của Hà Nội và TP.HCM trong mùa Hè.',
+    ],
+    hard: [
+      'Cuối năm nay (tháng 12) đi du lịch Sapa (Lào Cai) hay Đà Lạt (Lâm Đồng) thì dễ chịu hơn?',
+      'Tui tính mở trang trại điện gió và điện mặt trời ở Nam Trung Bộ. Tìm 3 tỉnh tiềm năng lớn nhất và vẽ biểu đồ chứng minh.',
+      'Nắng nhiều thì nước có bốc hơi nhanh hơn không? Quy luật này đúng nhất ở vùng nào và sai ở vùng nào?',
+      'Nơi nào ở Việt Nam có thời tiết ẩm ương và thất thường nhất? Tìm nơi có biên độ nhiệt lớn và mưa biến động mạnh.',
+      'Nhìn tổng thể cả nước vào Mùa Thu, lượng mây che phủ ảnh hưởng mạnh nhất tới nhiệt độ hay tới số giờ nắng?',
+    ],
+  };
+
   return (
     <div className="w-full min-h-full font-sans pb-10" id="report-export-area">
 
@@ -441,6 +723,7 @@ export default function AIAnalystPortal({
           <h1 className="text-4xl font-serif font-bold text-slate-800 tracking-tight dark:text-white">Phân tích tích hợp AI</h1>
           <p className="text-slate-500 mt-2 font-medium dark:text-slate-400">Trợ lý chuyên gia dữ liệu, tự động phân tích và trực quan hóa thông tin.</p>
         </div>
+
       </div>
 
       {/* 1. Input Section */}
@@ -449,11 +732,21 @@ export default function AIAnalystPortal({
           <span className="text-xs font-bold text-slate-600 uppercase tracking-widest flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-emerald-600" /> Khung nhập liệu yêu cầu
           </span>
-          <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200">
-            <button onClick={() => setEngine('python')} className={`px-3 py-1 text-[11px] font-bold rounded-md ${engine === 'python' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>Python</button>
-            <button onClick={() => setEngine('sql')} className={`px-3 py-1 text-[11px] font-bold rounded-md ${engine === 'sql' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>SQL</button>
+          {/* Dropdown chọn ngôn ngữ phân tích */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Ngôn ngữ</span>
+            <select
+              value={engine}
+              onChange={e => setEngine(e.target.value)}
+              className="text-[11px] font-bold px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-pointer shadow-sm"
+            >
+              <option value="python">🐍 Python (Pandas + Plotly)</option>
+              <option value="sql">🗄️ SQL (DuckDB)</option>
+              <option value="r">📊 R (dplyr style)</option>
+            </select>
           </div>
         </div>
+
 
         <div className="space-y-4">
           <textarea
@@ -464,8 +757,8 @@ export default function AIAnalystPortal({
           />
           {generateError && <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{generateError}</div>}
 
-          {/* Suggestion toggle button */}
-          <div className="flex items-center gap-2">
+          {/* Toggle buttons row */}
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={async () => {
                 if (!showSuggestions && suggestions.length === 0) {
@@ -483,11 +776,19 @@ export default function AIAnalystPortal({
               className="text-[11px] px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-full font-bold hover:bg-amber-100 transition-colors cursor-pointer flex items-center gap-1"
             >
               {loadingSuggestions ? <Cpu className="h-3 w-3 animate-spin" /> : '💡'}
-              {showSuggestions ? 'Ẩn gợi ý' : 'Chưa biết phân tích? Xem gợi ý'}
+              {showSuggestions ? 'Ẩn gợi ý AI' : 'Gợi ý phân tích từ AI'}
+            </button>
+
+            {/* Nút mở câu hỏi mẫu theo độ khó */}
+            <button
+              onClick={() => setShowSampleQuestions(v => !v)}
+              className={`text-[11px] px-3 py-1.5 rounded-full font-bold transition-colors cursor-pointer flex items-center gap-1 border ${showSampleQuestions ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'}`}
+            >
+              📚 {showSampleQuestions ? 'Ẩn câu hỏi mẫu' : '15 câu hỏi mẫu (🟢🟡🔴)'}
             </button>
           </div>
 
-          {/* Suggestion cards panel */}
+          {/* Existing AI suggestion cards panel */}
           {showSuggestions && suggestions.length > 0 && (
             <div className="bg-white border border-amber-100 rounded-xl p-4 shadow-sm">
               <p className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-3">Chọn một gợi ý để bắt đầu phân tích:</p>
@@ -519,14 +820,48 @@ export default function AIAnalystPortal({
             </div>
           )}
 
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex flex-wrap gap-2">
-              {["Diễn biến nhiệt độ Hà Nội", "Top 5 tỉnh nóng nhất tháng 5", "Tương quan nhiệt và ẩm miền Nam", "Biến động lượng mưa miền Trung", "So sánh giờ nắng Đà Nẵng & Huế"].map((tag) => (
-                <button key={tag} onClick={() => setPromptInput(tag)} className="text-[11px] px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full text-slate-600 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-emerald-900 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors cursor-pointer">
-                  {tag}
-                </button>
-              ))}
+          {/* Sample questions panel phân loại theo độ khó */}
+          {showSampleQuestions && (
+            <div className="bg-white border-2 border-indigo-100 rounded-2xl shadow-sm overflow-hidden animate-fade-in">
+              <div className="bg-indigo-600 px-5 py-3 flex items-center justify-between">
+                <p className="text-sm font-extrabold text-white flex items-center gap-2">📚 Bộ câu hỏi mẫu phân tích khí tượng</p>
+                <div className="flex items-center gap-1 bg-white/10 rounded-lg p-0.5">
+                  {[
+                    { key: 'easy',   label: '🟢 Dễ',        active: 'bg-emerald-500' },
+                    { key: 'medium', label: '🟡 Trung bình', active: 'bg-amber-500' },
+                    { key: 'hard',   label: '🔴 Nâng cao',   active: 'bg-rose-500' },
+                  ].map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setSampleDifficulty(tab.key)}
+                      className={`px-3 py-1 text-[10px] font-extrabold rounded-md transition-all cursor-pointer ${sampleDifficulty === tab.key ? `${tab.active} text-white shadow-sm` : 'text-white/70 hover:text-white'}`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {SAMPLE_QUESTIONS[sampleDifficulty].map((q, i) => (
+                  <button
+                    key={i}
+                    onClick={() => { setPromptInput(q); setShowSampleQuestions(false); }}
+                    className="w-full text-left px-5 py-3 text-sm text-slate-800 hover:bg-indigo-50 hover:text-indigo-900 transition-colors cursor-pointer group flex items-start gap-3 font-medium"
+                  >
+                    <span className={`shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-black mt-0.5 ${
+                      sampleDifficulty === 'easy' ? 'bg-emerald-100 text-emerald-700' :
+                      sampleDifficulty === 'medium' ? 'bg-amber-100 text-amber-700' :
+                      'bg-rose-100 text-rose-700'
+                    }`}>{i + 1}</span>
+                    <span className="group-hover:text-indigo-700 transition-colors">{q}</span>
+                  </button>
+                ))}
+              </div>
             </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-between gap-4">
+
 
             <button
               onClick={handleGenerate}
@@ -641,8 +976,20 @@ export default function AIAnalystPortal({
                   </button>
                 </div>
 
-                <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm overflow-hidden">
+                <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm overflow-hidden" id="ai-chart-wrapper">
                   {renderInteractiveChart()}
+                  {/* Nút lưu PNG nằm dưới biểu đồ */}
+                  {activeQuery?.chartData?.length > 0 && (
+                    <div className="mt-3 flex justify-end">
+                      <button
+                        onClick={handleExportPng}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-extrabold rounded-lg transition-colors cursor-pointer shadow-sm"
+                        title="Lưu biểu đồ dạng ảnh PNG"
+                      >
+                        <Download className="h-3 w-3" /> Lưu PNG
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {(activeQuery.additionalCharts || []).map((chart, index) => (
@@ -652,7 +999,18 @@ export default function AIAnalystPortal({
                 ))}
 
                 <details className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
-                  <summary className="cursor-pointer text-xs font-bold text-slate-600"><Table className="mr-1 inline h-3.5 w-3.5" />Xem bảng dữ liệu dùng để vẽ biểu đồ</summary>
+                  <summary className="cursor-pointer text-xs font-bold text-slate-600 flex items-center justify-between">
+                    <span><Table className="mr-1 inline h-3.5 w-3.5" />Xem bảng dữ liệu dùng để vẽ biểu đồ</span>
+                    {activeQuery?.chartData?.length > 0 && (
+                      <button
+                        onClick={e => { e.preventDefault(); handleExportCsv(); }}
+                        className="ml-4 flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold rounded-lg transition-colors cursor-pointer shadow-sm"
+                        title="Tải xuống file CSV"
+                      >
+                        <Download className="h-3 w-3" /> Xuất CSV
+                      </button>
+                    )}
+                  </summary>
                   {renderRawTable()}
                 </details>
 
@@ -694,6 +1052,126 @@ export default function AIAnalystPortal({
         </div>
       )}
 
+      {/* ─ Suggested Questions: câu hỏi gợi ý tiếp theo từ AI ─ */}
+      {executionStatus === 'success' && suggestedQuestions.length > 0 && (
+        <div className="mt-5 animate-fade-in">
+          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl p-4 shadow-sm">
+            <p className="text-xs font-extrabold text-indigo-700 uppercase tracking-widest mb-3 flex items-center gap-2">
+              <Sparkles className="h-3.5 w-3.5" /> Câu hỏi gợi ý tiếp theo từ AI
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {suggestedQuestions.map((q, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    setPromptInput(q);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="flex items-start gap-2 text-left px-4 py-2.5 bg-white border-2 border-indigo-100 hover:border-indigo-400 hover:bg-indigo-50 rounded-xl text-sm text-slate-800 font-medium transition-all cursor-pointer shadow-sm group max-w-sm"
+                >
+                  <span className="shrink-0 bg-indigo-100 text-indigo-700 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black mt-0.5 group-hover:bg-indigo-600 group-hover:text-white transition-colors">{i + 1}</span>
+                  <span className="group-hover:text-indigo-700 transition-colors leading-snug">{q}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─ 5. Multi-turn: Hội thoại bổ sung ─ */}
+      {executionStatus === 'success' && conversationHistory.length > 1 && !conversationEnded && (
+        <div className="mt-5 animate-fade-in">
+          {/* Banner context: đang bổ sung từ câu hỏi gốc nào */}
+          <div className="mb-3 flex items-start gap-3 bg-slate-800 text-white rounded-2xl px-5 py-4 shadow-md">
+            <MessageSquare className="h-5 w-5 mt-0.5 text-indigo-300 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-indigo-300 mb-1">Câu hỏi gốc đang được bổ sung / chỉnh sửa</p>
+              <p className="text-sm font-semibold text-white leading-snug break-words">
+                &ldquo;{conversationHistory[0]?.content || activeQuery?.question}&rdquo;
+              </p>
+              <p className="text-[10px] text-slate-400 mt-1">
+                {conversationHistory.filter(t => t.role === 'user').length > 1
+                  ? `Đã có ${conversationHistory.filter(t => t.role === 'user').length - 1} lần chỉnh sửa`
+                  : 'Chưa có chỉnh sửa nào — nhập yêu cầu bên dưới để bắt đầu'}
+              </p>
+            </div>
+          </div>
+
+          {/* Thread: các lần chỉnh sửa trước */}
+          {conversationHistory.filter((t, i) => i >= 2 && i % 2 === 0).map((turn, i) => {
+            const aiTurn = conversationHistory[conversationHistory.indexOf(turn) + 1];
+            const turnNum = i + 1;
+            return (
+              <div key={i} className="mb-3 border border-slate-300 bg-white rounded-xl overflow-hidden shadow-sm">
+                {/* Header của mỗi turn */}
+                <div className="bg-indigo-600 px-4 py-2 flex items-center gap-2">
+                  <span className="bg-white text-indigo-700 text-[10px] font-black px-2 py-0.5 rounded-full">#{turnNum}</span>
+                  <span className="text-xs font-bold text-white">Yêu cầu chỉnh sửa: <span className="text-indigo-100">{turn.content}</span></span>
+                </div>
+                {/* Diff code nếu có */}
+                {aiTurn?.prevCode && (
+                  <div className="p-3">
+                    {renderCodeDiff(aiTurn.prevCode, aiTurn.code)}
+                  </div>
+                )}
+                {!aiTurn?.prevCode && (
+                  <p className="px-4 py-2 text-xs text-slate-500 italic">Đang xử lý...</p>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Ô nhập follow-up */}
+          <div className="bg-white border-2 border-indigo-200 rounded-2xl p-5 shadow-md">
+            <p className="text-sm font-extrabold text-slate-800 mb-1 flex items-center gap-2">
+              <Send className="h-4 w-4 text-indigo-600" />
+              Yêu cầu chỉnh sửa tiếp theo
+            </p>
+            <p className="text-xs text-slate-500 mb-3">
+              Nhập yêu cầu mới — AI sẽ dựa trên kết quả hiện tại để điều chỉnh.
+            </p>
+            <div className="flex gap-3 items-end">
+              <textarea
+                value={followUpInput}
+                onChange={e => setFollowUpInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleFollowUp(); } }}
+                placeholder="VD: Chỉ lấy top 5 tỉnh, đổi sang biểu đồ đường, thêm đường trung bình, lọc theo miền Bắc..."
+                rows={3}
+                className="flex-1 px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-indigo-400 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 resize-none bg-white font-medium"
+              />
+              <div className="flex flex-col gap-2 min-w-fit">
+                <button
+                  onClick={handleFollowUp}
+                  disabled={isFollowingUp || !followUpInput.trim()}
+                  className="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-extrabold rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2 cursor-pointer whitespace-nowrap shadow-md shadow-indigo-200"
+                >
+                  {isFollowingUp ? <Cpu className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  {isFollowingUp ? 'Đang xử lý...' : 'Gửi yêu cầu'}
+                </button>
+                <button
+                  onClick={() => { setEndedConversationId(conversationId); setFollowUpInput(''); }}
+                  className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-extrabold rounded-xl border border-emerald-700 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap shadow-md shadow-emerald-200"
+                >
+                  <CheckCircle className="h-4 w-4" /> Hài lòng rồi
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {executionStatus === 'success' && conversationEnded && (
+        <div className="mt-5 bg-emerald-600 rounded-2xl p-4 text-sm text-white font-bold flex items-center gap-3 animate-fade-in shadow-md shadow-emerald-200">
+          <CheckCircle className="h-5 w-5 shrink-0" />
+          <div>
+            <p className="font-extrabold">Phiên phân tích hoàn thành ✓</p>
+            <p className="text-emerald-100 text-xs font-medium mt-0.5">
+              Câu hỏi: &ldquo;{conversationHistory[0]?.content || activeQuery?.question}&rdquo;
+            </p>
+          </div>
+          <button onClick={() => setEndedConversationId(null)} className="ml-auto bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors">Mở lại</button>
+        </div>
+      )}
+
       {/* 4. History Log Section */}
       <div className="mt-12 space-y-4">
         <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-widest flex items-center gap-2">
@@ -715,7 +1193,9 @@ export default function AIAnalystPortal({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {historyList.map((item, idx) => {
+              {(() => {
+                const pagedHistory = historyList.slice(historyPage * HISTORY_PAGE_SIZE, (historyPage + 1) * HISTORY_PAGE_SIZE);
+                return pagedHistory.map((item, idx) => {
                 const statusMap = {
                   approved: { label: 'Đã duyệt', cls: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
                   pending: { label: 'Chờ duyệt', cls: 'bg-amber-50 text-amber-700 border-amber-100' },
@@ -799,13 +1279,38 @@ export default function AIAnalystPortal({
                   </td>
                 </tr>
                 );
-              })}
+                });
+              })()}
               {historyList.length === 0 && (
                 <tr><td colSpan="9" className="text-center py-6 text-slate-500">Chưa có lịch sử phân tích nào.</td></tr>
               )}
 
             </tbody>
           </table>
+          {/* Phân trang lịch sử */}
+          {historyList.length > HISTORY_PAGE_SIZE && (
+            <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/50">
+              <span className="text-xs text-slate-500 font-medium">
+                Trang {historyPage + 1} / {Math.ceil(historyList.length / HISTORY_PAGE_SIZE)} &bull; {historyList.length} bản ghi
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setHistoryPage(p => Math.max(0, p - 1))}
+                  disabled={historyPage === 0}
+                  className="px-3 py-1.5 text-xs font-bold bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-40 cursor-pointer transition-colors"
+                >
+                  ← Trước
+                </button>
+                <button
+                  onClick={() => setHistoryPage(p => Math.min(Math.ceil(historyList.length / HISTORY_PAGE_SIZE) - 1, p + 1))}
+                  disabled={historyPage >= Math.ceil(historyList.length / HISTORY_PAGE_SIZE) - 1}
+                  className="px-3 py-1.5 text-xs font-bold bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-40 cursor-pointer transition-colors"
+                >
+                  Tiếp →
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
